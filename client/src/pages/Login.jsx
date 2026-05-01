@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Fingerprint, ShieldCheck, UserCog } from 'lucide-react';
-import supabase from '../supabaseClient';
 import API from '../api/axios';
 import './Auth.css';
 
@@ -23,23 +22,19 @@ const Login = () => {
     setError('');
 
     try {
-      // Authenticate with Supabase
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
+      const { data } = await API.post('/auth/login', {
         email,
         password,
       });
 
-      if (authError) throw authError;
-
-      if (data?.session) {
-        localStorage.setItem('token', data.session.access_token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+      if (data?.token) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user || null));
         
-        // Navigate to the protected dashboard route
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.message || 'An unexpected error occurred during login');
+      setError(err.response?.data?.message || err.response?.data?.error || err.message || 'An unexpected error occurred during login');
     } finally {
       setLoading(false);
     }
