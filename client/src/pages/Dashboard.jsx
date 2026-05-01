@@ -11541,10 +11541,11 @@ const selectedCustomer = useMemo(
                         <div className="profile-switcher-wrap">
                             <label className="profile-switcher">
                                 <span>Profile</span>
-                                <select value={normalizeRoleName(user?.role_name || 'SUPER_ADMIN')} disabled>
-                                    {ROLE_HIERARCHY.map((roleName) => (
-                                        <option key={`profile-role-${roleName}`} value={roleName}>
-                                            {getRoleDisplayName(roleName)}
+                                <select value={currentProfileDealerId} onChange={handleSuperAdminProfileSwitch} disabled={switchingProfile}>
+                                    <option value="">Super Admin Profile</option>
+                                    {(dashboardData.dealers || []).map((dealer) => (
+                                        <option key={`profile-switch-${dealer.id}`} value={dealer.id}>
+                                            {dealer.dealer_name}
                                         </option>
                                     ))}
                                 </select>
