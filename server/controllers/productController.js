@@ -1,0 +1,247 @@
+const pool = require('../config/db');
+
+exports.listProducts = async (_req, res) => {
+    try {
+        const result = await pool.query(
+            `
+            SELECT
+                id,
+                brand,
+                model,
+                serial_number,
+                registration_number,
+                vehicle_type,
+                chassis_number,
+                engine_number,
+                color,
+                description,
+                image_url,
+                monthly_rate,
+                purchase_price,
+                cash_markup_percent,
+                cash_markup_value,
+                installment_markup_percent,
+                installment_months,
+                is_active,
+                created_at,
+                updated_at
+            FROM product_catalog
+            WHERE is_active = TRUE
+            ORDER BY created_at DESC, brand ASC, model ASC
+            `
+        );
+
+        res.status(200).json(result.rows);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to load products', error: error.message });
+    }
+};
+
+exports.listVehicleTypes = async (_req, res) => {
+    try {
+        const result = await pool.query(
+            `
+            SELECT id, type_key, display_name, is_active, sort_order
+            FROM vehicle_types
+            WHERE is_active = TRUE
+            ORDER BY sort_order ASC, display_name ASC
+            `
+        );
+
+        res.status(200).json(result.rows);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to load vehicle types', error: error.message });
+    }
+};
+
+exports.createVehicleType = async (req, res) => {
+    try {
+        const rawName = String(req.body.display_name || req.body.type_key || '').trim();
+        if (!rawName) {
+            return res.status(400).json({ message: 'Vehicle type name is required' });
+        }
+
+        const typeKey = rawName.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
+        const result = await pool.query(
+            `
+            INSERT INTO vehicle_types (type_key, display_name, sort_order)
+            VALUES (
+                $1,
+                $2,
+                COALESCE((SELECT MAX(sort_order) + 1 FROM vehicle_types), 1)
+            )
+            ON CONFLICT (type_key)
+            DO UPDATE SET display_name = EXCLUDED.display_name
+            RETURNING id, type_key, display_name, is_active, sort_order
+            `,
+            [typeKey, rawName]
+        );
+
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to create vehicle type', error: error.message });
+    }
+};
+
+exports.createProduct = async (req, res) => {
+    try {
+        const {
+            brand,
+            model,
+            vehicle_type,
+            color,
+            description,
+            image_url,
+            monthly_rate,
+            purchase_price,
+            cash_markup_percent,
+            cash_markup_value,
+            installment_markup_percent,
+            installment_months,
+        } = req.body;
+
+        if (!image_url) {
+            return res.status(400).json({ message: 'Product image is required' });
+        }
+
+        const vehicleTypeCheck = await pool.query(
+            'SELECT type_key FROM vehicle_types WHERE type_key = $1 AND is_active = TRUE',
+            [String(vehicle_type || '').toUpperCase()]
+        );
+
+        if (vehicleTypeCheck.rows.length === 0) {
+            return res.status(400).json({ message: 'Select a valid vehicle type from the master table.' });
+        }
+        const result = await pool.query(
+            `
+            INSERT INTO product_catalog (
+                brand,
+                model,
+                vehicle_type,
+                color,
+                description,
+                image_url,
+                monthly_rate,
+                purchase_price,
+                cash_markup_percent,
+                cash_markup_value,
+                installment_markup_percent,
+                installment_months
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+            RETURNING *
+            `,
+            [
+                brand,
+                model,
+                String(vehicle_type || '').toUpperCase(),
+                color || null,
+                description || null,
+                image_url,
+                monthly_rate || 0,
+                purchase_price || 0,
+                cash_markup_percent || 0,
+                cash_markup_value || 0,
+                installment_markup_percent || 0,
+                installment_months || 12,
+            ]
+        );
+
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to create product', error: error.message });
+    }
+};
+
+exports.updateProduct = async (req, res) => {
+    try {
+        const {
+            brand,
+            model,
+            vehicle_type,
+            color,
+            description,
+            image_url,
+            monthly_rate,
+            purchase_price,
+            cash_markup_percent,
+            cash_markup_value,
+            installment_markup_percent,
+            installment_months,
+        } = req.body;
+
+        if (!String(brand || '').trim() || !String(model || '').trim() || !String(vehicle_type || '').trim()) {
+            return res.status(400).json({ message: 'Brand, model, and vehicle type are required.' });
+        }
+
+        if (!image_url) {
+            return res.status(400).json({ message: 'Product image is required' });
+        }
+
+        const vehicleTypeCheck = await pool.query(
+            'SELECT type_key FROM vehicle_types WHERE type_key = $1 AND is_active = TRUE',
+            [String(vehicle_type || '').toUpperCase()]
+        );
+
+        if (vehicleTypeCheck.rows.length === 0) {
+            return res.status(400).json({ message: 'Select a valid vehicle type from the master table.' });
+        }
+
+        const result = await pool.query(
+            `
+            UPDATE product_catalog
+            SET
+                brand = $1,
+                model = $2,
+                vehicle_type = $3,
+                color = $4,
+                description = $5,
+                image_url = $6,
+                monthly_rate = $7,
+                purchase_price = $8,
+                cash_markup_percent = $9,
+                cash_markup_value = $10,
+                installment_markup_percent = $11,
+                installment_months = $12,
+                updated_at = NOW()
+            WHERE id = $13
+            RETURNING *
+            `,
+            [
+                String(brand || '').trim(),
+                String(model || '').trim(),
+                String(vehicle_type || '').toUpperCase().trim(),
+                color || null,
+                description || null,
+                image_url,
+                monthly_rate || 0,
+                purchase_price || 0,
+                cash_markup_percent || 0,
+                cash_markup_value || 0,
+                installment_markup_percent || 0,
+                installment_months || 12,
+                req.params.id,
+            ]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Product not found.' });
+        }
+
+        res.status(200).json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to update product', error: error.message });
+    }
+};
+
+exports.uploadProductImage = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'Product image is required' });
+    }
+
+    res.status(201).json({
+        fileName: req.file.filename,
+        originalName: req.file.originalname,
+        url: `/uploads/products/${req.file.filename}`,
+    });
+};
