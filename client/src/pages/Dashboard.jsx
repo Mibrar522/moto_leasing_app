@@ -1553,7 +1553,7 @@ const Dashboard = () => {
     const loadDashboard = async () => {
         try {
             setLoading(true);
-            const { data } = await API.get('/admin/dashboard');
+            const { data } = await API.get('/api/v1/admin/dashboard');
             setDashboardData(data);
             localStorage.setItem('user', JSON.stringify(data.user));
             setReadNotificationKeys(data.notificationReadKeys || []);
@@ -1762,7 +1762,7 @@ const Dashboard = () => {
                 await API.put(`/admin/ads/${adForm.id}`, payload);
                 setAdMessage('Campaign updated.');
             } else {
-                await API.post('/admin/ads', payload);
+                await API.post('/api/v1/admin/ads', payload);
                 setAdMessage('Campaign created.');
             }
 
@@ -1790,7 +1790,7 @@ const Dashboard = () => {
         setSavingAd(true);
 
         try {
-            const { data } = await API.post('/admin/ads/upload-image', formData, {
+            const { data } = await API.post('/api/v1/admin/ads/upload-image', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             setAdForm((current) => ({ ...current, image_url: data.url || '' }));
@@ -4762,7 +4762,7 @@ const selectedCustomer = useMemo(
 
         try {
             setSwitchingProfile(true);
-            const { data } = await API.post('/auth/switch-profile', {
+            const { data } = await API.post('/api/v1/auth/switch-profile', {
                 dealer_id: nextDealerId,
             });
 
@@ -4784,7 +4784,7 @@ const selectedCustomer = useMemo(
     const handleRevertSuperAdminProfile = async () => {
         try {
             setSwitchingProfile(true);
-            const { data } = await API.post('/auth/switch-profile', {
+            const { data } = await API.post('/api/v1/auth/switch-profile', {
                 dealer_id: null,
             });
 
@@ -4952,7 +4952,7 @@ const selectedCustomer = useMemo(
         }
 
         try {
-            const { data } = await API.post('/admin/notifications/read', {
+            const { data } = await API.post('/api/v1/admin/notifications/read', {
                 notification_keys: keysToMark,
             });
             setReadNotificationKeys(data.notificationReadKeys || []);
@@ -5274,7 +5274,7 @@ const selectedCustomer = useMemo(
                 response = await API.put(`/customers/${customerForm.id}`, payload);
                 setCustomerMessage('Customer updated successfully.');
             } else {
-                response = await API.post('/customers', payload);
+                response = await API.post('/api/v1/customers', payload);
                 setCustomerMessage('Customer created successfully.');
             }
 
@@ -5429,7 +5429,7 @@ const selectedCustomer = useMemo(
                 response = await API.put(`/employees/${employeeForm.id}`, payload);
                 setEmployeeMessage('Employee updated successfully.');
             } else {
-                response = await API.post('/employees', payload);
+                response = await API.post('/api/v1/employees', payload);
                 setEmployeeMessage('Employee created successfully.');
             }
 
@@ -5562,7 +5562,7 @@ const selectedCustomer = useMemo(
                 });
                 setProductMessage('Product vehicle updated successfully.');
             } else {
-                await API.post('/products', {
+                await API.post('/api/v1/products', {
                     ...productForm,
                     monthly_rate: Number(productForm.monthly_rate || 0),
                     purchase_price: Number(productForm.purchase_price || 0),
@@ -5616,7 +5616,7 @@ const selectedCustomer = useMemo(
 
         try {
             setSavingProduct(true);
-            const { data } = await API.post('/products/upload-image', formData, {
+            const { data } = await API.post('/api/v1/products/upload-image', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             setProductForm((current) => ({ ...current, image_url: data.url }));
@@ -5637,7 +5637,7 @@ const selectedCustomer = useMemo(
 
         try {
             setUploadingAgreement(true);
-            const { data } = await API.post('/sales/upload-agreement', formData, {
+            const { data } = await API.post('/api/v1/sales/upload-agreement', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             setSaleForm((current) => ({ ...current, agreement_pdf_url: data.url }));
@@ -5658,7 +5658,7 @@ const selectedCustomer = useMemo(
 
         try {
             setUploadingState(true);
-            const { data } = await API.post('/sales/upload-document', formData, {
+            const { data } = await API.post('/api/v1/sales/upload-document', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             setSaleForm((current) => ({ ...current, [targetField]: data.url }));
@@ -5679,7 +5679,7 @@ const selectedCustomer = useMemo(
 
         try {
             setUploadingBankSlip(true);
-            const { data } = await API.post('/stock/upload-slip', formData, {
+            const { data } = await API.post('/api/v1/stock/upload-slip', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             setStockOrderForm((current) => ({ ...current, bank_slip_url: data.url }));
@@ -5700,7 +5700,7 @@ const selectedCustomer = useMemo(
 
         try {
             setSavingDealer(true);
-            const { data } = await API.post('/dealers/upload-logo', formData, {
+            const { data } = await API.post('/api/v1/dealers/upload-logo', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             setDealerForm((current) => ({ ...current, dealer_logo_url: data.url }));
@@ -5720,7 +5720,7 @@ const selectedCustomer = useMemo(
 
         try {
             setSavingDealer(true);
-            const { data } = await API.post('/dealers/upload-signature', formData, {
+            const { data } = await API.post('/api/v1/dealers/upload-signature', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             setDealerForm((current) => ({ ...current, dealer_signature_url: data.url }));
@@ -5740,7 +5740,7 @@ const selectedCustomer = useMemo(
 
         try {
             setSavingSale(true);
-            const { data } = await API.post('/dealers/upload-signature', formData, {
+            const { data } = await API.post('/api/v1/dealers/upload-signature', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             setSaleForm((current) => ({ ...current, dealer_signature_url: data.url }));
@@ -5757,7 +5757,7 @@ const selectedCustomer = useMemo(
         formData.append('customerAsset', file);
         formData.append('assetType', assetType);
 
-        const { data } = await API.post('/customers/upload-asset', formData, {
+        const { data } = await API.post('/api/v1/customers/upload-asset', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
         });
 
@@ -5960,7 +5960,7 @@ const selectedCustomer = useMemo(
             setUploadingEmployeeDocument(true);
             const formData = new FormData();
             formData.append('employeeDocument', file);
-            const { data } = await API.post('/employees/upload-cnic', formData, {
+            const { data } = await API.post('/api/v1/employees/upload-cnic', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
 
@@ -5989,7 +5989,7 @@ const selectedCustomer = useMemo(
 
         try {
             setSavingProfile(true);
-            const { data } = await API.post('/auth/profile/upload-logo', formData, {
+            const { data } = await API.post('/api/v1/auth/profile/upload-logo', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             setProfileForm((current) => ({ ...current, brand_logo_url: data.url }));
@@ -6069,7 +6069,7 @@ const selectedCustomer = useMemo(
 
         try {
             setSavingProfile(true);
-            const { data } = await API.put('/auth/profile', {
+            const { data } = await API.put('/api/v1/auth/profile', {
                 full_name: profileForm.full_name.trim(),
                 email: profileForm.email.trim(),
                 password: profileForm.password,
@@ -11435,7 +11435,7 @@ const selectedCustomer = useMemo(
     };
 
     return (
-        <div className="dashboard-layout" data-theme={dashboardTheme}>
+        <div className="dashboard-layout notranslate" data-theme={dashboardTheme}>
             <aside className="app-sidebar">
                 <nav className="side-nav">
                     {tabReferences.filter((tab) => tab.visible).map((tab) => {

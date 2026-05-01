@@ -97,7 +97,7 @@ const AdsManager = () => {
     const activeAdsCount = useMemo(() => ads.filter((a) => a.is_active).length, [ads]);
 
     return (
-        <div className="ads-container">
+        <div className="ads-container notranslate">
             <header className="ads-header">
                 <div>
                     <h2>Mobile Ad Studio</h2>
