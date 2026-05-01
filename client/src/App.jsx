@@ -7,7 +7,6 @@ import './App.css';
 
 const hasSessionToken = () => {
   const token = localStorage.getItem('token');
-  // Add a simple expiry or validity check if needed here
   return !!token;
 };
 
@@ -35,6 +34,11 @@ function App() {
         {/* Application Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/ads" element={<ProtectedRoute><AdsManager /></ProtectedRoute>} />
+
+        {/* Legacy Support (Important for old bookmarks/cached links) */}
+        <Route path="/app/dashboard" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/app/ads" element={<Navigate to="/ads" replace />} />
+        <Route path="/app/*" element={<Navigate to="/dashboard" replace />} />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
