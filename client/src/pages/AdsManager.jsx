@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import API from '../api/axios';
 import './AdsManager.css';
 
@@ -18,9 +19,6 @@ const emptyAdForm = {
     cta_url: '',
     display_order: 0,
     is_active: true,
-    start_at: '',
-    end_at: '',
-    dealer_id: '',
 };
 
 const AdsManager = () => {
@@ -28,16 +26,15 @@ const AdsManager = () => {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [form, setForm] = useState(emptyAdForm);
-
-    const resetForm = () => setForm(emptyAdForm);
+    const [uploading, setUploading] = useState(false);
 
     const loadAds = async () => {
-        setLoading(true);
         try {
+            setLoading(true);
             const { data } = await API.get('/admin/ads');
             setAds(data.ads || []);
-        } catch (error) {
-            setMessage(error?.response?.data?.message || 'Failed to load ads.');
+        } catch (err) {
+            setMessage('Failed to load campaigns.');
         } finally {
             setLoading(false);
         }
@@ -47,233 +44,181 @@ const AdsManager = () => {
         loadAds();
     }, []);
 
-    const handleChange = (event) => {
-        const { name, value, type, checked } = event.target;
-        setForm((prev) => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value,
-        }));
-    };
-
-    const handleEdit = (ad) => {
-        setForm({
-            id: ad.id || '',
-            title: ad.title || '',
-            subtitle: ad.subtitle || '',
-            image_url: ad.image_url || '',
-            cta_label: ad.cta_label || '',
-            cta_url: ad.cta_url || '',
-            display_order: ad.display_order ?? 0,
-            is_active: Boolean(ad.is_active),
-            start_at: ad.start_at ? ad.start_at.slice(0, 10) : '',
-            end_at: ad.end_at ? ad.end_at.slice(0, 10) : '',
-            dealer_id: ad.dealer_id || '',
-        });
-    };
-
-    const handleDelete = async (adId) => {
-        if (!window.confirm('Delete this advertisement?')) return;
-        setLoading(true);
-        try {
-            await API.delete(`/admin/ads/${adId}`);
-            setMessage('Ad deleted.');
-            await loadAds();
-        } catch (error) {
-            setMessage(error?.response?.data?.message || 'Failed to delete ad.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-        setLoading(true);
-        try {
-            const payload = {
-                title: form.title,
-                subtitle: form.subtitle,
-                image_url: form.image_url,
-                cta_label: form.cta_label,
-                cta_url: form.cta_url,
-                display_order: Number(form.display_order || 0),
-                is_active: Boolean(form.is_active),
-                start_at: form.start_at || null,
-                end_at: form.end_at || null,
-                dealer_id: form.dealer_id || null,
-            };
-            if (form.id) {
-                await API.put(`/admin/ads/${form.id}`, payload);
-                setMessage('Ad updated.');
-            } else {
-                await API.post('/admin/ads', payload);
-                setMessage('Ad created.');
-            }
-            resetForm();
-            await loadAds();
-        } catch (error) {
-            setMessage(error?.response?.data?.message || 'Failed to save ad.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleUpload = async (event) => {
-        const file = event.target.files?.[0];
+    const handleFileChange = async (e) => {
+        const file = e.target.files?.[0];
         if (!file) return;
+
         const formData = new FormData();
         formData.append('adImage', file);
-        setLoading(true);
+
         try {
+            setUploading(true);
             const { data } = await API.post('/admin/ads/upload-image', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
-            setForm((prev) => ({ ...prev, image_url: data.url || '' }));
-            setMessage('Image uploaded.');
-        } catch (error) {
-            setMessage(error?.response?.data?.message || 'Failed to upload image.');
+            setForm((prev) => ({ ...prev, image_url: data.imageUrl }));
+            setMessage('Image uploaded successfully.');
+        } catch (err) {
+            setMessage('Image upload failed.');
         } finally {
-            setLoading(false);
+            setUploading(false);
         }
     };
 
-    const previewUrl = useMemo(() => {
-        return buildAssetUrl(form.image_url);
-    }, [form.image_url]);
+    const handleSave = async (e) => {
+        e.preventDefault();
+        try {
+            setMessage('Saving campaign...');
+            if (form.id) {
+                await API.put(`/admin/ads/${form.id}`, form);
+                setMessage('Campaign updated.');
+            } else {
+                await API.post('/admin/ads', form);
+                setMessage('Campaign created.');
+            }
+            setForm(emptyAdForm);
+            loadAds();
+        } catch (err) {
+            setMessage('Failed to save campaign.');
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm('Delete this campaign?')) return;
+        try {
+            await API.delete(`/admin/ads/${id}`);
+            setMessage('Campaign deleted.');
+            loadAds();
+        } catch (err) {
+            setMessage('Delete failed.');
+        }
+    };
+
+    const activeAdsCount = useMemo(() => ads.filter((a) => a.is_active).length, [ads]);
 
     return (
-        <div className="ads-manager">
+        <div className="ads-container">
             <header className="ads-header">
                 <div>
                     <h2>Mobile Ad Studio</h2>
                     <p>Create vehicle campaigns on web and push them into the mobile app slider with image, name, and description.</p>
                 </div>
-                <a className="ads-back" href="#/app/dashboard">Back to Dashboard</a>
+                <Link className="ads-back" to="/dashboard">Back to Dashboard</Link>
             </header>
 
             {message ? <div className="ads-banner">{message}</div> : null}
 
             <section className="ads-studio">
-                <form className="ads-form" onSubmit={handleSubmit}>
-                    <div className="ads-form-heading">
-                        <div>
-                            <h3>{form.id ? 'Edit Campaign' : 'Create Campaign'}</h3>
-                            <p>Use the vehicle name and description exactly how you want them to appear in mobile.</p>
-                        </div>
-                        <span className={`ads-status ${form.is_active ? 'is-active' : 'is-draft'}`}>
-                            {form.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                    </div>
-                    <div className="ads-grid">
-                        <label>
-                            Vehicle / Ad Name
-                            <input name="title" value={form.title} onChange={handleChange} placeholder="Honda CD-70 Red 2026" />
-                        </label>
-                        <label>
-                            CTA Button Label
-                            <input name="cta_label" value={form.cta_label} onChange={handleChange} placeholder="View Offer" />
-                        </label>
-                        <label className="ads-span-2">
-                            Description
-                            <textarea
-                                name="subtitle"
-                                value={form.subtitle}
-                                onChange={handleChange}
-                                placeholder="Fresh stock, light monthly plan, dealer-approved delivery."
-                                rows={4}
+                <form className="ads-form" onSubmit={handleSave}>
+                    <h3>{form.id ? 'Edit Campaign' : 'Create New Campaign'}</h3>
+                    
+                    <div className="ads-input-row">
+                        <div className="ads-field">
+                            <label>Campaign Title</label>
+                            <input 
+                                type="text" 
+                                placeholder="e.g. Honda CD70 Offer" 
+                                value={form.title} 
+                                onChange={(e) => setForm({...form, title: e.target.value})}
+                                required
                             />
-                        </label>
-                        <label className="ads-span-2">
-                            CTA URL
-                            <input name="cta_url" value={form.cta_url} onChange={handleChange} placeholder="https://..." />
-                        </label>
-                        <label>
-                            Slide Order
-                            <input name="display_order" type="number" value={form.display_order} onChange={handleChange} />
-                        </label>
-                        <label>
-                            Dealer ID (optional)
-                            <input name="dealer_id" value={form.dealer_id} onChange={handleChange} placeholder="Leave empty for global" />
-                        </label>
-                        <label>
-                            Start Date
-                            <input name="start_at" type="date" value={form.start_at} onChange={handleChange} />
-                        </label>
-                        <label>
-                            End Date
-                            <input name="end_at" type="date" value={form.end_at} onChange={handleChange} />
-                        </label>
+                        </div>
+                        <div className="ads-field">
+                            <label>Subtitle / Slogan</label>
+                            <input 
+                                type="text" 
+                                placeholder="e.g. Save 10% on installments" 
+                                value={form.subtitle} 
+                                onChange={(e) => setForm({...form, subtitle: e.target.value})}
+                            />
+                        </div>
                     </div>
-                    <div className="ads-upload">
-                        <label className="ads-upload-label">
-                            Campaign Image
-                            <input type="file" accept="image/*" onChange={handleUpload} />
-                        </label>
-                        <label className="ads-inline">
-                            <input name="is_active" type="checkbox" checked={form.is_active} onChange={handleChange} />
-                            Push to mobile
-                        </label>
+
+                    <div className="ads-field">
+                        <label>Image Upload</label>
+                        <div className="ads-upload-area">
+                            <input type="file" onChange={handleFileChange} />
+                            {uploading && <span className="ads-uploading">Uploading...</span>}
+                        </div>
+                        {form.image_url && (
+                            <div className="ads-preview-small">
+                                <img src={buildAssetUrl(form.image_url)} alt="Preview" />
+                            </div>
+                        )}
                     </div>
-                    <div className="ads-actions">
-                        <button type="button" onClick={resetForm} disabled={loading}>Reset</button>
-                        <button type="submit" disabled={loading}>{loading ? 'Saving...' : form.id ? 'Update Campaign' : 'Publish Campaign'}</button>
+
+                    <div className="ads-input-row">
+                        <div className="ads-field">
+                            <label>CTA Button Label</label>
+                            <input 
+                                type="text" 
+                                placeholder="e.g. View Details" 
+                                value={form.cta_label} 
+                                onChange={(e) => setForm({...form, cta_label: e.target.value})}
+                            />
+                        </div>
+                        <div className="ads-field">
+                            <label>Order</label>
+                            <input 
+                                type="number" 
+                                value={form.display_order} 
+                                onChange={(e) => setForm({...form, display_order: parseInt(e.target.value)})}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="ads-form-actions">
+                        <button type="submit" className="ads-btn-save" disabled={uploading}>
+                            {form.id ? 'Update Campaign' : 'Launch Campaign'}
+                        </button>
+                        {form.id && (
+                            <button type="button" className="ads-btn-cancel" onClick={() => setForm(emptyAdForm)}>
+                                Cancel Edit
+                            </button>
+                        )}
                     </div>
                 </form>
 
-                <aside className="ads-phone-preview">
-                    <div className="ads-phone-shell">
-                        <div className="ads-phone-notch" />
-                        <div className="ads-phone-screen">
-                            <span className="ads-preview-kicker">Mobile Preview</span>
-                            <div className="ads-mobile-slide">
-                                <div className="ads-mobile-copy">
-                                    <span className="ads-chip">Featured Vehicle</span>
-                                    <h4>{form.title || 'Vehicle name will appear here'}</h4>
-                                    <p>{form.subtitle || 'Short campaign description will appear here for the mobile slider.'}</p>
-                                    <button type="button">{form.cta_label || 'View Offer'}</button>
-                                </div>
-                                <div className="ads-mobile-visual">
-                                    {previewUrl ? (
-                                        <img className="ads-preview" src={previewUrl} alt="Ad preview" />
-                                    ) : (
-                                        <div className="ads-preview-placeholder">Upload image</div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
+                <div className="ads-stats">
+                    <div className="ads-stat-card">
+                        <span className="ads-stat-val">{ads.length}</span>
+                        <span className="ads-stat-lbl">Total Campaigns</span>
                     </div>
-                </aside>
+                    <div className="ads-stat-card">
+                        <span className="ads-stat-val">{activeAdsCount}</span>
+                        <span className="ads-stat-lbl">Live on Mobile</span>
+                    </div>
+                </div>
             </section>
 
-            <div className="ads-list">
-                <h3>Campaign Library</h3>
-                {ads.length === 0 ? <p className="ads-empty">No ads created yet.</p> : null}
-                <div className="ads-cards">
-                    {ads.map((ad) => (
-                        <div key={ad.id} className="ads-card">
-                            <div className="ads-card-copy">
-                                {ad.image_url ? (
-                                    <img
-                                        className="ads-card-thumb"
-                                        src={buildAssetUrl(ad.image_url)}
-                                        alt={ad.title || 'Ad'}
-                                    />
-                                ) : null}
-                                <div>
-                                    <strong>{ad.title || 'Untitled ad'}</strong>
-                                    <p>{ad.subtitle || 'No description'}</p>
-                                    <span className="ads-card-meta">
-                                        Order {ad.display_order ?? 0} • {ad.is_active ? 'Live on mobile' : 'Inactive'}
-                                    </span>
+            <section className="ads-grid-wrap">
+                <h3>Managed Campaigns</h3>
+                {loading ? <p>Loading...</p> : (
+                    <div className="ads-grid">
+                        {ads.map((ad) => (
+                            <div key={ad.id} className={`ad-card ${!ad.is_active ? 'ad-card-paused' : ''}`}>
+                                <div className="ad-card-img">
+                                    <img src={buildAssetUrl(ad.image_url)} alt={ad.title} />
+                                </div>
+                                <div className="ad-card-body">
+                                    <h4>{ad.title}</h4>
+                                    <p>{ad.subtitle}</p>
+                                    <div className="ad-card-actions">
+                                        <button onClick={() => setForm(ad)}>Edit</button>
+                                        <button onClick={() => handleDelete(ad.id)}>Delete</button>
+                                        <button onClick={async () => {
+                                            await API.put(`/admin/ads/${ad.id}`, { ...ad, is_active: !ad.is_active });
+                                            loadAds();
+                                        }}>
+                                            {ad.is_active ? 'Pause' : 'Resume'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="ads-card-actions">
-                                <button type="button" onClick={() => handleEdit(ad)}>Edit</button>
-                                <button type="button" onClick={() => handleDelete(ad.id)}>Delete</button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
         </div>
     );
 };

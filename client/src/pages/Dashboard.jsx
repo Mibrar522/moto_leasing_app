@@ -2099,7 +2099,7 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
 
         const nextSearch = params.toString();
         navigate({
-            pathname: '/app/dashboard',
+            pathname: '/dashboard',
             search: nextSearch ? `?${nextSearch}` : '',
         }, { replace: true });
     }, [activePage, navigate]);
