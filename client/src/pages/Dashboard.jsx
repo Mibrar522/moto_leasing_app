@@ -221,6 +221,24 @@ const emptyAdForm = {
     dealer_id: '',
 };
 
+const ROLE_HIERARCHY = ['SUPER_ADMIN', 'APPLICATION_ADMIN', 'MANAGER', 'AGENT'];
+const LEGACY_ROLE_NAME_MAP = {
+    DEALER_ADMIN: 'APPLICATION_ADMIN',
+};
+const ROLE_DISPLAY_LABELS = {
+    SUPER_ADMIN: 'Super Admin',
+    APPLICATION_ADMIN: 'Application Admin',
+    MANAGER: 'Manager',
+    AGENT: 'Agent',
+};
+
+const normalizeRoleName = (roleName = '') => LEGACY_ROLE_NAME_MAP[String(roleName || '').toUpperCase()] || String(roleName || '').toUpperCase();
+const getRoleDisplayName = (roleName = '') => ROLE_DISPLAY_LABELS[normalizeRoleName(roleName)] || String(roleName || '').replace(/_/g, ' ');
+const getRoleSortIndex = (roleName = '') => {
+    const index = ROLE_HIERARCHY.indexOf(normalizeRoleName(roleName));
+    return index === -1 ? ROLE_HIERARCHY.length : index;
+};
+
 const ACCESS_PAGE_GROUPS = [
     {
         key: 'dashboard',
@@ -2245,10 +2263,19 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
     );
     const featureByKey = useMemo(
         () => (dashboardData.features || []).reduce((acc, feature) => {
-            acc[feature.feature_key] = feature;
+            const featureKey = feature.feature_key || feature.key;
+            if (featureKey) {
+                acc[featureKey] = feature;
+            }
             return acc;
         }, {}),
         [dashboardData.features]
+    );
+    const accessRoles = useMemo(
+        () => (dashboardData.roles || [])
+            .filter((role) => ROLE_HIERARCHY.includes(normalizeRoleName(role.role_name)))
+            .sort((a, b) => getRoleSortIndex(a.role_name) - getRoleSortIndex(b.role_name)),
+        [dashboardData.roles]
     );
     const accessPopupRole = useMemo(
         () => (dashboardData.roles || []).find((role) => Number(role.id) === Number(activeAccessPopup?.roleId)) || null,
@@ -2277,8 +2304,8 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
                 : [];
         }
 
-        const generalFeatures = accessPopupFeatures.filter((feature) => !String(feature.key || '').includes('FEAT_DASHBOARD_CARD_'));
-        const dashboardCardFeatures = accessPopupFeatures.filter((feature) => String(feature.key || '').includes('FEAT_DASHBOARD_CARD_'));
+        const generalFeatures = accessPopupFeatures.filter((feature) => !String(feature.feature_key || feature.key || '').includes('FEAT_DASHBOARD_CARD_'));
+        const dashboardCardFeatures = accessPopupFeatures.filter((feature) => String(feature.feature_key || feature.key || '').includes('FEAT_DASHBOARD_CARD_'));
 
         return [
             generalFeatures.length > 0 ? { key: 'general', title: 'Dashboard Role Features', features: generalFeatures } : null,
@@ -10958,10 +10985,10 @@ const selectedCustomer = useMemo(
                         {accessMessage ? <div className="notice-banner">{accessMessage}</div> : null}
 
                         <div className="access-role-grid">
-                            {(dashboardData.roles || []).map((role) => (
+                            {accessRoles.map((role) => (
                                 <div key={role.id} className="table-card">
                                     <div className="section-header">
-                                        <h3>{role.role_name}</h3>
+                                        <h3>{getRoleDisplayName(role.role_name)}</h3>
                                         <button
                                             type="button"
                                             className="primary-btn"
@@ -11054,9 +11081,9 @@ const selectedCustomer = useMemo(
                                     <label className="field">
                                         <span>Dealer Admin Role</span>
                                         <select name="admin_role_id" value={dealerForm.admin_role_id} onChange={handleDealerChange}>
-                                            {(dashboardData.roles || []).filter((role) => role.role_name !== 'SUPER_ADMIN').map((role) => (
-                                                <option key={`dealer-admin-role-${role.id}`} value={role.id}>{role.role_name}</option>
-                                            ))}
+                            {accessRoles.filter((role) => normalizeRoleName(role.role_name) !== 'SUPER_ADMIN').map((role) => (
+                                <option key={`dealer-admin-role-${role.id}`} value={role.id}>{getRoleDisplayName(role.role_name)}</option>
+                            ))}
                                         </select>
                                     </label>
                                     <label className="field"><span>Dealer Admin Password</span><input name="admin_password" value={dealerForm.admin_password} onChange={handleDealerChange} type="password" /></label>
@@ -11514,11 +11541,10 @@ const selectedCustomer = useMemo(
                         <div className="profile-switcher-wrap">
                             <label className="profile-switcher">
                                 <span>Profile</span>
-                                <select value={currentProfileDealerId} onChange={handleSuperAdminProfileSwitch} disabled={switchingProfile}>
-                                    <option value="">Super Admin Profile</option>
-                                    {(dashboardData.dealers || []).map((dealer) => (
-                                        <option key={`profile-switch-${dealer.id}`} value={dealer.id}>
-                                            {dealer.dealer_name}
+                                <select value={normalizeRoleName(user?.role_name || 'SUPER_ADMIN')} disabled>
+                                    {ROLE_HIERARCHY.map((roleName) => (
+                                        <option key={`profile-role-${roleName}`} value={roleName}>
+                                            {getRoleDisplayName(roleName)}
                                         </option>
                                     ))}
                                 </select>

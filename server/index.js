@@ -140,13 +140,11 @@ const startServer = async () => {
         await pool.query('SELECT NOW()');
         console.log('✓ Database connection successful.');
 
-        /* 
-           Bypassing sync functions for stability since schema 
-           is already manually set in Supabase.
-        */
-        // await syncAccessControlDefaults();
+        // Keep access roles/features present in hosted PostgreSQL.
+        await syncAccessControlDefaults();
         // await syncCustomerAppSchema();
         // await syncCustomerCoreSchema();
+        console.log('Access-control defaults verified.');
         // console.log('✓ Database schemas verified.');
 
         app.listen(PORT, SERVER_HOST, () => {
