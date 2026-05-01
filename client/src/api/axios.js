@@ -1,20 +1,22 @@
 import axios from "axios";
 
-// Base URL from Vite env - Ensure it ends with /api/v1
-let API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+// Base URL from Vite env - Robust resolution
+let envBase = import.meta.env.VITE_API_BASE_URL || "";
 
-if (API_BASE_URL && !API_BASE_URL.endsWith("/api/v1")) {
-    // Clean trailing slash then append /api/v1
-    API_BASE_URL = API_BASE_URL.replace(/\/$/, "") + "/api/v1";
+// If we have a URL, ensure it doesn't have a trailing slash, then ensure it ends with /api/v1
+if (envBase) {
+    envBase = envBase.replace(/\/$/, "");
+    if (!envBase.endsWith("/api/v1")) {
+        envBase += "/api/v1";
+    }
+} else {
+    // Fallback for development/production if variable is missing
+    envBase = window.location.hostname === "localhost" 
+        ? "http://localhost:10000/api/v1" 
+        : "/api/v1";
 }
 
-// Safety check (prevents silent failures)
-if (!API_BASE_URL && import.meta.env.MODE === "production") {
-    console.warn("VITE_API_BASE_URL is not defined. Using relative path /api/v1");
-    API_BASE_URL = "/api/v1";
-} else if (!API_BASE_URL) {
-    API_BASE_URL = "http://localhost:10000/api/v1"; // Local default
-}
+const API_BASE_URL = envBase;
 
 // Create axios instance
 const API = axios.create({
