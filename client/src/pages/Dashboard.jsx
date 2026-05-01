@@ -6067,14 +6067,14 @@ const selectedCustomer = useMemo(
             await loadDashboard();
             const backupMessage =
                   data.backup?.status === 'COMPLETED'
-                      ? ` Empty template backup saved to: ${data.backup.file_path}`
+                      ? ` Optional template backup saved to: ${data.backup.file_path}`
                       : data.backup?.status === 'FAILED'
-                          ? ` Dealer created, but empty template backup failed: ${data.backup.error}`
+                          ? ` Optional template backup failed: ${data.backup.error}`
                           : '';
             resetDealerForm();
             setDealerMessage(
                 dealerForm.id
-                    ? `Dealer updated. Dealer admin login: ${data.dealer_admin?.email || dealerForm.admin_email.trim()}.${data.backup ? backupMessage.replace('Dealer created, but empty template backup failed:', ' Dealer updated, but empty template backup failed:') : ''}`
+                    ? `Dealer updated. Dealer admin login: ${data.dealer_admin?.email || dealerForm.admin_email.trim()}.${backupMessage}`
                     : `Dealer created. Dealer admin login: ${data.dealer_admin?.email || dealerForm.admin_email.trim()}.${backupMessage}`
             );
         } catch (err) {
@@ -11087,7 +11087,7 @@ const selectedCustomer = useMemo(
                                         </select>
                                     </label>
                                     <label className="field"><span>Dealer Admin Password</span><input name="admin_password" value={dealerForm.admin_password} onChange={handleDealerChange} type="password" /></label>
-                                    <label className="field full-span"><span>Backup Directory</span><input name="backup_directory" value={dealerForm.backup_directory} onChange={handleDealerChange} placeholder="Example: C:\\Backups\\Dealers (leave blank for server default)" /></label>
+                                    <label className="field full-span"><span>Optional Backup Directory</span><input name="backup_directory" value={dealerForm.backup_directory} onChange={handleDealerChange} placeholder="Production: leave blank. Local only: C:\\Backups\\Dealers" /></label>
                                     <label className="field">
                                         <span>Dealer Status</span>
                                         <select name="is_active" value={String(dealerForm.is_active)} onChange={(event) => setDealerForm((current) => ({ ...current, is_active: event.target.value === 'true' }))}>
@@ -11110,8 +11110,8 @@ const selectedCustomer = useMemo(
                                     <div><span className="meta-label">New Dealer State</span><p className="meta-value">Fresh Start</p></div>
                                     <div><span className="meta-label">Data Baseline</span><p className="meta-value">0 customers, 0 employees, 0 products, 0 sales</p></div>
                                     <div><span className="meta-label">Provisioned Login</span><p className="meta-value">Application Admin</p></div>
-                                    <div><span className="meta-label">Clone Setup</span><p className="meta-value">DB backup label + clone profile</p></div>
-                                    <div><span className="meta-label">Backup Directory</span><p className="meta-value">{dealerForm.backup_directory.trim() || 'Server default backup folder'}</p></div>
+                                    <div><span className="meta-label">Dealer Setup</span><p className="meta-value">Clean profile + admin login</p></div>
+                                    <div><span className="meta-label">Backup Directory</span><p className="meta-value">{dealerForm.backup_directory.trim() || 'Optional backup disabled'}</p></div>
                                 </div>
                                 <div className="feature-list spaced-top">
                                     <span className="feature-pill">Branding Ready</span>

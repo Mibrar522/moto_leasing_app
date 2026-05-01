@@ -11,7 +11,24 @@ const buildSafeSegment = (value, fallback) =>
         .replace(/[^a-z0-9_-]+/g, '-')
         .replace(/^-+|-+$/g, '') || fallback;
 
-const getDatabaseName = () => process.env.DB_DATABASE || 'motor_leasing_db';
+const backupEnabled = () =>
+    ['1', 'true', 'yes', 'on'].includes(String(process.env.DEALER_TEMPLATE_BACKUP_ENABLED || '').trim().toLowerCase());
+
+exports.isDealerTemplateBackupEnabled = (backupDirectory) =>
+    backupEnabled() || Boolean(String(backupDirectory || '').trim());
+
+const getDatabaseConnectionArgs = () => {
+    if (process.env.DATABASE_URL) {
+        return [process.env.DATABASE_URL];
+    }
+
+    return [
+        '-h', process.env.DB_HOST || 'localhost',
+        '-p', String(process.env.DB_PORT || 5432),
+        '-U', process.env.DB_USER || 'postgres',
+        '-d', process.env.DB_DATABASE || 'motor_leasing_db',
+    ];
+};
 
 const getPgDumpCommands = () => {
     if (process.env.PG_DUMP_PATH) {
@@ -64,10 +81,7 @@ exports.createDatabaseBackup = async ({
     const filePath = path.join(resolvedDirectory, fileName);
 
     const args = [
-        '-h', process.env.DB_HOST || 'localhost',
-        '-p', String(process.env.DB_PORT || 5432),
-        '-U', process.env.DB_USER || 'postgres',
-        '-d', getDatabaseName(),
+        ...getDatabaseConnectionArgs(),
         '--encoding=UTF8',
         '--clean',
         '--if-exists',

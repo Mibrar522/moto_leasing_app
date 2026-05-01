@@ -1,6 +1,10 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
-const { createDatabaseBackup, resolveBackupDirectory } = require('../utils/databaseBackup');
+const {
+    createDatabaseBackup,
+    isDealerTemplateBackupEnabled,
+    resolveBackupDirectory,
+} = require('../utils/databaseBackup');
 
 const buildSlug = (value) =>
     String(value || '')
@@ -263,20 +267,23 @@ exports.createDealer = async (req, res) => {
             await client.query('COMMIT');
             transactionCommitted = true;
 
-            let backup;
-            try {
-                backup = await createDatabaseBackup({
-                    applicationSlug,
-                    backupLabel,
-                    dealerCode,
-                    backupDirectory: resolvedBackupDirectory,
-                });
-            } catch (backupError) {
-                backup = {
-                    status: 'FAILED',
-                    directory: resolvedBackupDirectory,
-                    error: backupError.message,
-                };
+            let backup = null;
+
+            if (isDealerTemplateBackupEnabled(backup_directory)) {
+                try {
+                    backup = await createDatabaseBackup({
+                        applicationSlug,
+                        backupLabel,
+                        dealerCode,
+                        backupDirectory: resolvedBackupDirectory,
+                    });
+                } catch (backupError) {
+                    backup = {
+                        status: 'FAILED',
+                        directory: resolvedBackupDirectory,
+                        error: backupError.message,
+                    };
+                }
             }
 
             res.status(201).json({
@@ -297,9 +304,11 @@ exports.createDealer = async (req, res) => {
                     provisioning_status: updatedDealer.rows[0].provisioning_status,
                 },
                 message:
-                    backup.status === 'COMPLETED'
+                    backup?.status === 'COMPLETED'
                         ? 'Dealer created and empty template backup completed'
-                        : 'Dealer created, but empty template backup failed',
+                        : backup?.status === 'FAILED'
+                            ? 'Dealer created, but empty template backup failed'
+                            : 'Dealer created successfully',
             });
         } catch (error) {
             if (!transactionCommitted) {
@@ -475,6 +484,40 @@ exports.updateDealer = async (req, res) => {
                     ]
                 );
             }
+        } else {
+            if (!admin_password) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({
+                    message: 'Dealer admin password is required because this dealer does not have an admin user yet.',
+                });
+            }
+
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash(admin_password, salt);
+            const adminUserResult = await client.query(
+                `
+                INSERT INTO users (full_name, email, password_hash, role_id, is_active, dealer_id)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id
+                `,
+                [
+                    String(admin_full_name).trim(),
+                    String(admin_email).trim().toLowerCase(),
+                    hashedPassword,
+                    roleResult.rows[0].id,
+                    is_active !== false,
+                    req.params.id,
+                ]
+            );
+
+            await client.query(
+                `
+                UPDATE dealers
+                SET admin_user_id = $1
+                WHERE id = $2
+                `,
+                [adminUserResult.rows[0].id, req.params.id]
+            );
         }
 
         const result = await client.query(
@@ -489,7 +532,7 @@ exports.updateDealer = async (req, res) => {
         const resolvedBackupDirectory = resolveBackupDirectory(backup_directory);
         let backup = null;
 
-        if (String(backup_directory || '').trim()) {
+        if (isDealerTemplateBackupEnabled(backup_directory)) {
             try {
                 backup = await createDatabaseBackup({
                     applicationSlug: result.rows[0].application_slug || existingDealer.rows[0].application_slug,
