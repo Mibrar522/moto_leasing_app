@@ -1705,7 +1705,7 @@ const Dashboard = () => {
     const canManageAds = realIsSuperAdmin || hasAnyFeature(user, ['FEAT_ADS_MGMT']);
     const canManageAccessControl = hasAnyFeature(user, ['FEAT_ACCESS_CONTROL', 'FEAT_USER_MGMT']);
     const canManageEmployees = (isSuperAdmin || effectiveIsApplicationAdmin) && canManageUsers;
-    const canManageAccess = realIsSuperAdmin && canManageAccessControl;
+    const canManageAccess = canManageAccessControl;
     const canManageThemes = hasAnyFeature(user, ['FEAT_THEME_MGMT']);
     const adPreviewUrl = useMemo(() => buildAssetUrl(adForm.image_url), [adForm.image_url]);
 
@@ -10975,11 +10975,11 @@ const selectedCustomer = useMemo(
                     <>
                         <div className="page-heading">
                             <h1>Roles and Features</h1>
-                            <p>Only the super admin can assign role permissions and control which features managers and employees can use.</p>
+                            <p>Application admins can assign role permissions and control which features managers and employees can use.</p>
                         </div>
 
                         {!canManageAccess ? (
-                            <div className="feedback-card error">Only the super admin can manage access control.</div>
+                            <div className="feedback-card error">Your account cannot manage access control.</div>
                         ) : null}
 
                         {accessMessage ? <div className="notice-banner">{accessMessage}</div> : null}
