@@ -20,6 +20,8 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
 
     try {
       const { data } = await API.post('/auth/login', {

@@ -1622,11 +1622,6 @@ const Dashboard = () => {
 
             setError(message);
 
-            if (err.response?.status === 401) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                navigate('/login');
-            }
         } finally {
             setLoading(false);
         }
