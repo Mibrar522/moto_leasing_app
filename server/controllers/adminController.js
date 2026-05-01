@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { reconcileReceivedStockOrders } = require('./stockController');
+const { syncAccessCatalogDefaults } = require('../utils/accessBootstrap');
 
 const PENDING_APPLICATION_STATUSES = ['PENDING', 'SUBMITTED', 'UNDER_REVIEW'];
 const hasAnyFeature = (featureKeys = [], requiredKeys = []) => requiredKeys.some((featureKey) => featureKeys.includes(featureKey));
@@ -34,6 +35,7 @@ const getRolePermissions = async () => {
 
 exports.getDashboardData = async (req, res) => {
     try {
+        await syncAccessCatalogDefaults();
         await reconcileReceivedStockOrders();
 
         const isEmployeeLogin = Number(req.user.role_id) === 3 || req.user.role_name === 'AGENT';

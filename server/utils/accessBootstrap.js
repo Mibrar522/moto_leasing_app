@@ -1022,3 +1022,37 @@ exports.syncAccessControlDefaults = async () => {
         client.release();
     }
 };
+
+exports.syncAccessCatalogDefaults = async () => {
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        for (const roleName of ROLE_NAMES) {
+            await ensureRole(client, roleName);
+        }
+
+        for (const [featureKey, displayName] of FEATURE_DEFINITIONS) {
+            await ensureFeature(client, featureKey, displayName);
+        }
+
+        const rolesResult = await client.query('SELECT id, role_name FROM roles');
+        const roleIdByName = rolesResult.rows.reduce((acc, role) => {
+            acc[role.role_name] = role.id;
+            return acc;
+        }, {});
+
+        await ensureDefaultRolePermissions(client, roleIdByName.SUPER_ADMIN, SUPER_ADMIN_FEATURES);
+        await ensureDefaultRolePermissions(client, roleIdByName.APPLICATION_ADMIN, APPLICATION_ADMIN_FEATURES);
+        await ensureDefaultRolePermissions(client, roleIdByName.MANAGER, MANAGER_FEATURES);
+        await ensureDefaultRolePermissions(client, roleIdByName.AGENT, AGENT_FEATURES);
+
+        await client.query('COMMIT');
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
+};
