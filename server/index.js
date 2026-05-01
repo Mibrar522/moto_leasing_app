@@ -99,6 +99,23 @@ app.use('/api/v1/app/auth', appAuthRoutes);
 app.use('/api/v1/app', appPublicRoutes);
 app.use('/api/v1/app/orders', appOrderRoutes);
 
+// Compatibility aliases for older deployed/cached clients that call paths
+// without the /api/v1 prefix, for example /admin/dashboard.
+app.use('/auth', authRoutes);
+app.use('/admin', adminRoutes);
+app.use('/leases', leaseRoutes);
+app.use('/customers', customerRoutes);
+app.use('/employees', employeeRoutes);
+app.use('/products', productRoutes);
+app.use('/sales', salesRoutes);
+app.use('/stock', stockRoutes);
+app.use('/dealers', dealerRoutes);
+app.use('/companies', companyRoutes);
+app.use('/workflow', workflowRoutes);
+app.use('/app/auth', appAuthRoutes);
+app.use('/app/orders', appOrderRoutes);
+app.use('/app', appPublicRoutes);
+
 // 6. Global Error Handler
 app.use((err, req, res, next) => {
     if (err.message === 'Not allowed by CORS') {
