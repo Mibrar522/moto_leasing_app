@@ -1705,7 +1705,7 @@ const Dashboard = () => {
     const canManageAds = realIsSuperAdmin || hasAnyFeature(user, ['FEAT_ADS_MGMT']);
     const canManageAccessControl = hasAnyFeature(user, ['FEAT_ACCESS_CONTROL', 'FEAT_USER_MGMT']);
     const canManageEmployees = (isSuperAdmin || effectiveIsApplicationAdmin) && canManageUsers;
-    const canManageAccess = canManageAccessControl;
+    const canManageAccess = realIsSuperAdmin || canManageAccessControl;
     const canManageThemes = hasAnyFeature(user, ['FEAT_THEME_MGMT']);
     const adPreviewUrl = useMemo(() => buildAssetUrl(adForm.image_url), [adForm.image_url]);
 
