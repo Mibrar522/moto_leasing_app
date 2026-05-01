@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="MotoLeasing app icon">
+  <defs>
+    <linearGradient id="ml-icon-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A2B45"/>
+      <stop offset="1" stop-color="#1B4D6B"/>
+    </linearGradient>
+    <linearGradient id="ml-icon-red" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF5252"/>
+      <stop offset="1" stop-color="#C62828"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="180" fill="url(#ml-icon-bg)"/>
+  <circle cx="332" cy="668" r="132" fill="none" stroke="#FFFFFF" stroke-width="28"/>
+  <circle cx="692" cy="668" r="132" fill="none" stroke="#FFFFFF" stroke-width="28"/>
+  <path d="M250 610 L360 500 L540 528 L610 420 L774 420" fill="none" stroke="url(#ml-icon-red)" stroke-width="44" stroke-linecap="round"/>
+  <path d="M360 500 L420 668 L540 528 L610 668" fill="none" stroke="#FFFFFF" stroke-width="32" stroke-linecap="round"/>
+  <rect x="420" y="340" width="220" height="48" rx="24" fill="#FFFFFF"/>
+  <text x="512" y="310" text-anchor="middle" font-family="Poppins, Segoe UI, Arial, sans-serif" font-size="84" font-weight="700" fill="#FFFFFF">
+    ML
+  </text>
+</svg>

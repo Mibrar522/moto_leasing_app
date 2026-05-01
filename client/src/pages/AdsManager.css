@@ -1,0 +1,421 @@
+.ads-manager {
+    --ads-bg: #f4efe5;
+    --ads-ink: #132238;
+    --ads-muted: #607086;
+    --ads-card: rgba(255, 255, 255, 0.82);
+    --ads-line: rgba(19, 34, 56, 0.1);
+    --ads-accent: #c96f2d;
+    --ads-accent-deep: #7f2f14;
+    --ads-olive: #5e7b42;
+    padding: 32px;
+    color: var(--ads-ink);
+    max-width: 1240px;
+    margin: 0 auto;
+    font-family: "Poppins", "Segoe UI", system-ui, sans-serif;
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at top left, rgba(201, 111, 45, 0.14), transparent 28%),
+        radial-gradient(circle at top right, rgba(94, 123, 66, 0.18), transparent 24%),
+        linear-gradient(180deg, #fff8ef 0%, var(--ads-bg) 100%);
+}
+
+.ads-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.ads-header h2 {
+    margin: 0;
+    font-size: 32px;
+}
+
+.ads-header p {
+    margin: 6px 0 0;
+    color: var(--ads-muted);
+    max-width: 720px;
+}
+
+.ads-back {
+    text-decoration: none;
+    color: var(--ads-ink);
+    border: 1px solid var(--ads-line);
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+}
+
+.ads-banner {
+    background: rgba(255, 255, 255, 0.76);
+    border: 1px solid rgba(94, 123, 66, 0.2);
+    padding: 12px 14px;
+    border-radius: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 18px 34px rgba(19, 34, 56, 0.08);
+}
+
+.ads-studio {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 420px);
+    gap: 24px;
+    align-items: start;
+}
+
+.ads-form {
+    background: var(--ads-card);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 28px;
+    padding: 24px;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+    margin-bottom: 30px;
+    backdrop-filter: blur(16px);
+}
+
+.ads-form-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 18px;
+}
+
+.ads-form-heading h3 {
+    margin: 0;
+    font-size: 24px;
+}
+
+.ads-form-heading p {
+    margin: 6px 0 0;
+    color: var(--ads-muted);
+}
+
+.ads-status {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.ads-status.is-active {
+    background: rgba(94, 123, 66, 0.14);
+    color: var(--ads-olive);
+}
+
+.ads-status.is-draft {
+    background: rgba(127, 47, 20, 0.12);
+    color: var(--ads-accent-deep);
+}
+
+.ads-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.ads-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    color: #334155;
+    font-weight: 600;
+}
+
+.ads-grid input,
+.ads-grid textarea {
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(19, 34, 56, 0.12);
+    background: rgba(255, 255, 255, 0.85);
+    color: var(--ads-ink);
+    font: inherit;
+    resize: vertical;
+}
+
+.ads-grid input:focus,
+.ads-grid textarea:focus {
+    outline: none;
+    border-color: rgba(201, 111, 45, 0.45);
+    box-shadow: 0 0 0 4px rgba(201, 111, 45, 0.12);
+}
+
+.ads-span-2 {
+    grid-column: span 2;
+}
+
+.ads-upload {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.ads-upload-label input {
+    display: block;
+    margin-top: 8px;
+}
+
+.ads-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.ads-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.ads-actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 12px;
+}
+
+.ads-actions button {
+    padding: 12px 18px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(135deg, var(--ads-accent), var(--ads-accent-deep));
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 12px 24px rgba(127, 47, 20, 0.22);
+    font-weight: 700;
+}
+
+.ads-actions button[type="button"] {
+    background: rgba(255, 255, 255, 0.86);
+    color: var(--ads-ink);
+    box-shadow: none;
+    border: 1px solid var(--ads-line);
+}
+
+.ads-phone-preview {
+    position: sticky;
+    top: 24px;
+}
+
+.ads-phone-shell {
+    background: #101315;
+    border-radius: 38px;
+    padding: 14px;
+    box-shadow: 0 30px 70px rgba(19, 34, 56, 0.24);
+}
+
+.ads-phone-notch {
+    width: 120px;
+    height: 24px;
+    border-radius: 999px;
+    background: #050608;
+    margin: 0 auto 10px;
+}
+
+.ads-phone-screen {
+    min-height: 680px;
+    border-radius: 28px;
+    padding: 20px;
+    background:
+        radial-gradient(circle at top right, rgba(255, 229, 143, 0.18), transparent 30%),
+        linear-gradient(180deg, #111827 0%, #1e293b 100%);
+    color: white;
+}
+
+.ads-preview-kicker {
+    display: inline-block;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.ads-mobile-slide {
+    display: grid;
+    gap: 18px;
+}
+
+.ads-mobile-copy {
+    padding: 20px;
+    border-radius: 28px;
+    background:
+        linear-gradient(140deg, rgba(241, 247, 140, 0.95), rgba(255, 176, 86, 0.92));
+    color: #182233;
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.ads-chip {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(24, 34, 51, 0.08);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.ads-mobile-copy h4 {
+    margin: 14px 0 8px;
+    font-size: 30px;
+    line-height: 1.04;
+}
+
+.ads-mobile-copy p {
+    margin: 0;
+    color: rgba(24, 34, 51, 0.8);
+    line-height: 1.55;
+}
+
+.ads-mobile-copy button {
+    margin-top: 18px;
+    border: none;
+    border-radius: 999px;
+    padding: 11px 16px;
+    background: #172334;
+    color: white;
+    font-weight: 700;
+    width: fit-content;
+}
+
+.ads-mobile-visual {
+    height: 260px;
+    border-radius: 28px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ads-preview-placeholder {
+    height: 100%;
+    display: grid;
+    place-items: center;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 600;
+}
+
+.ads-list h3 {
+    margin-bottom: 10px;
+    font-size: 24px;
+}
+
+.ads-cards {
+    display: grid;
+    gap: 12px;
+}
+
+.ads-card {
+    background: rgba(12, 24, 38, 0.96);
+    color: white;
+    padding: 16px 18px;
+    border-radius: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    box-shadow: 0 18px 28px rgba(15, 23, 42, 0.14);
+}
+
+.ads-card-copy {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.ads-card-thumb {
+    width: 84px;
+    height: 84px;
+    object-fit: cover;
+    border-radius: 18px;
+    flex-shrink: 0;
+}
+
+.ads-card p {
+    margin: 6px 0 0;
+    color: rgba(255, 255, 255, 0.7);
+    max-width: 520px;
+}
+
+.ads-card-meta {
+    display: inline-block;
+    margin-top: 10px;
+    color: rgba(255, 255, 255, 0.54);
+    font-size: 12px;
+}
+
+.ads-card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ads-card-actions button {
+    border: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.ads-card-actions button:first-of-type {
+    background: #facc15;
+}
+
+.ads-card-actions button:last-of-type {
+    background: #f87171;
+}
+
+.ads-empty {
+    color: var(--ads-muted);
+}
+
+@media (max-width: 980px) {
+    .ads-studio {
+        grid-template-columns: 1fr;
+    }
+
+    .ads-phone-preview {
+        position: static;
+    }
+}
+
+@media (max-width: 720px) {
+    .ads-manager {
+        padding: 20px;
+    }
+
+    .ads-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+    }
+
+    .ads-span-2 {
+        grid-column: span 1;
+    }
+
+    .ads-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ads-card-copy {
+        align-items: flex-start;
+    }
+}

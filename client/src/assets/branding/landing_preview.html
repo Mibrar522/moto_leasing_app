@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MotoLeasing Control Suite</title>
+    <style>
+      :root {
+        --navy-900: #0a2b45;
+        --navy-800: #123754;
+        --navy-700: #1b4d6b;
+        --red-500: #e53935;
+        --sand-50: #f8f4ef;
+        --glass: rgba(255, 255, 255, 0.16);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Poppins", "Segoe UI", Arial, sans-serif;
+        background: radial-gradient(circle at top left, #1f4d6b, #0a2436 55%);
+        color: #f2f6fb;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 32px;
+        padding: 56px clamp(24px, 5vw, 80px);
+        min-height: 100vh;
+      }
+      .glass {
+        background: var(--glass);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 24px;
+        padding: 24px;
+        backdrop-filter: blur(12px);
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+      .logo img { height: 64px; }
+      .hero h1 {
+        font-size: clamp(36px, 4.5vw, 64px);
+        margin: 24px 0 12px;
+        line-height: 1.05;
+      }
+      .hero p { color: #d8e6f2; font-size: 18px; }
+      .cta {
+        display: flex;
+        gap: 16px;
+        margin-top: 28px;
+      }
+      .btn {
+        padding: 14px 22px;
+        border-radius: 14px;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn-primary { background: var(--red-500); color: white; }
+      .btn-ghost {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        color: white;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-top: 32px;
+      }
+      .stat {
+        padding: 16px;
+        border-radius: 16px;
+        background: rgba(11, 35, 55, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .stat strong { display: block; font-size: 20px; }
+      .right-pane {
+        display: grid;
+        gap: 18px;
+      }
+      .bike-card img {
+        width: 100%;
+        max-height: 240px;
+        object-fit: contain;
+      }
+      .bike-card h3 { margin: 12px 0 6px; }
+      .tag {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(229, 57, 53, 0.2);
+        color: #ffbdbd;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.4px;
+      }
+      @media (max-width: 960px) {
+        .hero { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="hero">
+      <div class="glass">
+        <div class="logo">
+          <img src="logo.svg" alt="MotoLeasing logo" />
+          <div>
+            <div class="tag">CONTROL SUITE</div>
+            <h1>Modern leasing operations, unified and fast.</h1>
+          </div>
+        </div>
+        <p>
+          MotoLeasing keeps your dealer network, customer onboarding, and installment workflows in one calm workspace.
+        </p>
+        <div class="cta">
+          <button class="btn btn-primary">Enter Dashboard</button>
+          <button class="btn btn-ghost">View Inventory</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><strong>Realtime</strong><span>Live workflow and task approvals.</span></div>
+          <div class="stat"><strong>Secure</strong><span>Dealer-level access and audit controls.</span></div>
+          <div class="stat"><strong>Field ready</strong><span>Mobile onboarding + document capture.</span></div>
+        </div>
+      </div>
+      <div class="right-pane">
+        <div class="glass bike-card">
+          <span class="tag">FEATURED BIKE</span>
+          <h3>Honda CD-70</h3>
+          <img src="red.png" alt="Honda CD-70" />
+          <p>Showcase vehicles, inventory, and pricing with controlled access.</p>
+        </div>
+        <div class="glass">
+          <h3>Dealer Insights</h3>
+          <p>Track installments, pending approvals, and customer pipelines.</p>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>
