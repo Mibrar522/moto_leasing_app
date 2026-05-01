@@ -141,10 +141,14 @@ const startServer = async () => {
         console.log('✓ Database connection successful.');
 
         // Keep access roles/features present in hosted PostgreSQL.
-        await syncAccessControlDefaults();
+        try {
+            await syncAccessControlDefaults();
+            console.log('Access-control defaults verified.');
+        } catch (bootstrapError) {
+            console.warn('Access-control bootstrap skipped:', bootstrapError.message);
+        }
         // await syncCustomerAppSchema();
         // await syncCustomerCoreSchema();
-        console.log('Access-control defaults verified.');
         // console.log('✓ Database schemas verified.');
 
         app.listen(PORT, SERVER_HOST, () => {

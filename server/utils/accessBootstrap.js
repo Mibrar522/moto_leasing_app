@@ -326,8 +326,12 @@ const ensureRole = async (client, roleName) => {
     await client.query(
         `
         INSERT INTO roles (role_name)
-        VALUES ($1)
-        ON CONFLICT (role_name) DO NOTHING
+        SELECT $1
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM roles
+            WHERE role_name = $1
+        )
         `,
         [roleName]
     );
@@ -337,8 +341,12 @@ const ensureFeature = async (client, featureKey, displayName) => {
     await client.query(
         `
         INSERT INTO features (feature_key, display_name)
-        VALUES ($1, $2)
-        ON CONFLICT (feature_key) DO NOTHING
+        SELECT $1, $2
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM features
+            WHERE feature_key = $1
+        )
         `,
         [featureKey, displayName]
     );
