@@ -1607,11 +1607,18 @@ const Dashboard = () => {
             }));
             setError('');
         } catch (err) {
-            const message = err.response?.status === 401
+            const status = err.response?.status;
+            const serverMessage = err.response?.data?.message || err.response?.data?.error;
+            const requestUrl = err.config?.baseURL && err.config?.url
+                ? `${String(err.config.baseURL).replace(/\/$/, '')}/${String(err.config.url).replace(/^\//, '')}`
+                : '';
+            const message = status === 401
                 ? 'Your session has expired. Please sign in again.'
-                : err.response?.status === 403
-                    ? (err.response?.data?.message || 'Access denied. Your account is missing dealer scope or required features.')
-                : 'Unable to load live dashboard data from PostgreSQL.';
+                : status === 403
+                    ? (serverMessage || 'Access denied. Your account is missing dealer scope or required features.')
+                    : status
+                        ? `Dashboard request failed (${status})${serverMessage ? `: ${serverMessage}` : ''}`
+                        : `Dashboard request could not reach the backend${requestUrl ? `: ${requestUrl}` : ''}`;
 
             setError(message);
 
