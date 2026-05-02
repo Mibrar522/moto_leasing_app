@@ -23,6 +23,11 @@ const ensureVehicleTypesTable = async () => {
 
 };
 
+const getNextVehicleTypeId = async () => {
+    const result = await pool.query('SELECT COALESCE(MAX(id), 0)::int + 1 AS next_id FROM vehicle_types');
+    return Number(result.rows[0]?.next_id || 1);
+};
+
 exports.listProducts = async (_req, res) => {
     try {
         const result = await pool.query(
@@ -100,8 +105,10 @@ exports.createVehicleType = async (req, res) => {
             [typeKey]
         );
 
-        const result = existingResult.rows.length > 0
-            ? await pool.query(
+        let result;
+
+        if (existingResult.rows.length > 0) {
+            result = await pool.query(
                 `
                 UPDATE vehicle_types
                 SET display_name = $2,
@@ -110,24 +117,32 @@ exports.createVehicleType = async (req, res) => {
                 RETURNING id, type_key, display_name, is_active, sort_order
                 `,
                 [existingResult.rows[0].id, rawName]
-            )
-            : await pool.query(
-            `
-            INSERT INTO vehicle_types (id, type_key, display_name, sort_order)
-            VALUES (
-                COALESCE((SELECT MAX(id) + 1 FROM vehicle_types), 1),
-                $1,
-                $2,
-                COALESCE((SELECT MAX(sort_order) + 1 FROM vehicle_types), 1)
-            )
-            RETURNING id, type_key, display_name, is_active, sort_order
-            `,
-            [typeKey, rawName]
             );
+        } else {
+            const nextId = await getNextVehicleTypeId();
+            result = await pool.query(
+                `
+                INSERT INTO vehicle_types (id, type_key, display_name, is_active, sort_order)
+                VALUES (
+                    $1,
+                    $2,
+                    $3,
+                    TRUE,
+                    COALESCE((SELECT MAX(sort_order) + 1 FROM vehicle_types), 1)
+                )
+                RETURNING id, type_key, display_name, is_active, sort_order
+                `,
+                [nextId, typeKey, rawName]
+            );
+        }
 
         res.status(201).json(result.rows[0]);
     } catch (error) {
-        res.status(500).json({ message: 'Failed to create vehicle type', error: error.message });
+        res.status(500).json({
+            message: 'Failed to create vehicle type',
+            error: error.message,
+            codeVersion: 'vehicle-types-bound-id-v2',
+        });
     }
 };
 

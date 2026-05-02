@@ -428,6 +428,69 @@ const ensureDefaultRolePermissions = async (client, roleId, featureKeys = []) =>
     }
 };
 
+const getVehicleTypesIdDataType = async (client) => {
+    const result = await client.query(`
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'vehicle_types'
+          AND column_name = 'id'
+        LIMIT 1
+    `);
+
+    return result.rows[0]?.data_type || '';
+};
+
+const seedVehicleTypesFromVehicles = async (client) => {
+    const idDataType = await getVehicleTypesIdDataType(client);
+
+    if (idDataType.includes('integer')) {
+        await client.query(`
+            WITH new_types AS (
+                SELECT
+                    UPPER(TRIM(v.vehicle_type)) AS type_key,
+                    INITCAP(LOWER(TRIM(v.vehicle_type))) AS display_name,
+                    ROW_NUMBER() OVER (ORDER BY UPPER(TRIM(v.vehicle_type))) AS row_number
+                FROM vehicles v
+                WHERE COALESCE(TRIM(v.vehicle_type), '') <> ''
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM vehicle_types vt
+                      WHERE vt.type_key = UPPER(TRIM(v.vehicle_type))
+                  )
+                GROUP BY UPPER(TRIM(v.vehicle_type)), INITCAP(LOWER(TRIM(v.vehicle_type)))
+            ),
+            max_values AS (
+                SELECT
+                    COALESCE(MAX(id), 0) AS max_id,
+                    COALESCE(MAX(sort_order), 0) AS max_sort_order
+                FROM vehicle_types
+            )
+            INSERT INTO vehicle_types (id, type_key, display_name, sort_order)
+            SELECT
+                max_values.max_id + new_types.row_number,
+                new_types.type_key,
+                new_types.display_name,
+                max_values.max_sort_order + new_types.row_number
+            FROM new_types
+            CROSS JOIN max_values
+            ON CONFLICT (type_key) DO NOTHING
+        `);
+        return;
+    }
+
+    await client.query(`
+        INSERT INTO vehicle_types (type_key, display_name, sort_order)
+        SELECT DISTINCT
+            UPPER(TRIM(v.vehicle_type)) AS type_key,
+            INITCAP(LOWER(TRIM(v.vehicle_type))) AS display_name,
+            ROW_NUMBER() OVER (ORDER BY UPPER(TRIM(v.vehicle_type)))
+        FROM vehicles v
+        WHERE COALESCE(TRIM(v.vehicle_type), '') <> ''
+        ON CONFLICT (type_key) DO NOTHING
+    `);
+};
+
 exports.syncAccessControlDefaults = async () => {
     const client = await pool.connect();
 
@@ -715,16 +778,7 @@ exports.syncAccessControlDefaults = async () => {
             WHERE COALESCE(TRIM(serial_number), '') = ''
         `);
 
-        await client.query(`
-            INSERT INTO vehicle_types (type_key, display_name, sort_order)
-            SELECT DISTINCT
-                UPPER(TRIM(v.vehicle_type)) AS type_key,
-                INITCAP(LOWER(TRIM(v.vehicle_type))) AS display_name,
-                ROW_NUMBER() OVER (ORDER BY UPPER(TRIM(v.vehicle_type)))
-            FROM vehicles v
-            WHERE COALESCE(TRIM(v.vehicle_type), '') <> ''
-            ON CONFLICT (type_key) DO NOTHING
-        `);
+        await seedVehicleTypesFromVehicles(client);
 
         await client.query(`
             INSERT INTO company_profiles (company_name, company_email)
