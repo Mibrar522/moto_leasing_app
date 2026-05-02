@@ -1,5 +1,32 @@
 const pool = require('../config/db');
 
+const ensureVehicleTypesTable = async () => {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS vehicle_types (
+            id INTEGER PRIMARY KEY,
+            type_key VARCHAR(80) NOT NULL UNIQUE,
+            display_name VARCHAR(120) NOT NULL,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    `);
+
+    await pool.query(`
+        ALTER TABLE vehicle_types
+            ADD COLUMN IF NOT EXISTS type_key VARCHAR(80),
+            ADD COLUMN IF NOT EXISTS display_name VARCHAR(120),
+            ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    `);
+
+    await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS vehicle_types_type_key_unique
+        ON vehicle_types (type_key)
+    `);
+};
+
 exports.listProducts = async (_req, res) => {
     try {
         const result = await pool.query(
@@ -39,6 +66,8 @@ exports.listProducts = async (_req, res) => {
 
 exports.listVehicleTypes = async (_req, res) => {
     try {
+        await ensureVehicleTypesTable();
+
         const result = await pool.query(
             `
             SELECT id, type_key, display_name, is_active, sort_order
@@ -56,6 +85,8 @@ exports.listVehicleTypes = async (_req, res) => {
 
 exports.createVehicleType = async (req, res) => {
     try {
+        await ensureVehicleTypesTable();
+
         const rawName = String(req.body.display_name || req.body.type_key || '').trim();
         if (!rawName) {
             return res.status(400).json({ message: 'Vehicle type name is required' });
@@ -64,8 +95,9 @@ exports.createVehicleType = async (req, res) => {
         const typeKey = rawName.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
         const result = await pool.query(
             `
-            INSERT INTO vehicle_types (type_key, display_name, sort_order)
+            INSERT INTO vehicle_types (id, type_key, display_name, sort_order)
             VALUES (
+                COALESCE((SELECT MAX(id) + 1 FROM vehicle_types), 1),
                 $1,
                 $2,
                 COALESCE((SELECT MAX(sort_order) + 1 FROM vehicle_types), 1)
