@@ -21,10 +21,6 @@ const ensureVehicleTypesTable = async () => {
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     `);
 
-    await pool.query(`
-        CREATE UNIQUE INDEX IF NOT EXISTS vehicle_types_type_key_unique
-        ON vehicle_types (type_key)
-    `);
 };
 
 exports.listProducts = async (_req, res) => {
@@ -93,7 +89,29 @@ exports.createVehicleType = async (req, res) => {
         }
 
         const typeKey = rawName.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
-        const result = await pool.query(
+
+        const existingResult = await pool.query(
+            `
+            SELECT id
+            FROM vehicle_types
+            WHERE type_key = $1
+            LIMIT 1
+            `,
+            [typeKey]
+        );
+
+        const result = existingResult.rows.length > 0
+            ? await pool.query(
+                `
+                UPDATE vehicle_types
+                SET display_name = $2,
+                    is_active = TRUE
+                WHERE id = $1
+                RETURNING id, type_key, display_name, is_active, sort_order
+                `,
+                [existingResult.rows[0].id, rawName]
+            )
+            : await pool.query(
             `
             INSERT INTO vehicle_types (id, type_key, display_name, sort_order)
             VALUES (
@@ -102,12 +120,10 @@ exports.createVehicleType = async (req, res) => {
                 $2,
                 COALESCE((SELECT MAX(sort_order) + 1 FROM vehicle_types), 1)
             )
-            ON CONFLICT (type_key)
-            DO UPDATE SET display_name = EXCLUDED.display_name
             RETURNING id, type_key, display_name, is_active, sort_order
             `,
             [typeKey, rawName]
-        );
+            );
 
         res.status(201).json(result.rows[0]);
     } catch (error) {

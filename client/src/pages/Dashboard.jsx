@@ -4884,7 +4884,9 @@ const selectedCustomer = useMemo(
             setVehicleTypeMessage('Vehicle type saved successfully.');
             setNewVehicleType('');
         } catch (err) {
-            setVehicleTypeMessage(err.response?.data?.message || 'Unable to save vehicle type.');
+            const apiMessage = err.response?.data?.message || 'Unable to save vehicle type.';
+            const apiError = err.response?.data?.error;
+            setVehicleTypeMessage(apiError ? `${apiMessage}: ${apiError}` : apiMessage);
         } finally {
             setSavingVehicleType(false);
         }
