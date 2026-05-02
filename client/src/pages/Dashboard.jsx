@@ -1626,16 +1626,21 @@ const Dashboard = () => {
             setError('');
         } catch (err) {
             const status = err.response?.status;
-            const serverMessage = err.response?.data?.message || err.response?.data?.error;
+            const serverMessage = err.response?.data?.message || '';
+            const serverError = err.response?.data?.error || '';
+            const serverDetail = [serverMessage, serverError]
+                .filter(Boolean)
+                .filter((value, index, values) => values.indexOf(value) === index)
+                .join(': ');
             const requestUrl = err.config?.baseURL && err.config?.url
                 ? `${String(err.config.baseURL).replace(/\/$/, '')}/${String(err.config.url).replace(/^\//, '')}`
                 : '';
             const message = status === 401
                 ? 'Your session has expired. Please sign in again.'
                 : status === 403
-                    ? (serverMessage || 'Access denied. Your account is missing dealer scope or required features.')
+                    ? (serverDetail || 'Access denied. Your account is missing dealer scope or required features.')
                     : status
-                        ? `Dashboard request failed (${status})${serverMessage ? `: ${serverMessage}` : ''}`
+                        ? `Dashboard request failed (${status})${serverDetail ? `: ${serverDetail}` : ''}`
                         : `Dashboard request could not reach the backend${requestUrl ? `: ${requestUrl}` : ''}`;
 
             setError(message);

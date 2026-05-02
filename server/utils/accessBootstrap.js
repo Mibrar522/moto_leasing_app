@@ -1038,6 +1038,31 @@ exports.syncAccessCatalogDefaults = async () => {
         await client.query('BEGIN');
 
         await client.query(`
+            CREATE TABLE IF NOT EXISTS product_catalog (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                brand VARCHAR(120) NOT NULL,
+                model VARCHAR(120) NOT NULL,
+                serial_number VARCHAR(220),
+                registration_number VARCHAR(120),
+                vehicle_type VARCHAR(80) NOT NULL,
+                chassis_number VARCHAR(160),
+                engine_number VARCHAR(160),
+                color VARCHAR(80),
+                description TEXT,
+                image_url TEXT NOT NULL,
+                monthly_rate NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                purchase_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                cash_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
+                cash_markup_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                installment_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
+                installment_months INTEGER NOT NULL DEFAULT 12,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        `);
+
+        await client.query(`
             ALTER TABLE product_catalog
                 ADD COLUMN IF NOT EXISTS cash_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
                 ADD COLUMN IF NOT EXISTS cash_markup_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
