@@ -500,6 +500,10 @@ exports.syncAccessControlDefaults = async () => {
                 image_url TEXT NOT NULL,
                 monthly_rate NUMERIC(12, 2) NOT NULL DEFAULT 0,
                 purchase_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                cash_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
+                cash_markup_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                installment_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
+                installment_months INTEGER NOT NULL DEFAULT 12,
                 is_active BOOLEAN NOT NULL DEFAULT TRUE,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -516,6 +520,10 @@ exports.syncAccessControlDefaults = async () => {
                 ADD COLUMN IF NOT EXISTS description TEXT,
                 ADD COLUMN IF NOT EXISTS monthly_rate NUMERIC(12, 2) NOT NULL DEFAULT 0,
                 ADD COLUMN IF NOT EXISTS purchase_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS cash_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS cash_markup_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS installment_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS installment_months INTEGER NOT NULL DEFAULT 12,
                 ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE,
                 ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -1028,6 +1036,14 @@ exports.syncAccessCatalogDefaults = async () => {
 
     try {
         await client.query('BEGIN');
+
+        await client.query(`
+            ALTER TABLE product_catalog
+                ADD COLUMN IF NOT EXISTS cash_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS cash_markup_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS installment_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS installment_months INTEGER NOT NULL DEFAULT 12
+        `);
 
         for (const roleName of ROLE_NAMES) {
             await ensureRole(client, roleName);
