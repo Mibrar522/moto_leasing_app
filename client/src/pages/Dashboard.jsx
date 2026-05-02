@@ -1031,6 +1031,29 @@ const resolveVehicleIdFromSale = (sale, inventory = []) => {
     return byModel?.id || '';
 };
 
+const normalizeDateInputValue = (value = '') => {
+    const rawValue = String(value || '').trim();
+    if (!rawValue) return '';
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+        return rawValue;
+    }
+
+    const dayFirstMatch = rawValue.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+    if (dayFirstMatch) {
+        const [, day, month, year] = dayFirstMatch;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    const yearFirstMatch = rawValue.match(/^(\d{4})[./](\d{1,2})[./](\d{1,2})$/);
+    if (yearFirstMatch) {
+        const [, year, month, day] = yearFirstMatch;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    return '';
+};
+
 const extractOcrFields = (rawText, currentDocumentType, assetType = '') => {
     const normalizeOcrLine = (line) => String(line || '')
         .replace(/[|]/g, 'I')
@@ -1391,7 +1414,7 @@ const mapCustomerFromApi = (customer) => {
         country: ocrDetails.country || '',
         gender: ocrDetails.gender || '',
         address: ocrDetails.address || '',
-        date_of_birth: ocrDetails.date_of_birth || '',
+        date_of_birth: normalizeDateInputValue(ocrDetails.date_of_birth) || '',
         identity_doc_url: customer.identity_doc_url || '',
         identity_doc_back_url: ocrDetails.identity_doc_back_url || '',
         raw_ocr_text: customer.raw_ocr_text || ocrDetails.raw_ocr_text || '',
@@ -1929,7 +1952,6 @@ const canDeleteCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_C
 const canViewCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_VIEW', 'FEAT_CUSTOMER_MGMT', 'FEAT_CUSTOMER_RECORD_EDIT', 'FEAT_CUSTOMER_RECORD_DELETE']);
 const canViewCustomerRegister = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_REGISTER', 'FEAT_CUSTOMER_MGMT', 'FEAT_CUSTOMER_RECORD_VIEW', 'FEAT_CUSTOMER_RECORD_EDIT', 'FEAT_CUSTOMER_RECORD_DELETE']);
 const canViewCustomerFingerprint = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT', 'FEAT_CUSTOMER_MGMT', 'FEAT_CUSTOMER_BIOMETRIC', 'FEAT_BIOMETRIC']);
-// Show the intake form if the role explicitly has it, or if they can edit customer records (edit button uses the form).
 const canViewCustomerForm = canOpenCustomers && (hasAnyFeature(user, ['FEAT_CUSTOMER_FORM', 'FEAT_CUSTOMER_MGMT']) || canEditCustomerRecord);
 const canUnlockCustomerOwnership = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_OWNERSHIP_UNLOCK']) && hasAnyFeature(user, ['FEAT_CUSTOMER_MGMT']);
 const canViewEmployeeForm = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_FORM']);
@@ -5198,7 +5220,7 @@ const selectedCustomer = useMemo(
             gender: extracted.gender || current.gender,
             country: extracted.country || current.country,
             address: extracted.address || current.address,
-            date_of_birth: extracted.date_of_birth || current.date_of_birth,
+            date_of_birth: normalizeDateInputValue(extracted.date_of_birth) || current.date_of_birth,
             extracted_name: extracted.extracted_name || current.extracted_name,
             father_name: extracted.father_name || current.father_name,
             full_name: extracted.extracted_name || current.full_name,
@@ -5276,6 +5298,11 @@ const selectedCustomer = useMemo(
 
         if (!customerForm.id && !canManageCustomers) {
             setCustomerMessage('Your account does not have permission to create new customers.');
+            return;
+        }
+
+        if (!customerForm.id && !canUnlockCustomerOwnership) {
+            setCustomerMessage('Creation disabled.');
             return;
         }
 
@@ -5948,7 +5975,7 @@ const selectedCustomer = useMemo(
                     nextState.gender = extracted.gender || current.gender;
                     nextState.country = extracted.country || current.country;
                     nextState.address = extracted.address || current.address;
-                    nextState.date_of_birth = extracted.date_of_birth || current.date_of_birth;
+                    nextState.date_of_birth = normalizeDateInputValue(extracted.date_of_birth) || current.date_of_birth;
                     nextState.extracted_name = extracted.extracted_name || current.extracted_name;
                     nextState.father_name = extracted.father_name || current.father_name;
                     nextState.full_name = extracted.extracted_name || current.full_name;
@@ -10200,25 +10227,21 @@ const selectedCustomer = useMemo(
                                         <button type="button" className="view-btn" onClick={resetCustomerForm}>
                                             Clear
                                         </button>
-                                        <button type="submit" className="primary-btn" disabled={savingCustomer}>
+                                        <button type="submit" className="primary-btn" disabled={savingCustomer || (!customerForm.id && !canUnlockCustomerOwnership)}>
                                             {savingCustomer ? 'Saving...' : customerForm.id ? 'Update Customer' : 'Create Customer'}
                                         </button>
                                     </div>
                                 </div>
 
-                                {customerForm.id ? (
+                                {customerForm.id && !canUnlockCustomerOwnership ? (
                                     <div className="notice-banner">
-                                        {canUnlockCustomerOwnership
-                                            ? 'Customer ownership is locked by default after creation. You have unlock permission, but ownership changes should stay exceptional for security and tracking.'
-                                            : 'Customer ownership is locked after creation. Assigned dealer and created by stay fixed for security and tracking.'}
+                                        Ownership locked.
                                     </div>
-                                ) : (
+                                ) : !customerForm.id && !canUnlockCustomerOwnership ? (
                                     <div className="notice-banner">
-                                        {canUnlockCustomerOwnership
-                                            ? 'Your account can set assigned dealer and created by during new customer creation because the ownership unlock feature is enabled.'
-                                            : 'Assigned dealer and created by are preset and locked on new customer creation for security. Enable the unlock feature if you need to change them.'}
+                                        Creation disabled.
                                     </div>
-                                )}
+                                ) : null}
 
                                 {customerMessage ? <div className="notice-banner">{customerMessage}</div> : null}
 
@@ -10261,7 +10284,7 @@ const selectedCustomer = useMemo(
                                     </label>
                                     <label className="field">
                                         <span>Date Of Birth</span>
-                                        <input name="date_of_birth" value={customerForm.date_of_birth} onChange={handleCustomerChange} placeholder="16.06.1994" />
+                                        <input type="date" name="date_of_birth" value={normalizeDateInputValue(customerForm.date_of_birth)} onChange={handleCustomerChange} />
                                     </label>
                                     <label className="field">
                                         <span>Gender</span>
@@ -10365,10 +10388,6 @@ const selectedCustomer = useMemo(
                                     <label className="field full-span">
                                         <span>OCR Extracted Name</span>
                                         <input name="extracted_name" value={customerForm.extracted_name} onChange={handleCustomerChange} placeholder="Autofilled from OCR or entered manually" />
-                                    </label>
-                                    <label className="field full-span">
-                                        <span>OCR Scan Text</span>
-                                        <textarea name="raw_ocr_text" value={customerForm.raw_ocr_text} onChange={handleCustomerChange} rows="7" placeholder="Paste OCR text from the CNIC image here, then click Process OCR." />
                                     </label>
                                 </div>
 
@@ -10567,17 +10586,17 @@ const selectedCustomer = useMemo(
 
                                 {!canManageEmployees ? (
                                     <div className="notice-banner">
-                                        Your account does not have employee management access.
+                                        Creation disabled.
                                     </div>
                                 ) : employeeForm.id && !canEditEmployees ? (
                                     <div className="notice-banner">
-                                        Application admins can create staff for their dealer. Only the super admin can edit existing employee records or move them between dealers.
+                                        Record locked.
                                     </div>
                                 ) : !canUnlockEmployeeSecurityFields ? (
                                     <div className="notice-banner">
                                         {employeeForm.id
-                                            ? 'Assigned dealer, role, and active status are locked after creation for security. Ask an authorized user with unlock permission if one of these must change later.'
-                                            : 'Assigned dealer, role, and active status are preset and locked on new employee creation for security. Enable the unlock feature if you need to change them.'}
+                                            ? 'Record locked.'
+                                            : 'Creation disabled.'}
                                     </div>
                                 ) : null}
 
