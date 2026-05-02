@@ -323,16 +323,35 @@ const AGENT_FEATURES = [
     'FEAT_REPORT_INVOICE_VIEW',
 ];
 
+const ensureAccessTableShape = async (client) => {
+    await client.query(`
+        ALTER TABLE roles
+            ADD COLUMN IF NOT EXISTS name VARCHAR(60),
+            ADD COLUMN IF NOT EXISTS role_name VARCHAR(60)
+    `);
+};
+
 const ensureRole = async (client, roleName) => {
     await client.query(
         `
-        INSERT INTO roles (role_name)
-        SELECT $1::varchar
+        INSERT INTO roles (id, name, role_name)
+        SELECT next_id, $1::varchar, $1::varchar
+        FROM (SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM roles) ids
         WHERE NOT EXISTS (
             SELECT 1
             FROM roles
-            WHERE role_name = $1::varchar
+            WHERE role_name = $1::varchar OR name = $1::varchar
         )
+        `,
+        [roleName]
+    );
+
+    await client.query(
+        `
+        UPDATE roles
+        SET role_name = COALESCE(role_name, name),
+            name = COALESCE(name, role_name)
+        WHERE role_name = $1::varchar OR name = $1::varchar
         `,
         [roleName]
     );
@@ -341,8 +360,9 @@ const ensureRole = async (client, roleName) => {
 const ensureFeature = async (client, featureKey, displayName) => {
     await client.query(
         `
-        INSERT INTO features (feature_key, display_name)
-        SELECT $1::varchar, $2::varchar
+        INSERT INTO features (id, feature_key, display_name)
+        SELECT next_id, $1::varchar, $2::varchar
+        FROM (SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM features) ids
         WHERE NOT EXISTS (
             SELECT 1
             FROM features
@@ -353,7 +373,7 @@ const ensureFeature = async (client, featureKey, displayName) => {
     );
 
     await client.query(
-        'UPDATE features SET display_name = $2 WHERE feature_key = $1',
+        'UPDATE features SET display_name = $2::varchar WHERE feature_key = $1::varchar',
         [featureKey, displayName]
     );
 };
@@ -413,6 +433,7 @@ exports.syncAccessControlDefaults = async () => {
 
     try {
         await client.query('BEGIN');
+        await ensureAccessTableShape(client);
 
         await client.query(`
             ALTER TABLE dealers
@@ -1005,7 +1026,7 @@ exports.syncAccessControlDefaults = async () => {
         }
 
         const rolesResult = await client.query(
-            'SELECT id, role_name FROM roles'
+            'SELECT id, COALESCE(role_name, name) AS role_name FROM roles'
         );
 
         const roleIdByName = rolesResult.rows.reduce((acc, role) => {
@@ -1036,6 +1057,7 @@ exports.syncAccessCatalogDefaults = async () => {
 
     try {
         await client.query('BEGIN');
+        await ensureAccessTableShape(client);
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS product_catalog (
@@ -1078,7 +1100,7 @@ exports.syncAccessCatalogDefaults = async () => {
             await ensureFeature(client, featureKey, displayName);
         }
 
-        const rolesResult = await client.query('SELECT id, role_name FROM roles');
+        const rolesResult = await client.query('SELECT id, COALESCE(role_name, name) AS role_name FROM roles');
         const roleIdByName = rolesResult.rows.reduce((acc, role) => {
             acc[role.role_name] = role.id;
             return acc;
