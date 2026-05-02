@@ -232,7 +232,15 @@ const ROLE_DISPLAY_LABELS = {
     AGENT: 'Agent',
 };
 
-const normalizeRoleName = (roleName = '') => LEGACY_ROLE_NAME_MAP[String(roleName || '').toUpperCase()] || String(roleName || '').toUpperCase();
+const normalizeRoleName = (roleName = '') => {
+    const normalized = String(roleName || '')
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+
+    return LEGACY_ROLE_NAME_MAP[normalized] || normalized;
+};
 const getRoleDisplayName = (roleName = '') => ROLE_DISPLAY_LABELS[normalizeRoleName(roleName)] || String(roleName || '').replace(/_/g, ' ');
 const getRoleSortIndex = (roleName = '') => {
     const index = ROLE_HIERARCHY.indexOf(normalizeRoleName(roleName));
@@ -10990,6 +10998,11 @@ const selectedCustomer = useMemo(
                         {accessMessage ? <div className="notice-banner">{accessMessage}</div> : null}
 
                         <div className="access-role-grid">
+                            {accessRoles.length === 0 ? (
+                                <div className="feedback-card error">
+                                    No access roles were returned by the backend. Check the roles table has SUPER_ADMIN, APPLICATION_ADMIN, MANAGER, and AGENT role names.
+                                </div>
+                            ) : null}
                             {accessRoles.map((role) => (
                                 <div key={role.id} className="table-card">
                                     <div className="section-header">

@@ -20,7 +20,7 @@ const getRolePermissions = async () => {
         SELECT
             rp.role_id,
             rp.feature_id,
-            r.role_name,
+            COALESCE(r.role_name, r.name) AS role_name,
             f.feature_key,
             f.display_name
         FROM role_permissions rp
@@ -591,7 +591,7 @@ exports.getDashboardData = async (req, res) => {
             dealerStaffScopeParams
         );
 
-        const rolesResult = await pool.query('SELECT id, role_name FROM roles ORDER BY id');
+        const rolesResult = await pool.query('SELECT id, COALESCE(role_name, name) AS role_name FROM roles ORDER BY id');
         const featuresResult = await pool.query('SELECT id, feature_key, display_name FROM features ORDER BY id');
         const workflowDefinitionScopeClause = hasGlobalScope ? '' : 'WHERE wd.dealer_id = $1 OR wd.dealer_id IS NULL';
         const workflowDefinitionScopeParams = hasGlobalScope ? [] : [effectiveDealerId || null];
