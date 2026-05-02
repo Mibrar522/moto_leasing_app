@@ -3,13 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { Pool } = require('pg');
-
-// 1. Database Configuration
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, 
-  ssl: { rejectUnauthorized: false } 
-});
+const pool = require('./config/db');
 
 // Export pool so other files/routes can use it
 module.exports = { pool };

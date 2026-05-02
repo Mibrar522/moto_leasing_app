@@ -327,11 +327,11 @@ const ensureRole = async (client, roleName) => {
     await client.query(
         `
         INSERT INTO roles (role_name)
-        SELECT $1
+        SELECT $1::varchar
         WHERE NOT EXISTS (
             SELECT 1
             FROM roles
-            WHERE role_name = $1
+            WHERE role_name = $1::varchar
         )
         `,
         [roleName]
@@ -342,11 +342,11 @@ const ensureFeature = async (client, featureKey, displayName) => {
     await client.query(
         `
         INSERT INTO features (feature_key, display_name)
-        SELECT $1, $2
+        SELECT $1::varchar, $2::varchar
         WHERE NOT EXISTS (
             SELECT 1
             FROM features
-            WHERE feature_key = $1
+            WHERE feature_key = $1::varchar
         )
         `,
         [featureKey, displayName]
