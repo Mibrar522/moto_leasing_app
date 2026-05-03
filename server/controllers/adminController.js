@@ -397,6 +397,7 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN dealers d ON d.id = ou.dealer_id
             ${isDealerScopedView ? 'WHERE d.id = $1' : ''}
             ORDER BY v.created_at DESC NULLS LAST, v.brand ASC, v.model ASC
+            LIMIT 500
             `,
             isDealerScopedView ? [effectiveDealerId] : []
         );
@@ -427,6 +428,7 @@ exports.getDashboardData = async (req, res) => {
             FROM product_catalog
             WHERE is_active = TRUE
             ORDER BY created_at DESC, brand ASC, model ASC
+            LIMIT 500
             `
         );
 
@@ -446,6 +448,7 @@ exports.getDashboardData = async (req, res) => {
             FROM company_profiles
             WHERE is_active = TRUE
             ORDER BY company_name ASC
+            LIMIT 300
             `
         );
 
@@ -587,6 +590,7 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN roles r ON r.id = COALESCE(e.role_id, u.role_id)
             ${dealerStaffScopeClause}
             ORDER BY u.full_name ASC, u.created_at DESC
+            LIMIT 300
             `,
             dealerStaffScopeParams
         );
@@ -838,6 +842,7 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN dealers d ON d.id = u.dealer_id
             ${isDealerScopedView ? 'WHERE d.id = $1' : ''}
             ORDER BY so.created_at DESC
+            LIMIT 300
             `,
             isDealerScopedView ? [effectiveDealerId] : []
         );
@@ -949,6 +954,7 @@ exports.getDashboardData = async (req, res) => {
                 ${isEmployeeLogin ? 'WHERE st.agent_id = $1' : isDealerScopedView ? 'WHERE d.id = $1' : ''}
                 GROUP BY st.id, c.full_name, c.cnic_passport_number, c.identity_doc_url, c.ocr_details, v.brand, v.model, v.image_url, v.vehicle_type, v.serial_number, v.registration_number, v.chassis_number, v.engine_number, v.color, v.product_description, v.purchase_price, u.full_name, d.id, d.dealer_name, d.dealer_code, d.dealer_signature_url
                 ORDER BY st.created_at DESC
+                LIMIT 300
                 `,
                 isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
                 ),

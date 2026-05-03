@@ -2,6 +2,7 @@
 require('dotenv').config(); 
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const path = require('path');
 const pool = require('./config/db');
 
@@ -63,6 +64,7 @@ app.use(cors({
 
 app.options('*', cors());
 
+app.use(compression({ threshold: 1024 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
