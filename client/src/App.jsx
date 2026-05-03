@@ -1,9 +1,11 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Navigate, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard'; 
-import AdsManager from './pages/AdsManager';
 import './App.css';
+
+const Register = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const AdsManager = lazy(() => import('./pages/AdsManager'));
 
 const hasSessionToken = () => {
   const token = localStorage.getItem('token');
@@ -23,26 +25,28 @@ function App() {
 
   return (
     <Router>
-      <Routes>
-        {/* Entry Point */}
-        <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
+      <Suspense fallback={<div className="app-loading">Loading...</div>}>
+        <Routes>
+          {/* Entry Point */}
+          <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
 
-        {/* Auth Routes */}
-        <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
-        <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+          {/* Auth Routes */}
+          <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+          <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
 
-        {/* Application Routes */}
-        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/ads" element={<ProtectedRoute><AdsManager /></ProtectedRoute>} />
+          {/* Application Routes */}
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/ads" element={<ProtectedRoute><AdsManager /></ProtectedRoute>} />
 
-        {/* Legacy Support (Important for old bookmarks/cached links) */}
-        <Route path="/app/dashboard" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/app/ads" element={<Navigate to="/ads" replace />} />
-        <Route path="/app/*" element={<Navigate to="/dashboard" replace />} />
+          {/* Legacy Support (Important for old bookmarks/cached links) */}
+          <Route path="/app/dashboard" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/app/ads" element={<Navigate to="/ads" replace />} />
+          <Route path="/app/*" element={<Navigate to="/dashboard" replace />} />
 
-        {/* Catch-all */}
-        <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
-      </Routes>
+          {/* Catch-all */}
+          <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
+        </Routes>
+      </Suspense>
     </Router>
   );
 }
