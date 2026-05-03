@@ -6245,7 +6245,7 @@ const selectedCustomer = useMemo(
 
         try {
             setSavingStock(true);
-            await API.post('/stock/orders', {
+            const { data } = await API.post('/stock/orders', {
                 ...stockOrderForm,
                 quantity: 1,
                 unit_price: Number(stockOrderForm.unit_price || 0),
@@ -6253,7 +6253,13 @@ const selectedCustomer = useMemo(
             });
             await loadDashboard();
             resetStockOrderForm();
-            setStockMessage('Stock order created and processing email status has been recorded.');
+            if (data.email_sent) {
+                setStockMessage('Stock order created and email sent to company.');
+            } else if (data.email_error) {
+                setStockMessage(`Stock order created, but email was not sent: ${data.email_error}`);
+            } else {
+                setStockMessage('Stock order created. No company email was available for notification.');
+            }
         } catch (err) {
             setStockMessage(err.response?.data?.message || 'Unable to create stock order.');
         } finally {
