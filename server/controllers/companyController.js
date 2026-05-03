@@ -43,37 +43,62 @@ exports.createCompany = async (req, res) => {
             return res.status(400).json({ message: 'Company name is required' });
         }
 
-        const result = await pool.query(
+        const values = [
+            String(company_name || '').trim(),
+            String(company_email || '').trim() || null,
+            String(contact_person || '').trim() || null,
+            String(phone || '').trim() || null,
+            String(address || '').trim() || null,
+            String(notes || '').trim() || null,
+            typeof is_active === 'boolean' ? is_active : true,
+        ];
+
+        const existingCompany = await pool.query(
             `
-            INSERT INTO company_profiles (
-                company_name, company_email, contact_person, phone, address, notes, is_active
-            )
-            VALUES ($1,$2,$3,$4,$5,$6,$7)
-            ON CONFLICT (company_name)
-            DO UPDATE SET
-                company_email = EXCLUDED.company_email,
-                contact_person = EXCLUDED.contact_person,
-                phone = EXCLUDED.phone,
-                address = EXCLUDED.address,
-                notes = EXCLUDED.notes,
-                is_active = EXCLUDED.is_active,
-                updated_at = NOW()
-            RETURNING *
+            SELECT id
+            FROM company_profiles
+            WHERE UPPER(TRIM(company_name)) = UPPER(TRIM($1::varchar))
+            LIMIT 1
             `,
-            [
-                String(company_name || '').trim(),
-                String(company_email || '').trim() || null,
-                String(contact_person || '').trim() || null,
-                String(phone || '').trim() || null,
-                String(address || '').trim() || null,
-                String(notes || '').trim() || null,
-                typeof is_active === 'boolean' ? is_active : true,
-            ]
+            [values[0]]
         );
+
+        const result = existingCompany.rows.length > 0
+            ? await pool.query(
+                `
+                UPDATE company_profiles
+                SET
+                    company_name = $2,
+                    company_email = $3,
+                    contact_person = $4,
+                    phone = $5,
+                    address = $6,
+                    notes = $7,
+                    is_active = $8,
+                    updated_at = NOW()
+                WHERE id = $1
+                RETURNING *
+                `,
+                [existingCompany.rows[0].id, ...values]
+            )
+            : await pool.query(
+                `
+                INSERT INTO company_profiles (
+                    company_name, company_email, contact_person, phone, address, notes, is_active
+                )
+                VALUES ($1,$2,$3,$4,$5,$6,$7)
+                RETURNING *
+                `,
+                values
+            );
 
         res.status(201).json(result.rows[0]);
     } catch (error) {
-        res.status(500).json({ message: 'Failed to save company profile', error: error.message });
+        res.status(500).json({
+            message: 'Failed to save company profile',
+            error: error.message,
+            codeVersion: 'company-profile-no-conflict-v1',
+        });
     }
 };
 
