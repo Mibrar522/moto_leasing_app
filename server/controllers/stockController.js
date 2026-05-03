@@ -1,6 +1,5 @@
-const path = require('path');
 const pool = require('../config/db');
-const { createTransporter } = require('../utils/mail');
+const { buildHtml, buildLocalAttachments, sendMailSafe } = require('../utils/mail');
 
 const normalizeStockOrderId = (orderId) => String(orderId || '').replace(/-/g, '').toUpperCase();
 const buildStockRegistrationNumber = (orderId, pieceNumber) =>
@@ -36,6 +35,33 @@ const buildInventorySerialBase = (order, pieceNumber) => {
         sanitizeSerialSegment(order.chassis_number || `${order.id}${pieceNumber}`),
         sanitizeSerialSegment(order.engine_number || `${order.id}${pieceNumber}`),
     ].join('');
+};
+
+const getDealerMailContext = async (userId, fallbackUser = {}) => {
+    const result = await pool.query(
+        `
+        SELECT
+            d.dealer_name,
+            d.contact_email,
+            d.mobile_country_code,
+            d.mobile_number,
+            u.email AS user_email,
+            u.full_name AS user_name
+        FROM users u
+        LEFT JOIN dealers d ON d.id = u.dealer_id
+        WHERE u.id = $1
+        LIMIT 1
+        `,
+        [userId]
+    );
+
+    const row = result.rows[0] || {};
+    return {
+        name: row.dealer_name || fallbackUser.dealer_name || fallbackUser.full_name || row.user_name || 'MotorLease',
+        email: row.contact_email || row.user_email || fallbackUser.contact_email || fallbackUser.email || process.env.SMTP_USER,
+        mobile_country_code: row.mobile_country_code || fallbackUser.mobile_country_code,
+        mobile_number: row.mobile_number || fallbackUser.mobile_number,
+    };
 };
 
 const resolveUniqueInventorySerialNumber = async (client, order, pieceNumber) => {
@@ -342,31 +368,40 @@ exports.createStockOrder = async (req, res) => {
         let emailError = null;
 
         if (company.company_email) {
-            const transporter = createTransporter();
+            const dealerMail = await getDealerMailContext(req.user.id, req.user);
+            const amount = Number(total_amount || unit_price || product.purchase_price || 0);
+            const lines = [
+                `A new stock order has been placed for ${product.brand} ${product.model}.`,
+                `Vehicle type: ${String(product.vehicle_type || vehicle_type || '').toUpperCase()}`,
+                `Quantity: 1`,
+                `Total amount: ${amount}`,
+                expected_delivery_date ? `Expected delivery date: ${expected_delivery_date}` : '',
+                notes ? `Notes: ${notes}` : '',
+            ].filter(Boolean);
+            const emailResult = await sendMailSafe({
+                dealer: dealerMail,
+                to: company.company_email,
+                subject: `Stock order ${order.id} - ${product.brand} ${product.model}`,
+                text: [
+                    `Dear ${company.company_name},`,
+                    '',
+                    ...lines,
+                    '',
+                    'The bank slip is attached when available.',
+                    '',
+                    `Thanks and regards,\n${dealerMail.name}\n${dealerMail.email || ''}`,
+                ].join('\n'),
+                html: buildHtml({
+                    title: 'New Stock Order',
+                    greeting: `Dear ${company.company_name},`,
+                    lines: [...lines, 'The bank slip is attached when available.'],
+                    dealer: dealerMail,
+                }),
+                attachments: buildLocalAttachments([bank_slip_url]),
+            });
 
-            if (!transporter) {
-                emailError = 'SMTP is not configured on the server';
-            } else {
-                try {
-                    await transporter.sendMail({
-                        from: process.env.SMTP_FROM || process.env.SMTP_USER,
-                        to: company.company_email,
-                        subject: `Stock order ${order.id} - ${product.brand} ${product.model}`,
-                        text: `A stock order has been processed for ${product.brand} ${product.model}. Total amount: ${Number(total_amount || unit_price || product.purchase_price || 0)}.`,
-                        attachments: bank_slip_url
-                            ? [
-                                {
-                                    filename: path.basename(bank_slip_url),
-                                    path: path.join(__dirname, '..', bank_slip_url.replace(/^\//, '')),
-                                },
-                            ]
-                            : [],
-                    });
-                    emailSent = true;
-                } catch (error) {
-                    emailError = error.message;
-                }
-            }
+            emailSent = emailResult.sent;
+            emailError = emailResult.error;
 
             await pool.query(
                 'UPDATE stock_orders SET email_sent = $1, email_error = $2 WHERE id = $3',

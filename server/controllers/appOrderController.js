@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { buildHtml, sendMailSafe } = require('../utils/mail');
 
 const safeNumber = (value) => {
     const n = Number(value);
@@ -29,6 +30,109 @@ const buildInstallmentAmounts = (total, months) => {
     const sumFirst = round2(base * (normalizedMonths - 1));
     amounts[normalizedMonths - 1] = round2(normalizedTotal - sumFirst);
     return amounts;
+};
+
+const getOrderDealerMailContext = async (dealerId) => {
+    if (!dealerId) {
+        return {
+            name: 'MotorLease',
+            email: process.env.SMTP_USER,
+        };
+    }
+
+    const result = await pool.query(
+        `
+        SELECT
+            d.dealer_name,
+            d.contact_email,
+            d.mobile_country_code,
+            d.mobile_number,
+            admin_user.email AS admin_email
+        FROM dealers d
+        LEFT JOIN users admin_user ON admin_user.id = d.admin_user_id
+        WHERE d.id = $1
+        LIMIT 1
+        `,
+        [dealerId]
+    );
+
+    const row = result.rows[0] || {};
+    return {
+        name: row.dealer_name || 'MotorLease',
+        email: row.contact_email || row.admin_email || process.env.SMTP_USER,
+        admin_email: row.admin_email,
+        mobile_country_code: row.mobile_country_code,
+        mobile_number: row.mobile_number,
+    };
+};
+
+const sendOrderCreatedEmails = async ({ customer, order, vehicle, installments }) => {
+    const dealerMail = await getOrderDealerMailContext(customer.preferred_dealer_id || vehicle.dealer_id);
+    const modeLabel = order.purchase_mode === 'INSTALLMENT' ? 'Installment' : 'Cash';
+    const lines = [
+        `Order ID: ${order.id}`,
+        `Vehicle: ${vehicle.brand} ${vehicle.model}`,
+        `Vehicle type: ${vehicle.vehicle_type || 'Not set'}`,
+        `Purchase mode: ${modeLabel}`,
+        `Total price: ${Number(order.total_price || 0)}`,
+        order.purchase_mode === 'INSTALLMENT' ? `Installment months: ${order.installment_months}` : '',
+        order.purchase_mode === 'INSTALLMENT' ? `Monthly amount: ${Number(order.monthly_amount || 0)}` : '',
+        order.purchase_mode === 'INSTALLMENT' ? `Down payment: ${Number(order.down_payment || 0)}` : '',
+    ].filter(Boolean);
+
+    const customerResult = await sendMailSafe({
+        dealer: dealerMail,
+        to: customer.email,
+        subject: `Order confirmation - ${vehicle.brand} ${vehicle.model}`,
+        text: [
+            `Dear ${customer.full_name || 'Customer'},`,
+            '',
+            'Your order has been placed successfully.',
+            ...lines,
+            installments?.length ? `Installment schedule created with ${installments.length} installment(s).` : '',
+            '',
+            `Thanks and regards,\n${dealerMail.name}\n${dealerMail.email || ''}`,
+        ].filter(Boolean).join('\n'),
+        html: buildHtml({
+            title: 'Order Confirmation',
+            greeting: `Dear ${customer.full_name || 'Customer'},`,
+            lines: [
+                'Your order has been placed successfully.',
+                ...lines,
+                installments?.length ? `Installment schedule created with ${installments.length} installment(s).` : '',
+            ].filter(Boolean),
+            dealer: dealerMail,
+        }),
+    });
+
+    const dealerResult = await sendMailSafe({
+        dealer: dealerMail,
+        to: [dealerMail.email, dealerMail.admin_email],
+        subject: `New customer order - ${vehicle.brand} ${vehicle.model}`,
+        text: [
+            'Dear team,',
+            '',
+            `A customer order has been placed by ${customer.full_name || customer.email}.`,
+            `Customer email: ${customer.email}`,
+            `Customer phone: ${customer.phone_e164 || ''}`,
+            ...lines,
+            '',
+            `Thanks and regards,\n${dealerMail.name}\n${dealerMail.email || ''}`,
+        ].join('\n'),
+        html: buildHtml({
+            title: 'New Customer Order',
+            greeting: 'Dear team,',
+            lines: [
+                `A customer order has been placed by ${customer.full_name || customer.email}.`,
+                `Customer email: ${customer.email}`,
+                customer.phone_e164 ? `Customer phone: ${customer.phone_e164}` : '',
+                ...lines,
+            ].filter(Boolean),
+            dealer: dealerMail,
+        }),
+    });
+
+    return [customerResult, dealerResult];
 };
 
 const ensureCustomerOrdersColumns = async (client) => {
@@ -73,10 +177,13 @@ exports.createOrder = async (req, res) => {
                 pc.cash_markup_value,
                 pc.installment_markup_percent,
                 pc.installment_months,
-                pc.is_active AS product_is_active
+                pc.is_active AS product_is_active,
+                d.id AS dealer_id
             FROM vehicles v
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN users ordered_by_user ON ordered_by_user.id = so.ordered_by
+            LEFT JOIN dealers d ON d.id = ordered_by_user.dealer_id
             WHERE v.id = $1
             LIMIT 1
             `,
@@ -216,6 +323,20 @@ exports.createOrder = async (req, res) => {
         );
 
         await client.query('COMMIT');
+
+        sendOrderCreatedEmails({
+            customer: req.customer,
+            order,
+            vehicle,
+            installments,
+        })
+            .then((results) => {
+                const failed = results.filter((entry) => entry && !entry.sent);
+                if (failed.length > 0) {
+                    console.warn('Order created email warning:', failed.map((entry) => entry.error).join('; '));
+                }
+            })
+            .catch((mailError) => console.warn('Order created email warning:', mailError.message));
 
         return res.status(201).json({
             message: 'Order created',

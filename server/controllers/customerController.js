@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { syncCustomerCoreSchema } = require('../utils/customerCoreBootstrap');
+const { buildHtml, buildLocalAttachments, sendMailSafe } = require('../utils/mail');
 
 const LOCAL_TESSDATA_DIR = path.join(__dirname, '..', 'tessdata');
 const OCR_LANGS = ['eng', 'urd'];
@@ -142,6 +143,116 @@ const buildCustomerPayload = (body, userId, includeCreator = true) => {
     }
 
     return values;
+};
+
+const getCustomerDealerMailContext = async (dealerId, creatorId) => {
+    const result = await pool.query(
+        `
+        SELECT
+            d.dealer_name,
+            d.contact_email,
+            d.mobile_country_code,
+            d.mobile_number,
+            creator.email AS creator_email,
+            creator.full_name AS creator_name,
+            admin_user.email AS admin_email
+        FROM dealers d
+        LEFT JOIN users admin_user ON admin_user.id = d.admin_user_id
+        LEFT JOIN users creator ON creator.id = $2
+        WHERE d.id = $1
+        LIMIT 1
+        `,
+        [dealerId, creatorId]
+    );
+
+    const row = result.rows[0] || {};
+    return {
+        name: row.dealer_name || row.creator_name || 'MotorLease',
+        email: row.contact_email || row.admin_email || row.creator_email || process.env.SMTP_USER,
+        admin_email: row.admin_email,
+        creator_email: row.creator_email,
+        mobile_country_code: row.mobile_country_code,
+        mobile_number: row.mobile_number,
+    };
+};
+
+const sendCustomerCreatedEmails = async (customer, creatorId) => {
+    const ocrDetails = normalizeOcrDetails(customer.ocr_details);
+    const customerEmail = ocrDetails.contact_email;
+    const dealerMail = await getCustomerDealerMailContext(customer.dealer_id, creatorId);
+    const dealerRecipients = [dealerMail.email, dealerMail.admin_email, dealerMail.creator_email];
+    const attachmentUrls = [
+        customer.identity_doc_url,
+        ocrDetails.identity_doc_back_url,
+        ocrDetails.signature_image_url,
+        ocrDetails.fingerprint?.thumb_image_url,
+    ];
+    const attachments = buildLocalAttachments(attachmentUrls);
+
+    const customerLines = [
+        `Your customer profile has been created with ${dealerMail.name}.`,
+        `Customer name: ${customer.full_name}`,
+        `CNIC / Passport: ${customer.cnic_passport_number}`,
+        'Please contact the dealer if any information needs correction.',
+    ];
+
+    const dealerLines = [
+        `A new customer profile has been created.`,
+        `Customer name: ${customer.full_name}`,
+        `CNIC / Passport: ${customer.cnic_passport_number}`,
+        customerEmail ? `Customer email: ${customerEmail}` : '',
+        ocrDetails.contact_phone ? `Customer phone: ${ocrDetails.contact_phone}` : '',
+    ].filter(Boolean);
+
+    const results = [];
+
+    if (customerEmail) {
+        results.push(await sendMailSafe({
+            dealer: dealerMail,
+            to: customerEmail,
+            subject: `Customer profile created - ${dealerMail.name}`,
+            text: [
+                `Dear ${customer.full_name},`,
+                '',
+                ...customerLines,
+                '',
+                `Thanks and regards,\n${dealerMail.name}\n${dealerMail.email || ''}`,
+            ].join('\n'),
+            html: buildHtml({
+                title: 'Customer Profile Created',
+                greeting: `Dear ${customer.full_name},`,
+                lines: customerLines,
+                dealer: dealerMail,
+            }),
+        }));
+    }
+
+    results.push(await sendMailSafe({
+        dealer: dealerMail,
+        to: dealerRecipients,
+        subject: `New customer created - ${customer.full_name}`,
+        text: [
+            'Dear team,',
+            '',
+            ...dealerLines,
+            '',
+            attachments.length > 0 ? 'Customer documents are attached.' : 'No customer document attachment was available.',
+            '',
+            `Thanks and regards,\n${dealerMail.name}\n${dealerMail.email || ''}`,
+        ].join('\n'),
+        html: buildHtml({
+            title: 'New Customer Created',
+            greeting: 'Dear team,',
+            lines: [
+                ...dealerLines,
+                attachments.length > 0 ? 'Customer documents are attached.' : 'No customer document attachment was available.',
+            ],
+            dealer: dealerMail,
+        }),
+        attachments,
+    }));
+
+    return results;
 };
 
 exports.listCustomers = async (req, res) => {
@@ -288,7 +399,17 @@ exports.createCustomer = async (req, res) => {
             }
         }
 
-        res.status(201).json(mapCustomerRow(result.rows[0]));
+        const createdCustomer = mapCustomerRow(result.rows[0]);
+        sendCustomerCreatedEmails(createdCustomer, effectiveCreatedByAgent)
+            .then((results) => {
+                const failed = results.filter((entry) => entry && !entry.sent);
+                if (failed.length > 0) {
+                    console.warn('Customer created email warning:', failed.map((entry) => entry.error).join('; '));
+                }
+            })
+            .catch((mailError) => console.warn('Customer created email warning:', mailError.message));
+
+        res.status(201).json(createdCustomer);
     } catch (error) {
         if (error?.code === '23505') {
             const constraint = String(error?.constraint || '');

@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
+const { buildHtml, buildLocalAttachments, sendMailSafe } = require('../utils/mail');
 
 const isSuperAdminSession = (user = {}) =>
     Number(user?.real_role_id || user?.role_id) === 1 ||
@@ -117,6 +118,74 @@ const syncEmployeeFeatures = async (client, employeeId, featureIds = [], deniedF
             [employeeId, featureId]
         );
     }
+};
+
+const getEmployeeDealerMailContext = async (dealerId, creatorId) => {
+    const result = await pool.query(
+        `
+        SELECT
+            d.dealer_name,
+            d.contact_email,
+            d.mobile_country_code,
+            d.mobile_number,
+            admin_user.email AS admin_email,
+            creator.email AS creator_email,
+            creator.full_name AS creator_name
+        FROM dealers d
+        LEFT JOIN users admin_user ON admin_user.id = d.admin_user_id
+        LEFT JOIN users creator ON creator.id = $2
+        WHERE d.id = $1
+        LIMIT 1
+        `,
+        [dealerId, creatorId]
+    );
+
+    const row = result.rows[0] || {};
+    return {
+        name: row.dealer_name || row.creator_name || 'MotorLease',
+        email: row.contact_email || row.admin_email || row.creator_email || process.env.SMTP_USER,
+        mobile_country_code: row.mobile_country_code,
+        mobile_number: row.mobile_number,
+    };
+};
+
+const sendEmployeeCreatedEmail = async ({ employee, password, dealerId, creatorId }) => {
+    const dealerMail = await getEmployeeDealerMailContext(dealerId, creatorId);
+    const roleName = employee.role_name || 'Staff';
+    const loginUrl = process.env.CLIENT_APP_URL || process.env.FRONTEND_URL || 'https://moto-leasing-app.vercel.app/login';
+    const lines = [
+        `Your staff account has been created for ${dealerMail.name}.`,
+        `Role: ${roleName}`,
+        `Employee code: ${employee.employee_code}`,
+        `Login email: ${employee.email}`,
+        `Temporary password: ${password}`,
+        `Login URL: ${loginUrl}`,
+        'Please sign in and keep your password secure.',
+    ];
+
+    return sendMailSafe({
+        dealer: dealerMail,
+        to: employee.email,
+        subject: `Staff account created - ${dealerMail.name}`,
+        text: [
+            `Dear ${employee.full_name},`,
+            '',
+            ...lines,
+            '',
+            `Thanks and regards,\n${dealerMail.name}\n${dealerMail.email || ''}`,
+        ].join('\n'),
+        html: buildHtml({
+            title: 'Staff Account Created',
+            greeting: `Dear ${employee.full_name},`,
+            lines,
+            dealer: dealerMail,
+        }),
+        attachments: buildLocalAttachments([
+            employee.cnic_doc_url,
+            employee.cnic_front_url,
+            employee.cnic_back_url,
+        ]),
+    });
 };
 
 const getEmployeeScopeClause = (isSuperAdmin) => (isSuperAdmin ? 'WHERE e.id = $1' : 'WHERE e.id = $1 AND e.dealer_id = $2');
@@ -521,7 +590,21 @@ exports.createEmployee = async (req, res) => {
         );
 
         await client.query('COMMIT');
-        res.status(201).json(mapEmployee(result.rows[0]));
+        const createdEmployee = mapEmployee(result.rows[0]);
+        sendEmployeeCreatedEmail({
+            employee: createdEmployee,
+            password,
+            dealerId: effectiveDealerId,
+            creatorId: req.user.id,
+        })
+            .then((mailResult) => {
+                if (!mailResult.sent) {
+                    console.warn('Employee created email warning:', mailResult.error);
+                }
+            })
+            .catch((mailError) => console.warn('Employee created email warning:', mailError.message));
+
+        res.status(201).json(createdEmployee);
     } catch (error) {
         await client.query('ROLLBACK');
         const constraintMessage = getEmployeeConstraintMessage(error);
