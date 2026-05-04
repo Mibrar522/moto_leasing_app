@@ -2533,8 +2533,27 @@
     .agent-strip {
         margin-top: 0;
         min-width: 0;
-        overflow: hidden;
-    }
+    overflow: hidden;
+}
+
+.field-url-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.field-url-actions .view-btn,
+.field-url-actions .secondary-btn {
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+}
+
+.field-url-actions .view-btn[aria-disabled="true"] {
+    pointer-events: none;
+    opacity: 0.55;
+}
 
     .notification-panel,
     .profile-panel {

@@ -4629,6 +4629,10 @@ const selectedCustomer = useMemo(
         });
     };
 
+    const clearCustomerDocumentField = (fieldName) => {
+        setCustomerForm((current) => ({ ...current, [fieldName]: '' }));
+    };
+
     const handleEmployeeChange = (event) => {
         const { name, type, value, checked } = event.target;
         setEmployeeForm((current) => ({
@@ -10312,6 +10316,14 @@ const selectedCustomer = useMemo(
                                     <label className="field">
                                         <span>Identity Document URL</span>
                                         <input name="identity_doc_url" value={customerForm.identity_doc_url} onChange={handleCustomerChange} placeholder="https://... or internal document path" />
+                                        <div className="field-url-actions">
+                                            <a className="view-btn" href={buildAssetUrl(customerForm.identity_doc_url)} target="_blank" rel="noreferrer" aria-disabled={!customerForm.identity_doc_url}>
+                                                Open
+                                            </a>
+                                            <button type="button" className="secondary-btn" onClick={() => clearCustomerDocumentField('identity_doc_url')} disabled={!customerForm.identity_doc_url}>
+                                                Clear
+                                            </button>
+                                        </div>
                                     </label>
                                     <label className="field">
                                         <span>CNIC Front Upload</span>
@@ -10346,6 +10358,14 @@ const selectedCustomer = useMemo(
                                     <label className="field">
                                         <span>CNIC Back URL</span>
                                         <input name="identity_doc_back_url" value={customerForm.identity_doc_back_url} onChange={handleCustomerChange} placeholder="/uploads/customers/..." />
+                                        <div className="field-url-actions">
+                                            <a className="view-btn" href={buildAssetUrl(customerForm.identity_doc_back_url)} target="_blank" rel="noreferrer" aria-disabled={!customerForm.identity_doc_back_url}>
+                                                Open
+                                            </a>
+                                            <button type="button" className="secondary-btn" onClick={() => clearCustomerDocumentField('identity_doc_back_url')} disabled={!customerForm.identity_doc_back_url}>
+                                                Clear
+                                            </button>
+                                        </div>
                                     </label>
                                     <label className="field">
                                         <span>CNIC Back Upload</span>
