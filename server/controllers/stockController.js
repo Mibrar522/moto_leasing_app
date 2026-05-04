@@ -64,6 +64,63 @@ const getDealerMailContext = async (userId, fallbackUser = {}) => {
     };
 };
 
+const sendStockOrderEmailInBackground = ({ order, company, product, vehicle_type, total_amount, unit_price, expected_delivery_date, notes, bank_slip_url, userId, user }) => {
+    if (!company.company_email) {
+        return;
+    }
+
+    setImmediate(async () => {
+        try {
+            const dealerMail = await getDealerMailContext(userId, user);
+            const amount = Number(total_amount || unit_price || product.purchase_price || 0);
+            const lines = [
+                `A new stock order has been placed for ${product.brand} ${product.model}.`,
+                `Vehicle type: ${String(product.vehicle_type || vehicle_type || '').toUpperCase()}`,
+                `Quantity: 1`,
+                `Total amount: ${amount}`,
+                expected_delivery_date ? `Expected delivery date: ${expected_delivery_date}` : '',
+                notes ? `Notes: ${notes}` : '',
+            ].filter(Boolean);
+            const emailResult = await sendMailSafe({
+                dealer: dealerMail,
+                to: company.company_email,
+                subject: `Stock order ${order.id} - ${product.brand} ${product.model}`,
+                text: [
+                    `Dear ${company.company_name},`,
+                    '',
+                    ...lines,
+                    '',
+                    'The bank slip is attached when available.',
+                    '',
+                    `Thanks and regards\n${dealerMail.name}\n${dealerMail.email || ''}`,
+                ].join('\n'),
+                html: buildHtml({
+                    title: 'New Stock Order',
+                    greeting: `Dear ${company.company_name},`,
+                    lines: [...lines, 'The bank slip is attached when available.'],
+                    dealer: dealerMail,
+                }),
+                attachments: buildLocalAttachments([bank_slip_url]),
+            });
+
+            await pool.query(
+                'UPDATE stock_orders SET email_sent = $1, email_error = $2 WHERE id = $3',
+                [emailResult.sent, emailResult.error, order.id]
+            );
+
+            if (!emailResult.sent) {
+                console.warn('Stock order email warning:', emailResult.error);
+            }
+        } catch (error) {
+            await pool.query(
+                'UPDATE stock_orders SET email_sent = $1, email_error = $2 WHERE id = $3',
+                [false, error.message, order.id]
+            ).catch(() => {});
+            console.warn('Stock order email warning:', error.message);
+        }
+    });
+};
+
 const resolveUniqueInventorySerialNumber = async (client, order, pieceNumber) => {
     const baseSerialNumber = buildInventorySerialBase(order, pieceNumber);
 
@@ -364,52 +421,23 @@ exports.createStockOrder = async (req, res) => {
         );
 
         const order = result.rows[0];
-        let emailSent = false;
-        let emailError = null;
+        const emailPending = Boolean(company.company_email);
 
-        if (company.company_email) {
-            const dealerMail = await getDealerMailContext(req.user.id, req.user);
-            const amount = Number(total_amount || unit_price || product.purchase_price || 0);
-            const lines = [
-                `A new stock order has been placed for ${product.brand} ${product.model}.`,
-                `Vehicle type: ${String(product.vehicle_type || vehicle_type || '').toUpperCase()}`,
-                `Quantity: 1`,
-                `Total amount: ${amount}`,
-                expected_delivery_date ? `Expected delivery date: ${expected_delivery_date}` : '',
-                notes ? `Notes: ${notes}` : '',
-            ].filter(Boolean);
-            const emailResult = await sendMailSafe({
-                dealer: dealerMail,
-                to: company.company_email,
-                subject: `Stock order ${order.id} - ${product.brand} ${product.model}`,
-                text: [
-                    `Dear ${company.company_name},`,
-                    '',
-                    ...lines,
-                    '',
-                    'The bank slip is attached when available.',
-                    '',
-                    `Thanks and regards,\n${dealerMail.name}\n${dealerMail.email || ''}`,
-                ].join('\n'),
-                html: buildHtml({
-                    title: 'New Stock Order',
-                    greeting: `Dear ${company.company_name},`,
-                    lines: [...lines, 'The bank slip is attached when available.'],
-                    dealer: dealerMail,
-                }),
-                attachments: buildLocalAttachments([bank_slip_url]),
-            });
+        sendStockOrderEmailInBackground({
+            order,
+            company,
+            product,
+            vehicle_type,
+            total_amount,
+            unit_price,
+            expected_delivery_date,
+            notes,
+            bank_slip_url,
+            userId: req.user.id,
+            user: req.user,
+        });
 
-            emailSent = emailResult.sent;
-            emailError = emailResult.error;
-
-            await pool.query(
-                'UPDATE stock_orders SET email_sent = $1, email_error = $2 WHERE id = $3',
-                [emailSent, emailError, order.id]
-            );
-        }
-
-        res.status(201).json({ ...order, email_sent: emailSent, email_error: emailError });
+        res.status(201).json({ ...order, email_sent: false, email_error: null, email_pending: emailPending });
     } catch (error) {
         res.status(500).json({ message: 'Failed to create stock order', error: error.message });
     }

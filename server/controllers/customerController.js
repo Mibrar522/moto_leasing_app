@@ -443,20 +443,17 @@ exports.createCustomer = async (req, res) => {
         }
 
         const createdCustomer = mapCustomerRow(result.rows[0]);
-        let emailDelivery = [];
 
-        try {
-            emailDelivery = await sendCustomerCreatedEmails(createdCustomer, effectiveCreatedByAgent);
-            const failed = emailDelivery.filter((entry) => entry && !entry.sent);
-            if (failed.length > 0) {
-                console.warn('Customer created email warning:', failed.map((entry) => entry.error).join('; '));
-            }
-        } catch (mailError) {
-            emailDelivery = [{ sent: false, error: mailError.message }];
-            console.warn('Customer created email warning:', mailError.message);
-        }
+        sendCustomerCreatedEmails(createdCustomer, effectiveCreatedByAgent)
+            .then((results) => {
+                const failed = results.filter((entry) => entry && !entry.sent);
+                if (failed.length > 0) {
+                    console.warn('Customer created email warning:', failed.map((entry) => entry.error).join('; '));
+                }
+            })
+            .catch((mailError) => console.warn('Customer created email warning:', mailError.message));
 
-        res.status(201).json({ ...createdCustomer, email_delivery: emailDelivery });
+        res.status(201).json({ ...createdCustomer, email_delivery: [{ sent: false, pending: true, error: null }] });
     } catch (error) {
         if (error?.code === '23505') {
             const constraint = String(error?.constraint || '');

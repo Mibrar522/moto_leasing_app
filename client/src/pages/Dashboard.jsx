@@ -6261,6 +6261,8 @@ const selectedCustomer = useMemo(
                 setStockMessage('Stock order created and email sent to company.');
             } else if (data.email_error) {
                 setStockMessage(`Stock order created, but email was not sent: ${data.email_error}`);
+            } else if (data.email_pending) {
+                setStockMessage('Stock order created. Email is sending in the background.');
             } else {
                 setStockMessage('Stock order created. No company email was available for notification.');
             }

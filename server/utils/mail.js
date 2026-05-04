@@ -26,8 +26,8 @@ const createTransporter = async () => {
         port: Number(SMTP_PORT),
         secure: String(SMTP_SECURE).toLowerCase() === 'true',
         family: 4,
-        connectionTimeout: 30000,
-        greetingTimeout: 30000,
+        connectionTimeout: Number(process.env.SMTP_TIMEOUT_MS || 8000),
+        greetingTimeout: Number(process.env.SMTP_TIMEOUT_MS || 8000),
         tls: {
             servername: SMTP_HOST,
         },
@@ -113,6 +113,102 @@ const buildLocalAttachments = (fileUrls = []) => fileUrls
     .map(resolveLocalAttachment)
     .filter(Boolean);
 
+const normalizeSender = (dealer = {}) => {
+    const sender = process.env.SMTP_FROM || process.env.SMTP_USER || '';
+    const match = String(sender).match(/<([^>]+)>/);
+    const email = normalizeEmail(match ? match[1] : sender);
+    const name = String(dealer.name || dealer.dealer_name || dealer.brand_name || 'MotorLease').trim() || 'MotorLease';
+
+    return { email, name };
+};
+
+const readAttachmentContent = (attachment) => {
+    if (!attachment?.path || !fs.existsSync(attachment.path)) {
+        return null;
+    }
+
+    return {
+        filename: attachment.filename || path.basename(attachment.path),
+        content: fs.readFileSync(attachment.path).toString('base64'),
+    };
+};
+
+const sendWithBrevo = async ({ recipients, ccRecipients, subject, text, html, dealer, attachments }) => {
+    const apiKey = process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY;
+    if (!apiKey) return null;
+
+    const sender = normalizeSender(dealer);
+    if (!sender.email) {
+        return { sent: false, error: 'SMTP_FROM or SMTP_USER is required for Brevo sender email' };
+    }
+
+    const payload = {
+        sender,
+        to: recipients.map((email) => ({ email })),
+        cc: ccRecipients.map((email) => ({ email })),
+        subject,
+        textContent: text,
+        htmlContent: html || text,
+    };
+
+    const apiAttachments = attachments.map(readAttachmentContent).filter(Boolean);
+    if (apiAttachments.length > 0) {
+        payload.attachment = apiAttachments;
+    }
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+            accept: 'application/json',
+            'api-key': apiKey,
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        return { sent: false, error: `Brevo email failed (${response.status}): ${errorBody || response.statusText}` };
+    }
+
+    return { sent: true, error: null };
+};
+
+const sendWithResend = async ({ recipients, ccRecipients, subject, text, html, dealer, attachments }) => {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) return null;
+
+    const sender = normalizeSender(dealer);
+    if (!sender.email) {
+        return { sent: false, error: 'SMTP_FROM or SMTP_USER is required for Resend sender email' };
+    }
+
+    const apiAttachments = attachments.map(readAttachmentContent).filter(Boolean);
+    const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+            authorization: `Bearer ${apiKey}`,
+            'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+            from: `${sender.name} <${sender.email}>`,
+            to: recipients,
+            cc: ccRecipients,
+            subject,
+            text,
+            html: html || text,
+            attachments: apiAttachments.length > 0 ? apiAttachments : undefined,
+        }),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        return { sent: false, error: `Resend email failed (${response.status}): ${errorBody || response.statusText}` };
+    }
+
+    return { sent: true, error: null };
+};
+
 const sendMailSafe = async ({ to = [], cc = [], subject, text, html, dealer = {}, attachments = [] }) => {
     const recipients = uniqueEmails(Array.isArray(to) ? to : [to]);
     const ccRecipients = uniqueEmails(Array.isArray(cc) ? cc : [cc]);
@@ -121,9 +217,20 @@ const sendMailSafe = async ({ to = [], cc = [], subject, text, html, dealer = {}
         return { sent: false, error: 'No email recipient available' };
     }
 
+    try {
+        const apiResult = await sendWithBrevo({ recipients, ccRecipients, subject, text, html, dealer, attachments })
+            || await sendWithResend({ recipients, ccRecipients, subject, text, html, dealer, attachments });
+
+        if (apiResult) {
+            return apiResult;
+        }
+    } catch (error) {
+        return { sent: false, error: error.message };
+    }
+
     const transporter = await createTransporter();
     if (!transporter) {
-        return { sent: false, error: 'SMTP is not configured on the server' };
+        return { sent: false, error: 'Email API key or SMTP is not configured on the server' };
     }
 
     try {
