@@ -680,7 +680,6 @@ const isSuperAdminUser = (user) =>
 const hasFeature = (user, featureKey) =>
     isSuperAdminUser(user) ||
     (Array.isArray(user?.feature_keys) && user.feature_keys.includes(featureKey)) ||
-    (Array.isArray(user?.real_feature_keys) && user.real_feature_keys.includes(featureKey)) ||
     (user?.features || []).some((feature) => feature.key === featureKey);
 const hasAnyFeature = (user, featureKeys = []) =>
     isSuperAdminUser(user) || featureKeys.some((featureKey) => hasFeature(user, featureKey));
@@ -1739,7 +1738,7 @@ const Dashboard = () => {
     const canManageDealers = hasAnyFeature(user, ['FEAT_DEALER_MGMT']) && realIsSuperAdmin;
     const canManageUsers = hasAnyFeature(user, ['FEAT_USER_MGMT']);
     const canManageAds = realIsSuperAdmin || hasAnyFeature(user, ['FEAT_ADS_MGMT']);
-    const canManageAccessControl = hasAnyFeature(user, ['FEAT_ACCESS_CONTROL', 'FEAT_USER_MGMT']);
+    const canManageAccessControl = hasAnyFeature(user, ['FEAT_ACCESS_CONTROL']);
     const canManageEmployees = (isSuperAdmin || effectiveIsApplicationAdmin) && canManageUsers;
     const canManageAccess = realIsSuperAdmin || canManageAccessControl;
     const canManageThemes = hasAnyFeature(user, ['FEAT_THEME_MGMT']);
@@ -2025,14 +2024,14 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
         { key: 'customers', label: 'Customers', visible: canOpenCustomers, featureRef: 'FEAT_CUSTOMER_MGMT / FEAT_OCR_SCAN / FEAT_BIOMETRIC / FEAT_CUSTOMER_BIOMETRIC' },
         { key: 'employees', label: 'Employees', visible: canManageEmployees, featureRef: 'FEAT_USER_MGMT' },
         { key: 'dealers', label: 'Dealers', visible: canManageDealers, featureRef: 'FEAT_DEALER_MGMT' },
-        { key: 'access', label: 'Access Control', visible: canManageAccess, featureRef: 'FEAT_ACCESS_CONTROL / FEAT_USER_MGMT' },
+        { key: 'access', label: 'Access Control', visible: canManageAccess, featureRef: 'FEAT_ACCESS_CONTROL' },
         { key: 'applications', label: 'Applications', visible: canViewApplications, featureRef: 'FEAT_APPLICATIONS_VIEW' },
         { key: 'workflow', label: 'Workflow', visible: canOpenWorkflowWorkspace, featureRef: 'FEAT_WORKFLOW_VIEW / FEAT_WORKFLOW_CONFIG / FEAT_WORKFLOW_TASKS' },
         { key: 'user-tasks', label: 'User Tasks', visible: canViewWorkflow && canViewWorkflowTasks, featureRef: 'FEAT_WORKFLOW_VIEW / FEAT_WORKFLOW_TASKS' },
         { key: 'sales', label: 'Sales', visible: canOpenSalesWorkspace, featureRef: 'Sales function access' },
         { key: 'transactions', label: 'Adhoc Transactions', visible: canViewTransactionRegister && dashboardData.salesTransactions.length > 0, featureRef: 'FEAT_TRANSACTION_REGISTER' },
         { key: 'reports', label: 'Reports', visible: canOpenReports, featureRef: 'Report function access' },
-        { key: 'installments', label: 'Installments', visible: canOpenInstallmentWorkspace && dashboardData.salesTransactions.filter((sale) => sale.sale_mode === 'INSTALLMENT').length > 0, featureRef: 'Installment function access' },
+        { key: 'installments', label: 'Installments', visible: canOpenInstallmentWorkspace, featureRef: 'Installment function access' },
         { key: 'companies', label: 'Company Profile', visible: canManageStock, featureRef: 'FEAT_STOCK_MGMT / FEAT_FLEET_MGMT' },
         { key: 'stock', label: 'Stock', visible: canManageStock, featureRef: 'FEAT_STOCK_MGMT / FEAT_FLEET_MGMT' },
         { key: 'products', label: 'Products', visible: canManageProducts, featureRef: 'FEAT_PRODUCT_MGMT / FEAT_FLEET_MGMT' },
@@ -2063,17 +2062,13 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
     }, [isReportPage]);
 
     useEffect(() => {
-        const installmentTabVisible =
-            canOpenInstallmentWorkspace &&
-            dashboardData.salesTransactions.some((sale) => sale.sale_mode === 'INSTALLMENT');
-
         const pageAccess = {
             dashboard: canViewDashboard,
             applications: canViewApplications,
             workflow: canOpenWorkflowWorkspace,
             'user-tasks': canViewWorkflow && canViewWorkflowTasks,
             products: canManageProducts,
-            installments: installmentTabVisible,
+            installments: canOpenInstallmentWorkspace,
             stock: canManageStock,
             companies: canManageStock,
             dealers: canManageDealers,
