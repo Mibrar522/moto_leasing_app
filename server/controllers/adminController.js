@@ -549,7 +549,34 @@ exports.getDashboardData = async (req, res) => {
                 LEFT JOIN employee_feature_overrides efo ON efo.employee_id = e.id AND efo.access_mode = 'DENY'
                 LEFT JOIN features df ON df.id = efo.feature_id
                 ${employeeScopeClause}
-                GROUP BY e.id, e.dealer_id, d.dealer_name, d.dealer_code, r.role_name, creator.full_name, creator.email
+                GROUP BY
+                    e.id,
+                    e.user_id,
+                    e.dealer_id,
+                    d.dealer_name,
+                    d.dealer_code,
+                    e.employee_code,
+                    e.full_name,
+                    e.email,
+                    e.phone,
+                    e.cnic_number,
+                    e.cnic_doc_url,
+                    e.cnic_front_url,
+                    e.cnic_back_url,
+                    e.department,
+                    e.job_title,
+                    e.commission_percentage,
+                    e.commission_value,
+                    e.base_salary,
+                    e.role_id,
+                    e.is_active,
+                    e.hired_at,
+                    e.notes,
+                    e.created_by,
+                    r.role_name,
+                    creator.full_name,
+                    creator.email,
+                    e.created_at
                 ORDER BY e.created_at DESC
                 LIMIT 50
                 `,
@@ -952,7 +979,55 @@ exports.getDashboardData = async (req, res) => {
                 LEFT JOIN dealers d ON d.id = COALESCE(st.dealer_id, c.dealer_id, u.dealer_id)
                 LEFT JOIN sale_installments si ON si.sale_id = st.id
                 ${isEmployeeLogin ? 'WHERE st.agent_id = $1' : isDealerScopedView ? 'WHERE d.id = $1' : ''}
-                GROUP BY st.id, c.full_name, c.cnic_passport_number, c.identity_doc_url, c.ocr_details, v.brand, v.model, v.image_url, v.vehicle_type, v.serial_number, v.registration_number, v.chassis_number, v.engine_number, v.color, v.product_description, v.purchase_price, u.full_name, d.id, d.dealer_name, d.dealer_code, d.dealer_signature_url
+                GROUP BY
+                    st.id,
+                    st.customer_id,
+                    st.vehicle_id,
+                    st.sale_mode,
+                    st.approval_status,
+                    st.agreement_number,
+                    st.agreement_date,
+                    st.agreement_pdf_url,
+                    st.dealer_signature_url,
+                    st.authorized_signature_url,
+                    st.customer_cnic_front_url,
+                    st.customer_cnic_back_url,
+                    st.bank_check_url,
+                    st.misc_document_url,
+                    st.purchase_date,
+                    st.vehicle_price,
+                    st.down_payment,
+                    st.financed_amount,
+                    st.monthly_installment,
+                    st.installment_months,
+                    st.first_due_date,
+                    st.witness_name,
+                    st.witness_cnic,
+                    st.witness_two_name,
+                    st.witness_two_cnic,
+                    st.remarks,
+                    st.status,
+                    st.created_at,
+                    c.full_name,
+                    c.cnic_passport_number,
+                    c.identity_doc_url,
+                    c.ocr_details,
+                    v.brand,
+                    v.model,
+                    v.image_url,
+                    v.vehicle_type,
+                    v.serial_number,
+                    v.registration_number,
+                    v.chassis_number,
+                    v.engine_number,
+                    v.color,
+                    v.product_description,
+                    v.purchase_price,
+                    u.full_name,
+                    d.id,
+                    d.dealer_name,
+                    d.dealer_code,
+                    d.dealer_signature_url
                 ORDER BY st.created_at DESC
                 LIMIT 300
                 `,

@@ -1,21 +1,39 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
+const dns = require('dns').promises;
 
-const createTransporter = () => {
+const resolveSmtpHost = async (host) => {
+    try {
+        const addresses = await dns.resolve4(host);
+        return addresses[0] || host;
+    } catch (_error) {
+        return host;
+    }
+};
+
+const createTransporter = async () => {
     const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE } = process.env;
 
     if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
         return null;
     }
 
+    const resolvedHost = await resolveSmtpHost(SMTP_HOST);
+
     return nodemailer.createTransport({
-        host: SMTP_HOST,
+        host: resolvedHost,
         port: Number(SMTP_PORT),
         secure: String(SMTP_SECURE).toLowerCase() === 'true',
+        family: 4,
+        connectionTimeout: 30000,
+        greetingTimeout: 30000,
+        tls: {
+            servername: SMTP_HOST,
+        },
         auth: {
             user: SMTP_USER,
-            pass: SMTP_PASS,
+            pass: String(SMTP_PASS).replace(/\s+/g, ''),
         },
     });
 };
@@ -103,7 +121,7 @@ const sendMailSafe = async ({ to = [], cc = [], subject, text, html, dealer = {}
         return { sent: false, error: 'No email recipient available' };
     }
 
-    const transporter = createTransporter();
+    const transporter = await createTransporter();
     if (!transporter) {
         return { sent: false, error: 'SMTP is not configured on the server' };
     }

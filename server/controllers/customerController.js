@@ -23,11 +23,54 @@ const OCR_LANG_READY = Object.fromEntries(
 );
 const OCR_ENGINE_READY = OCR_LANG_READY.eng || OCR_LANG_READY.urd;
 const OCR_UNAVAILABLE_MESSAGE = 'Automatic OCR is not ready on this server yet. Upload succeeded, but OCR text was not extracted.';
+const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'moto-leasing-assets';
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const isSupabaseStorageConfigured = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 const isSuperAdminSession = (user = {}) =>
     Number(user?.real_role_id || user?.role_id) === 1 ||
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
 const hasFeature = (user = {}, featureKey) =>
     Array.isArray(user?.feature_keys) && user.feature_keys.includes(featureKey);
+
+const safeStorageSegment = (value) =>
+    String(value || 'file')
+        .trim()
+        .replace(/\\/g, '/')
+        .split('/')
+        .pop()
+        .replace(/[^a-zA-Z0-9._-]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .toLowerCase() || 'file';
+
+const uploadFileToSupabaseStorage = async (file, folder) => {
+    if (!isSupabaseStorageConfigured || !file?.path) {
+        return null;
+    }
+
+    const fileName = safeStorageSegment(file.filename || file.originalname);
+    const objectPath = `${safeStorageSegment(folder)}/${fileName}`;
+    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(SUPABASE_STORAGE_BUCKET)}/${objectPath}`;
+    const fileBuffer = fs.readFileSync(file.path);
+
+    const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            apikey: SUPABASE_SERVICE_ROLE_KEY,
+            'Content-Type': file.mimetype || 'application/octet-stream',
+            'x-upsert': 'true',
+        },
+        body: fileBuffer,
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        throw new Error(`Supabase Storage upload failed (${response.status}): ${errorBody || response.statusText}`);
+    }
+
+    return `${SUPABASE_URL}/storage/v1/object/public/${encodeURIComponent(SUPABASE_STORAGE_BUCKET)}/${objectPath}`;
+};
 
 const normalizeOcrDetails = (ocrDetails = {}) => {
     if (!ocrDetails || Array.isArray(ocrDetails)) {
@@ -400,16 +443,20 @@ exports.createCustomer = async (req, res) => {
         }
 
         const createdCustomer = mapCustomerRow(result.rows[0]);
-        sendCustomerCreatedEmails(createdCustomer, effectiveCreatedByAgent)
-            .then((results) => {
-                const failed = results.filter((entry) => entry && !entry.sent);
-                if (failed.length > 0) {
-                    console.warn('Customer created email warning:', failed.map((entry) => entry.error).join('; '));
-                }
-            })
-            .catch((mailError) => console.warn('Customer created email warning:', mailError.message));
+        let emailDelivery = [];
 
-        res.status(201).json(createdCustomer);
+        try {
+            emailDelivery = await sendCustomerCreatedEmails(createdCustomer, effectiveCreatedByAgent);
+            const failed = emailDelivery.filter((entry) => entry && !entry.sent);
+            if (failed.length > 0) {
+                console.warn('Customer created email warning:', failed.map((entry) => entry.error).join('; '));
+            }
+        } catch (mailError) {
+            emailDelivery = [{ sent: false, error: mailError.message }];
+            console.warn('Customer created email warning:', mailError.message);
+        }
+
+        res.status(201).json({ ...createdCustomer, email_delivery: emailDelivery });
     } catch (error) {
         if (error?.code === '23505') {
             const constraint = String(error?.constraint || '');
@@ -676,8 +723,16 @@ exports.uploadCustomerAsset = async (req, res) => {
             }
         }
 
+        let durableUrl = null;
+
+        try {
+            durableUrl = await uploadFileToSupabaseStorage(req.file, 'customers');
+        } catch (storageError) {
+            console.warn('Customer asset Supabase Storage upload skipped:', storageError.message);
+        }
+
         res.status(201).json({
-            url: `/uploads/customers/${req.file.filename}`,
+            url: durableUrl || `/uploads/customers/${req.file.filename}`,
             originalName: req.file.originalname,
             mimetype: req.file.mimetype,
             ocr,
