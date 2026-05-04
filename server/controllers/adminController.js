@@ -5,6 +5,28 @@ const { syncAccessCatalogDefaults } = require('../utils/accessBootstrap');
 const PENDING_APPLICATION_STATUSES = ['PENDING', 'SUBMITTED', 'UNDER_REVIEW'];
 const hasAnyFeature = (featureKeys = [], requiredKeys = []) => requiredKeys.some((featureKey) => featureKeys.includes(featureKey));
 const getNotificationReaderUserId = (user = {}) => user.real_user_id || user.id;
+let dashboardMaintenanceRunning = false;
+let dashboardMaintenanceLastStartedAt = 0;
+
+const runDashboardMaintenance = () => {
+    const now = Date.now();
+    if (dashboardMaintenanceRunning || now - dashboardMaintenanceLastStartedAt < 5 * 60 * 1000) {
+        return;
+    }
+
+    dashboardMaintenanceRunning = true;
+    dashboardMaintenanceLastStartedAt = now;
+
+    Promise.all([
+        syncAccessCatalogDefaults(),
+        reconcileReceivedStockOrders(),
+    ])
+        .catch((error) => console.warn('Dashboard maintenance skipped:', error.message))
+        .finally(() => {
+            dashboardMaintenanceRunning = false;
+        });
+};
+
 const safeDashboardQuery = async (runner, label, fallbackRows = []) => {
     try {
         return await runner();
@@ -35,8 +57,7 @@ const getRolePermissions = async () => {
 
 exports.getDashboardData = async (req, res) => {
     try {
-        await syncAccessCatalogDefaults();
-        await reconcileReceivedStockOrders();
+        runDashboardMaintenance();
 
         const isEmployeeLogin = Number(req.user.role_id) === 3 || req.user.role_name === 'AGENT';
         const isSuperAdmin = Number(req.user.role_id) === 1 || req.user.role_name === 'SUPER_ADMIN';
