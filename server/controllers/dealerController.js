@@ -1,11 +1,6 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { resolveDurableUploadUrl } = require('../utils/storage');
-const {
-    createDatabaseBackup,
-    isDealerTemplateBackupEnabled,
-    resolveBackupDirectory,
-} = require('../utils/databaseBackup');
 
 const buildSlug = (value) =>
     String(value || '')
@@ -105,7 +100,6 @@ exports.createDealer = async (req, res) => {
             admin_email,
             admin_password,
             admin_role_id,
-            backup_directory,
         } = req.body;
 
         if (!dealer_name || !dealer_signature_url || !dealer_address || !dealer_cnic || !mobile_number || !currency_code || !admin_full_name || !admin_email || !admin_password) {
@@ -189,7 +183,6 @@ exports.createDealer = async (req, res) => {
 
             const cloneName = `${applicationSlug.replace(/-/g, '_')}_app`;
             const backupLabel = `${applicationSlug}_backup_seed`;
-            const resolvedBackupDirectory = resolveBackupDirectory(backup_directory);
             const result = await client.query(
             `
             INSERT INTO dealers (
@@ -268,29 +261,9 @@ exports.createDealer = async (req, res) => {
             await client.query('COMMIT');
             transactionCommitted = true;
 
-            let backup = null;
-
-            if (isDealerTemplateBackupEnabled(backup_directory)) {
-                try {
-                    backup = await createDatabaseBackup({
-                        applicationSlug,
-                        backupLabel,
-                        dealerCode,
-                        backupDirectory: resolvedBackupDirectory,
-                    });
-                } catch (backupError) {
-                    backup = {
-                        status: 'FAILED',
-                        directory: resolvedBackupDirectory,
-                        error: backupError.message,
-                    };
-                }
-            }
-
             res.status(201).json({
                 ...updatedDealer.rows[0],
                 dealer_admin: adminUserResult.rows[0],
-                backup,
                 fresh_start_summary: {
                     customers: 0,
                     employees: 0,
@@ -301,15 +274,9 @@ exports.createDealer = async (req, res) => {
                     application_slug: applicationSlug,
                     db_clone_name: cloneName,
                     db_backup_label: backupLabel,
-                    backup_directory: resolvedBackupDirectory,
                     provisioning_status: updatedDealer.rows[0].provisioning_status,
                 },
-                message:
-                    backup?.status === 'COMPLETED'
-                        ? 'Dealer created and empty template backup completed'
-                        : backup?.status === 'FAILED'
-                            ? 'Dealer created, but empty template backup failed'
-                            : 'Dealer created successfully',
+                message: 'Dealer created successfully',
             });
         } catch (error) {
             if (!transactionCommitted) {
@@ -347,7 +314,6 @@ exports.updateDealer = async (req, res) => {
             admin_email,
             admin_password,
             admin_role_id,
-            backup_directory,
         } = req.body;
 
         if (!dealer_name || !dealer_signature_url || !dealer_address || !dealer_cnic || !mobile_number || !admin_full_name || !admin_email) {
@@ -530,25 +496,6 @@ exports.updateDealer = async (req, res) => {
         );
 
         await client.query('COMMIT');
-        const resolvedBackupDirectory = resolveBackupDirectory(backup_directory);
-        let backup = null;
-
-        if (isDealerTemplateBackupEnabled(backup_directory)) {
-            try {
-                backup = await createDatabaseBackup({
-                    applicationSlug: result.rows[0].application_slug || existingDealer.rows[0].application_slug,
-                    backupLabel: result.rows[0].db_backup_label || existingDealer.rows[0].db_backup_label || `${result.rows[0].application_slug || 'dealer'}_backup_seed`,
-                    dealerCode: result.rows[0].dealer_code || existingDealer.rows[0].dealer_code,
-                    backupDirectory: resolvedBackupDirectory,
-                });
-            } catch (backupError) {
-                backup = {
-                    status: 'FAILED',
-                    directory: resolvedBackupDirectory,
-                    error: backupError.message,
-                };
-            }
-        }
 
         res.status(200).json({
             ...result.rows[0],
@@ -557,20 +504,13 @@ exports.updateDealer = async (req, res) => {
                 full_name: result.rows[0].admin_full_name,
                 email: result.rows[0].admin_email,
             },
-            backup,
             clone_profile: {
                 application_slug: result.rows[0].application_slug || existingDealer.rows[0].application_slug,
                 db_clone_name: result.rows[0].db_clone_name,
                 db_backup_label: result.rows[0].db_backup_label || existingDealer.rows[0].db_backup_label,
-                backup_directory: resolvedBackupDirectory,
                 provisioning_status: result.rows[0].provisioning_status,
             },
-            message:
-                backup?.status === 'COMPLETED'
-                    ? 'Dealer updated and empty template backup completed'
-                    : backup?.status === 'FAILED'
-                        ? 'Dealer updated, but empty template backup failed'
-                        : 'Dealer updated successfully',
+            message: 'Dealer updated successfully',
         });
     } catch (error) {
         await client.query('ROLLBACK');

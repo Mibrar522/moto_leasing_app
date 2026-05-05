@@ -193,7 +193,6 @@ const emptyDealerForm = {
     admin_email: '',
     admin_password: '',
     admin_role_id: '4',
-    backup_directory: '',
     notes: '',
     is_active: true,
 };
@@ -804,7 +803,22 @@ const getDashboardPageFromSearch = (search) => {
 
     return legacyPage;
 };
-const getDashboardTokenForPage = (page) => DASHBOARD_PAGE_TOKENS[page] || DASHBOARD_PAGE_TOKENS.dashboard;
+const getDashboardPageFromLocation = (pathname, search) => {
+    const pageFromSearch = getDashboardPageFromSearch(search);
+    if (pageFromSearch) {
+        return pageFromSearch;
+    }
+
+    const pathPage = String(pathname || '')
+        .split('/')
+        .filter(Boolean)
+        .slice(1)
+        .join('/')
+        .trim()
+        .toLowerCase();
+
+    return DASHBOARD_PAGE_TOKENS[pathPage] ? pathPage : 'dashboard';
+};
 const normalizeIdentityNumber = (value) => String(value || '').replace(/\D/g, '');
 const normalizePreviewAssetPath = (value) => {
     const trimmed = String(value || '').trim();
@@ -1461,10 +1475,10 @@ const mapEmployeeFromApi = (employee) => ({
     denied_feature_ids: (employee.denied_features || []).map((feature) => Number(feature.id)),
 });
 
-const Dashboard = () => {
+const Dashboard = ({ pageKey = '' }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [activePage, setActivePage] = useState(() => getDashboardPageFromSearch(window.location.search) || 'dashboard');
+    const [activePage, setActivePage] = useState(() => pageKey || getDashboardPageFromLocation(window.location.pathname, window.location.search));
     const [searchTerm, setSearchTerm] = useState('');
     const [dashboardData, setDashboardData] = useState({
         user: null,
@@ -1597,62 +1611,128 @@ const Dashboard = () => {
     const [adMessage, setAdMessage] = useState('');
     const [savingAd, setSavingAd] = useState(false);
     const workflowTasksTableRef = useRef(null);
+    const loadedDashboardPageRef = useRef('');
 
-    const loadDashboard = async () => {
+    const getDashboardDataKeysForPage = (pageKey = 'dashboard') => {
+        const normalizedPage = String(pageKey || 'dashboard').toLowerCase();
+        if (normalizedPage === 'reports' || normalizedPage.startsWith('report-')) {
+            return ['salesTransactions', 'stockOrders', 'customers', 'employees', 'products', 'inventory', 'dealers', 'employeeCommissions', 'employeeAdvances', 'employeePayrolls'];
+        }
+
+        const keysByPage = {
+            dashboard: ['metrics', 'employeeSales', 'applications', 'ads', 'dealers'],
+            customers: ['customers', 'dealers'],
+            employees: ['employees', 'dealerStaff', 'dealers', 'roles', 'features', 'employeeCommissions', 'employeeAdvances', 'employeePayrolls'],
+            dealers: ['dealers'],
+            access: ['roles', 'features', 'rolePermissions'],
+            applications: ['applications'],
+            workflow: ['workflowDefinitions', 'workflowTasks', 'salesTransactions'],
+            'user-tasks': ['workflowTasks', 'salesTransactions'],
+            products: ['products', 'vehicleTypes'],
+            companies: ['companies'],
+            stock: ['stockOrders', 'products', 'companies', 'vehicleTypes'],
+            sales: ['salesTransactions', 'customers', 'inventory', 'dealers', 'workflowDefinitions'],
+            transactions: ['salesTransactions'],
+            installments: ['salesTransactions', 'customers', 'inventory'],
+        };
+
+        return keysByPage[normalizedPage] || keysByPage.dashboard;
+    };
+
+    const loadDashboard = async (pageKey = 'dashboard') => {
         try {
             setLoading(true);
-            const { data } = await API.get('/api/v1/admin/dashboard');
-            setDashboardData(data);
-            localStorage.setItem('user', JSON.stringify(data.user));
-            setReadNotificationKeys(data.notificationReadKeys || []);
+            const normalizedPage = String(pageKey || 'dashboard').toLowerCase();
+            const { data } = await API.get('/api/v1/admin/dashboard', {
+                params: { page: normalizedPage },
+            });
+            const dataKeys = getDashboardDataKeysForPage(normalizedPage);
+            setDashboardData((current) => {
+                const next = {
+                    ...current,
+                    user: data.user || current.user,
+                };
+
+                dataKeys.forEach((key) => {
+                    if (Object.prototype.hasOwnProperty.call(data, key)) {
+                        next[key] = data[key];
+                    }
+                });
+
+                return next;
+            });
+            if (data.user) {
+                localStorage.setItem('user', JSON.stringify(data.user));
+            }
+            if (Array.isArray(data.notificationReadKeys)) {
+                setReadNotificationKeys(data.notificationReadKeys);
+            }
             const assignments = (data.roles || []).reduce((acc, role) => {
                 acc[role.id] = (data.rolePermissions || [])
                     .filter((permission) => Number(permission.role_id) === Number(role.id))
                     .map((permission) => Number(permission.feature_id));
                 return acc;
             }, {});
-            setRoleAssignments(assignments);
-            setSelectedCustomerId((current) => (
-                current && (data.customers || []).some((customer) => customer.id === current)
-                    ? current
-                    : ''
-            ));
-            setSelectedEmployeeId((current) => (
-                current && (data.employees || []).some((employee) => employee.id === current)
-                    ? current
-                    : ''
-            ));
-            setSelectedInstallmentSaleId((current) => {
-                const installmentSales = (data.salesTransactions || []).filter((sale) => sale.sale_mode === 'INSTALLMENT');
-                if (current && installmentSales.some((sale) => sale.id === current)) {
-                    return current;
-                }
-                return installmentSales[0]?.id || '';
-            });
-            setSelectedTransactionSaleId((current) => {
-                const salesTransactions = data.salesTransactions || [];
-                if (current && salesTransactions.some((sale) => sale.id === current)) {
-                    return current;
-                }
-                return salesTransactions[0]?.id || '';
-            });
-            setSelectedWorkflowTaskId((current) => {
-                const workflowTasks = data.workflowTasks || [];
-                if (current && workflowTasks.some((task) => task.id === current)) {
-                    return current;
-                }
-                return '';
-            });
-            setProductForm((current) => ({
-                ...current,
-                vehicle_type: current.vehicle_type || data.vehicleTypes?.[0]?.type_key || '',
-            }));
-            setStockOrderForm((current) => ({
-                ...current,
-                company_profile_id: current.company_profile_id || data.companies?.[0]?.id || '',
-                product_id: current.product_id || data.products?.[0]?.id || '',
-                vehicle_type: current.vehicle_type || data.vehicleTypes?.[0]?.type_key || '',
-            }));
+            if ((data.roles || []).length > 0 || (data.rolePermissions || []).length > 0) {
+                setRoleAssignments(assignments);
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'customers')) {
+                setSelectedCustomerId((current) => (
+                    current && (data.customers || []).some((customer) => customer.id === current)
+                        ? current
+                        : ''
+                ));
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'employees')) {
+                setSelectedEmployeeId((current) => (
+                    current && (data.employees || []).some((employee) => employee.id === current)
+                        ? current
+                        : ''
+                ));
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'salesTransactions')) {
+                setSelectedInstallmentSaleId((current) => {
+                    const installmentSales = (data.salesTransactions || []).filter((sale) => sale.sale_mode === 'INSTALLMENT');
+                    if (current && installmentSales.some((sale) => sale.id === current)) {
+                        return current;
+                    }
+                    return installmentSales[0]?.id || '';
+                });
+                setSelectedTransactionSaleId((current) => {
+                    const salesTransactions = data.salesTransactions || [];
+                    if (current && salesTransactions.some((sale) => sale.id === current)) {
+                        return current;
+                    }
+                    return salesTransactions[0]?.id || '';
+                });
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'workflowTasks')) {
+                setSelectedWorkflowTaskId((current) => {
+                    const workflowTasks = data.workflowTasks || [];
+                    if (current && workflowTasks.some((task) => task.id === current)) {
+                        return current;
+                    }
+                    return '';
+                });
+            }
+            if (Object.prototype.hasOwnProperty.call(data, 'vehicleTypes')) {
+                setProductForm((current) => ({
+                    ...current,
+                    vehicle_type: current.vehicle_type || data.vehicleTypes?.[0]?.type_key || '',
+                }));
+            }
+            if (
+                Object.prototype.hasOwnProperty.call(data, 'companies') ||
+                Object.prototype.hasOwnProperty.call(data, 'products') ||
+                Object.prototype.hasOwnProperty.call(data, 'vehicleTypes')
+            ) {
+                setStockOrderForm((current) => ({
+                    ...current,
+                    company_profile_id: current.company_profile_id || data.companies?.[0]?.id || '',
+                    product_id: current.product_id || data.products?.[0]?.id || '',
+                    vehicle_type: current.vehicle_type || data.vehicleTypes?.[0]?.type_key || '',
+                }));
+            }
             setError('');
         } catch (err) {
             const status = err.response?.status;
@@ -1680,6 +1760,13 @@ const Dashboard = () => {
         }
     };
 
+    const openDashboardPage = (pageKey) => {
+        setActivePage(pageKey);
+        if (pageKey === activePage) {
+            loadDashboard(pageKey);
+        }
+    };
+
     useEffect(() => {
         const token = localStorage.getItem('token');
 
@@ -1688,8 +1775,18 @@ const Dashboard = () => {
             return;
         }
 
-        loadDashboard();
+        loadedDashboardPageRef.current = activePage;
+        loadDashboard(activePage);
     }, [navigate]);
+
+    useEffect(() => {
+        if (!localStorage.getItem('token') || loadedDashboardPageRef.current === activePage) {
+            return;
+        }
+
+        loadedDashboardPageRef.current = activePage;
+        loadDashboard(activePage);
+    }, [activePage]);
 
     const resetAdForm = () => {
         setAdForm(emptyAdForm);
@@ -1778,7 +1875,7 @@ const Dashboard = () => {
             if (adForm.id === adId) {
                 setAdForm(emptyAdForm);
             }
-            await loadDashboard();
+            await loadDashboard(activePage);
         } catch (err) {
             setAdMessage(err.response?.data?.message || 'Failed to delete campaign.');
         } finally {
@@ -1822,7 +1919,7 @@ const Dashboard = () => {
             }
 
             setAdForm(emptyAdForm);
-            await loadDashboard();
+            await loadDashboard(activePage);
         } catch (err) {
             const status = err.response?.status;
             const serverMessage = err.response?.data?.message;
@@ -2029,7 +2126,7 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
         { key: 'workflow', label: 'Workflow', visible: canOpenWorkflowWorkspace, featureRef: 'FEAT_WORKFLOW_VIEW / FEAT_WORKFLOW_CONFIG / FEAT_WORKFLOW_TASKS' },
         { key: 'user-tasks', label: 'User Tasks', visible: canViewWorkflow && canViewWorkflowTasks, featureRef: 'FEAT_WORKFLOW_VIEW / FEAT_WORKFLOW_TASKS' },
         { key: 'sales', label: 'Sales', visible: canOpenSalesWorkspace, featureRef: 'Sales function access' },
-        { key: 'transactions', label: 'Adhoc Transactions', visible: canViewTransactionRegister && dashboardData.salesTransactions.length > 0, featureRef: 'FEAT_TRANSACTION_REGISTER' },
+        { key: 'transactions', label: 'Adhoc Transactions', visible: canViewTransactionRegister, featureRef: 'FEAT_TRANSACTION_REGISTER' },
         { key: 'reports', label: 'Reports', visible: canOpenReports, featureRef: 'Report function access' },
         { key: 'installments', label: 'Installments', visible: canOpenInstallmentWorkspace, featureRef: 'Installment function access' },
         { key: 'companies', label: 'Company Profile', visible: canManageStock, featureRef: 'FEAT_STOCK_MGMT / FEAT_FLEET_MGMT' },
@@ -2124,35 +2221,24 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
         tabReferences,
     ]);
     useEffect(() => {
-        const pageFromSearch = getDashboardPageFromSearch(location.search) || 'dashboard';
+        const pageFromSearch = pageKey || getDashboardPageFromLocation(location.pathname, location.search);
 
         if (pageFromSearch !== activePage) {
             setActivePage(pageFromSearch);
         }
-    }, [location.search]);
+    }, [activePage, location.pathname, location.search, pageKey]);
     useEffect(() => {
-        const currentPage = getDashboardPageFromSearch(location.search) || 'dashboard';
+        const currentPage = getDashboardPageFromLocation(location.pathname, location.search);
 
         if (currentPage === activePage) {
             return;
         }
 
-        const params = new URLSearchParams(location.search);
-
-        params.delete('page');
-
-        if (!activePage || activePage === 'dashboard') {
-            params.delete('v');
-        } else {
-            params.set('v', getDashboardTokenForPage(activePage));
-        }
-
-        const nextSearch = params.toString();
         navigate({
-            pathname: '/dashboard',
-            search: nextSearch ? `?${nextSearch}` : '',
+            pathname: activePage && activePage !== 'dashboard' ? `/dashboard/${activePage}` : '/dashboard',
+            search: '',
         }, { replace: true });
-    }, [activePage, navigate]);
+    }, [activePage, location.pathname, location.search, navigate]);
 
     const filteredApplications = useMemo(() => {
         const query = searchTerm.trim().toLowerCase();
@@ -4577,7 +4663,6 @@ const selectedCustomer = useMemo(
             admin_email: dealer.admin_email || '',
             admin_password: '',
             admin_role_id: dealer.admin_role_id ? String(dealer.admin_role_id) : '4',
-            backup_directory: '',
             notes: dealer.notes || '',
             is_active: dealer.is_active ?? true,
         });
@@ -4599,7 +4684,7 @@ const selectedCustomer = useMemo(
             if (dealerForm.id === dealer.id) {
                 resetDealerForm();
             }
-            await loadDashboard();
+            await loadDashboard(activePage);
             setDealerMessage(`Deleted ${dealer.dealer_name}.`);
         } catch (err) {
             setDealerMessage(
@@ -4672,7 +4757,7 @@ const selectedCustomer = useMemo(
             if (companyForm.id === company.id) {
                 resetCompanyForm();
             }
-            await loadDashboard();
+            await loadDashboard(activePage);
             setCompanyMessage(`Deleted ${company.company_name}.`);
         } catch (err) {
             setCompanyMessage(err.response?.data?.message || 'Unable to delete company profile.');
@@ -4836,7 +4921,7 @@ const selectedCustomer = useMemo(
                 user: data.user,
             }));
             setProfileMessage(nextDealerId ? `Dealer profile loaded: ${data.user?.dealer_name || 'Dealer'}` : 'Switched back to super admin profile.');
-            await loadDashboard();
+            await loadDashboard(activePage);
         } catch (err) {
             setProfileMessage(err.response?.data?.message || 'Unable to switch profile right now.');
         } finally {
@@ -4858,7 +4943,7 @@ const selectedCustomer = useMemo(
                 user: data.user,
             }));
             setProfileMessage('Switched back to super admin profile.');
-            await loadDashboard();
+            await loadDashboard(activePage);
         } catch (err) {
             setProfileMessage(err.response?.data?.message || 'Unable to switch back to super admin profile right now.');
         } finally {
@@ -4879,7 +4964,7 @@ const selectedCustomer = useMemo(
             await API.post('/products/vehicle-types', {
                 display_name: newVehicleType.trim(),
             });
-            await loadDashboard();
+            await loadDashboard(activePage);
             setVehicleTypeMessage('Vehicle type saved successfully.');
             setNewVehicleType('');
         } catch (err) {
@@ -4905,7 +4990,7 @@ const selectedCustomer = useMemo(
                 ...workflowDefinitionForm,
                 dealer_id: isSuperAdmin ? (workflowDefinitionForm.dealer_id || null) : (user?.dealer_id || null),
             });
-            await loadDashboard();
+            await loadDashboard(activePage);
             resetWorkflowDefinitionForm();
             setWorkflowMessage('Workflow definition saved successfully.');
         } catch (err) {
@@ -4931,7 +5016,7 @@ const selectedCustomer = useMemo(
             await API.patch(`/workflow/tasks/${taskId}/${action}`, {
                 decision_notes: decisionNotes.trim(),
             });
-            await loadDashboard();
+            await loadDashboard(activePage);
             setWorkflowMessage(action === 'approve' ? 'Workflow task approved.' : 'Workflow task rejected.');
         } catch (err) {
             setWorkflowMessage(err.response?.data?.message || 'Unable to process workflow task.');
@@ -5348,7 +5433,7 @@ const selectedCustomer = useMemo(
                 setCustomerMessage('Customer created successfully.');
             }
 
-            await loadDashboard();
+            await loadDashboard(activePage);
             setSelectedCustomerId(response.data.id);
             resetCustomerForm({ preserveSelection: true });
         } catch (err) {
@@ -5432,7 +5517,7 @@ const selectedCustomer = useMemo(
             if (customerForm.id === customer.id) {
                 resetCustomerForm();
             }
-            await loadDashboard();
+            await loadDashboard(activePage);
         } catch (err) {
             setCustomerMessage(err.response?.data?.message || 'Unable to delete customer.');
         }
@@ -5503,7 +5588,7 @@ const selectedCustomer = useMemo(
                 setEmployeeMessage('Employee created successfully.');
             }
 
-            await loadDashboard();
+            await loadDashboard(activePage);
             setSelectedEmployeeId(response.data.id);
             resetEmployeeForm({ preserveSelection: true });
             setEmployeeAccessPopupOpen(false);
@@ -5542,7 +5627,7 @@ const selectedCustomer = useMemo(
                 reason: advanceForm.reason.trim(),
                 advance_date: advanceForm.advance_date || null,
             });
-            await loadDashboard();
+            await loadDashboard(activePage);
             resetAdvanceForm();
             setEmployeeMessage('Employee advance cash recorded successfully.');
         } catch (err) {
@@ -5572,7 +5657,7 @@ const selectedCustomer = useMemo(
             await API.post(`/employees/${salaryGenerationEmployeeId}/generate-salary`, {
                 payroll_month: payrollMonth,
             });
-            await loadDashboard();
+            await loadDashboard(activePage);
             setEmployeeMessage(`Salary generated for ${payrollMonth}.`);
         } catch (err) {
             setEmployeeMessage(err.response?.data?.message || 'Unable to generate employee salary.');
@@ -5599,7 +5684,7 @@ const selectedCustomer = useMemo(
             if (employeeForm.id === employee.id) {
                 resetEmployeeForm();
             }
-            await loadDashboard();
+            await loadDashboard(activePage);
         } catch (err) {
             setEmployeeMessage(err.response?.data?.message || 'Unable to delete employee.');
         }
@@ -5643,7 +5728,7 @@ const selectedCustomer = useMemo(
                 });
                 setProductMessage('Product vehicle created successfully.');
             }
-            await loadDashboard();
+            await loadDashboard(activePage);
             resetProductForm();
         } catch (err) {
             setProductMessage(err.response?.data?.message || 'Unable to save product vehicle.');
@@ -5667,7 +5752,7 @@ const selectedCustomer = useMemo(
             } else {
                 await API.post('/companies', companyForm);
             }
-            await loadDashboard();
+            await loadDashboard(activePage);
             resetCompanyForm();
             setCompanyMessage(companyForm.id ? 'Company profile updated successfully.' : 'Company profile saved successfully.');
         } catch (err) {
@@ -6099,24 +6184,17 @@ const selectedCustomer = useMemo(
                 admin_email: dealerForm.admin_email.trim(),
                 admin_password: dealerForm.admin_password,
                 admin_role_id: dealerForm.admin_role_id ? Number(dealerForm.admin_role_id) : null,
-                backup_directory: dealerForm.backup_directory.trim(),
                 notes: dealerForm.notes.trim(),
             };
             const { data } = dealerForm.id
                 ? await API.put(`/dealers/${dealerForm.id}`, payload)
                 : await API.post('/dealers', payload);
-            await loadDashboard();
-            const backupMessage =
-                  data.backup?.status === 'COMPLETED'
-                      ? ` Optional template backup saved to: ${data.backup.file_path}`
-                      : data.backup?.status === 'FAILED'
-                          ? ` Optional template backup failed: ${data.backup.error}`
-                          : '';
+            await loadDashboard(activePage);
             resetDealerForm();
             setDealerMessage(
                 dealerForm.id
-                    ? `Dealer updated. Dealer admin login: ${data.dealer_admin?.email || dealerForm.admin_email.trim()}.${backupMessage}`
-                    : `Dealer created. Dealer admin login: ${data.dealer_admin?.email || dealerForm.admin_email.trim()}.${backupMessage}`
+                    ? `Dealer updated. Dealer admin login: ${data.dealer_admin?.email || dealerForm.admin_email.trim()}.`
+                    : `Dealer created. Dealer admin login: ${data.dealer_admin?.email || dealerForm.admin_email.trim()}.`
             );
         } catch (err) {
             setDealerMessage(
@@ -6219,7 +6297,7 @@ const selectedCustomer = useMemo(
                 await API.post('/sales', payload);
                 setSaleMessage('Sales transaction created successfully.');
             }
-            await loadDashboard();
+            await loadDashboard(activePage);
             resetSaleForm();
         } catch (err) {
             const apiMessage = err.response?.data?.message;
@@ -6250,7 +6328,7 @@ const selectedCustomer = useMemo(
                 unit_price: Number(stockOrderForm.unit_price || 0),
                 total_amount: Number(stockOrderForm.total_amount || 0),
             });
-            await loadDashboard();
+            await loadDashboard(activePage);
             resetStockOrderForm();
             if (data.email_sent) {
                 setStockMessage('Stock order created and email sent to company.');
@@ -6318,7 +6396,7 @@ const selectedCustomer = useMemo(
                 notes: receivingStockOrder.notes || '',
             });
             setStockMessage(`Stock order ${receivingStockOrder.id} updated with the received vehicle details.`);
-            await loadDashboard();
+            await loadDashboard(activePage);
             closeStockReceiveModal();
         } catch (err) {
             setStockMessage(err.response?.data?.message || 'Unable to save received stock details.');
@@ -7434,7 +7512,7 @@ const selectedCustomer = useMemo(
                             key={report.key}
                             type="button"
                             className="report-link-card"
-                            onClick={() => setActivePage(report.key)}
+                            onClick={() => openDashboardPage(report.key)}
                         >
                             <span className="report-link-label">{report.label}</span>
                             <span className="report-link-arrow">Open</span>
@@ -7479,7 +7557,7 @@ const selectedCustomer = useMemo(
         try {
             setReceivingInstallmentId(installmentId);
             await API.patch(`/sales/installments/${installmentId}/receive`, payload);
-            await loadDashboard();
+            await loadDashboard(activePage);
             setInstallmentReceiptInputs((current) => {
                 const nextState = { ...current };
                 delete nextState[installmentId];
@@ -11149,7 +11227,6 @@ const selectedCustomer = useMemo(
                                         </select>
                                     </label>
                                     <label className="field"><span>Dealer Admin Password</span><input name="admin_password" value={dealerForm.admin_password} onChange={handleDealerChange} type="password" /></label>
-                                    <label className="field full-span"><span>Optional Backup Directory</span><input name="backup_directory" value={dealerForm.backup_directory} onChange={handleDealerChange} placeholder="Production: leave blank. Local only: C:\\Backups\\Dealers" /></label>
                                     <label className="field">
                                         <span>Dealer Status</span>
                                         <select name="is_active" value={String(dealerForm.is_active)} onChange={(event) => setDealerForm((current) => ({ ...current, is_active: event.target.value === 'true' }))}>
@@ -11173,7 +11250,6 @@ const selectedCustomer = useMemo(
                                     <div><span className="meta-label">Data Baseline</span><p className="meta-value">0 customers, 0 employees, 0 products, 0 sales</p></div>
                                     <div><span className="meta-label">Provisioned Login</span><p className="meta-value">Application Admin</p></div>
                                     <div><span className="meta-label">Dealer Setup</span><p className="meta-value">Clean profile + admin login</p></div>
-                                    <div><span className="meta-label">Backup Directory</span><p className="meta-value">{dealerForm.backup_directory.trim() || 'Optional backup disabled'}</p></div>
                                 </div>
                                 <div className="feature-list spaced-top">
                                     <span className="feature-pill">Branding Ready</span>
@@ -11235,8 +11311,6 @@ const selectedCustomer = useMemo(
                                                 <td>{dashboardThemes.find((theme) => theme.key === dealer.theme_key)?.label || 'Sandstone Pro'}</td>
                                                 <td>
                                                     {dealer.application_slug || 'Pending'}
-                                                    <br />
-                                                    {dealer.db_backup_label || 'No backup label'}
                                                 </td>
                                                 <td>
                                                     <span className={getStatusClass(dealer.is_active ? 'ACTIVE' : 'DRAFT')}>
@@ -11538,7 +11612,7 @@ const selectedCustomer = useMemo(
                                         className={`nav-btn nav-btn-parent ${isReportPage ? 'active' : ''}`}
                                         onClick={() => {
                                             setReportsMenuOpen((current) => !current);
-                                            setActivePage('reports');
+                                            openDashboardPage('reports');
                                         }}
                                         title={tab.featureRef}
                                     >
@@ -11555,7 +11629,7 @@ const selectedCustomer = useMemo(
                                                     key={report.key}
                                                     type="button"
                                                     className={`nav-sub-btn ${activePage === report.key ? 'active' : ''}`}
-                                                    onClick={() => setActivePage(report.key)}
+                                                    onClick={() => openDashboardPage(report.key)}
                                                 >
                                                     {report.label}
                                                 </button>
@@ -11570,7 +11644,7 @@ const selectedCustomer = useMemo(
                             <button
                                 key={tab.key}
                                 className={`nav-btn ${activePage === tab.key ? 'active' : ''}`}
-                                onClick={() => setActivePage(tab.key)}
+                                onClick={() => openDashboardPage(tab.key)}
                                 title={tab.featureRef}
                             >
                                 <span className="nav-btn-content">

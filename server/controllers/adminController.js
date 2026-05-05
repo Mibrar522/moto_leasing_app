@@ -217,7 +217,31 @@ exports.getDashboardData = async (req, res) => {
             'FEAT_DASHBOARD_COMPANY_PROFITABILITY',
         ]);
 
-        const metricsResult = await pool.query(
+        const requestedPage = String(req.query.page || 'dashboard').trim().toLowerCase();
+        const reportPageRequested = requestedPage === 'reports' || requestedPage.startsWith('report-');
+        const dashboardGroupsByPage = {
+            dashboard: ['metrics', 'applications', 'ads', 'notifications', 'dealers'],
+            customers: ['customers', 'dealers'],
+            employees: ['employees', 'dealers', 'roles', 'features', 'employeeFinancials'],
+            dealers: ['dealers'],
+            access: ['roles', 'features', 'rolePermissions'],
+            applications: ['applications'],
+            workflow: ['workflowDefinitions', 'workflowTasks', 'salesTransactions'],
+            'user-tasks': ['workflowTasks', 'salesTransactions'],
+            products: ['products', 'vehicleTypes'],
+            companies: ['companies'],
+            stock: ['stockOrders', 'products', 'companies', 'vehicleTypes'],
+            sales: ['salesTransactions', 'customers', 'inventory', 'dealers', 'workflowDefinitions'],
+            transactions: ['salesTransactions'],
+            installments: ['salesTransactions', 'customers', 'inventory'],
+        };
+        const requestedGroups = new Set([
+            ...(dashboardGroupsByPage[requestedPage] || dashboardGroupsByPage.dashboard),
+            ...(reportPageRequested ? ['salesTransactions', 'stockOrders', 'customers', 'employees', 'products', 'inventory', 'dealers', 'employeeFinancials'] : []),
+        ]);
+        const wantsGroup = (groupKey) => requestedGroups.has(groupKey);
+
+        const metricsResult = wantsGroup('metrics') ? await pool.query(
             `
             SELECT
                 COUNT(*) FILTER (WHERE UPPER(v.status) = 'AVAILABLE')::int AS available_vehicles,
@@ -230,9 +254,9 @@ exports.getDashboardData = async (req, res) => {
             ` : ''}
             `,
             isDealerScopedView ? [effectiveDealerId] : []
-        );
+        ) : { rows: [{ available_vehicles: 0, total_vehicles: 0 }] };
 
-        const leaseMetricsResult = await pool.query(
+        const leaseMetricsResult = wantsGroup('metrics') ? await pool.query(
             `
             SELECT
                 COUNT(*) FILTER (WHERE UPPER(status) = ANY($1::text[]))::int AS pending_applications,
@@ -243,9 +267,9 @@ exports.getDashboardData = async (req, res) => {
             ${isEmployeeLogin ? 'WHERE agent_id = $2' : isDealerScopedView ? 'WHERE lu.dealer_id = $2' : ''}
             `,
             applicationsParams
-        );
+        ) : { rows: [{ pending_applications: 0, total_applications: 0, total_revenue: 0 }] };
 
-        const settledLeaseMetricsResult = await pool.query(
+        const settledLeaseMetricsResult = wantsGroup('metrics') ? await pool.query(
             `
             SELECT
                 COUNT(*) FILTER (
@@ -273,9 +297,9 @@ exports.getDashboardData = async (req, res) => {
             ) AS installment_sales
             `,
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
-        );
+        ) : { rows: [{ settled_leases: 0, pending_leases: 0 }] };
 
-        const salesMetricsResult = await pool.query(
+        const salesMetricsResult = wantsGroup('metrics') ? await pool.query(
             `
             SELECT
                 COUNT(*)::int AS total_sales,
@@ -291,9 +315,9 @@ exports.getDashboardData = async (req, res) => {
             ${isEmployeeLogin ? 'WHERE agent_id = $1' : isDealerScopedView ? 'WHERE agent_id IN (SELECT id FROM users WHERE dealer_id = $1)' : ''}
             `,
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
-        );
+        ) : { rows: [{ total_sales: 0, active_installment_sales: 0, pending_sales: 0, total_sales_revenue: 0 }] };
 
-        const installmentTaskMetricsResult = await pool.query(
+        const installmentTaskMetricsResult = wantsGroup('metrics') ? await pool.query(
             `
             SELECT
                 COUNT(*)::int AS pending_installments
@@ -304,9 +328,9 @@ exports.getDashboardData = async (req, res) => {
             ${isEmployeeLogin ? 'AND st.agent_id = $1' : isDealerScopedView ? 'AND stu.dealer_id = $1' : ''}
             `,
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
-        );
+        ) : { rows: [{ pending_installments: 0 }] };
 
-        const employeeSalesResult = isEmployeeLogin
+        const employeeSalesResult = wantsGroup('metrics') && isEmployeeLogin
             ? await pool.query(
                 `
                 SELECT
@@ -325,7 +349,7 @@ exports.getDashboardData = async (req, res) => {
             )
             : { rows: [{ received_count: 0, pending_count: 0, received_value: 0, pending_value: 0, overdue_followups: 0 }] };
 
-        const customerMetricsResult = await pool.query(
+        const customerMetricsResult = wantsGroup('metrics') ? await pool.query(
             `
             SELECT
                 COUNT(*)::int AS total_customers,
@@ -337,9 +361,9 @@ exports.getDashboardData = async (req, res) => {
             ${isDealerScopedView ? 'WHERE created_by_agent IN (SELECT id FROM users WHERE dealer_id = $1)' : ''}
             `,
             isDealerScopedView ? [effectiveDealerId] : []
-        );
+        ) : { rows: [{ total_customers: 0, enrolled_biometrics: 0, scanned_documents: 0 }] };
 
-        const employeeMetricsResult = await pool.query(
+        const employeeMetricsResult = wantsGroup('metrics') ? await pool.query(
             `
             SELECT
                 COUNT(*)::int AS total_employees,
@@ -348,9 +372,9 @@ exports.getDashboardData = async (req, res) => {
             ${isDealerScopedView ? 'WHERE dealer_id = $1' : ''}
             `,
             isDealerScopedView ? [effectiveDealerId] : []
-        );
+        ) : { rows: [{ total_employees: 0, active_employees: 0 }] };
 
-        const dealerMetricsResult = await pool.query(
+        const dealerMetricsResult = wantsGroup('metrics') ? await pool.query(
             `
             SELECT
                 COUNT(*)::int AS total_dealers,
@@ -359,9 +383,9 @@ exports.getDashboardData = async (req, res) => {
             ${isDealerScopedView ? 'WHERE id = $1' : ''}
             `,
             isDealerScopedView ? [effectiveDealerId] : []
-        );
+        ) : { rows: [{ total_dealers: 0, active_dealers: 0 }] };
 
-        const applicationsResult = await pool.query(
+        const applicationsResult = wantsGroup('applications') ? await pool.query(
             `
             SELECT
                 la.id,
@@ -384,9 +408,9 @@ exports.getDashboardData = async (req, res) => {
             LIMIT 10
             `,
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
-        );
+        ) : { rows: [] };
 
-        const inventoryResult = await pool.query(
+        const inventoryResult = wantsGroup('inventory') ? await pool.query(
             `
             SELECT
                 v.id,
@@ -421,9 +445,9 @@ exports.getDashboardData = async (req, res) => {
             LIMIT 500
             `,
             isDealerScopedView ? [effectiveDealerId] : []
-        );
+        ) : { rows: [] };
 
-        const productsResult = await pool.query(
+        const productsResult = wantsGroup('products') ? await pool.query(
             `
             SELECT
                 id,
@@ -451,9 +475,9 @@ exports.getDashboardData = async (req, res) => {
             ORDER BY created_at DESC, brand ASC, model ASC
             LIMIT 500
             `
-        );
+        ) : { rows: [] };
 
-        const companiesResult = await pool.query(
+        const companiesResult = wantsGroup('companies') ? await pool.query(
             `
             SELECT
                 id,
@@ -471,9 +495,9 @@ exports.getDashboardData = async (req, res) => {
             ORDER BY company_name ASC
             LIMIT 300
             `
-        );
+        ) : { rows: [] };
 
-        const customersResult = await safeDashboardQuery(
+        const customersResult = wantsGroup('customers') ? await safeDashboardQuery(
             () => pool.query(
                 `
                 SELECT
@@ -500,7 +524,7 @@ exports.getDashboardData = async (req, res) => {
             ),
             'customers query',
             []
-        );
+        ) : { rows: [] };
 
         const employeeScopeClause = hasGlobalScope
             ? ''
@@ -511,7 +535,7 @@ exports.getDashboardData = async (req, res) => {
                     : 'WHERE e.dealer_id = $1';
         const employeeScopeParams = hasGlobalScope ? [] : [isAgentLogin ? req.user.id : effectiveDealerId];
 
-        const employeesResult = await safeDashboardQuery(
+        const employeesResult = wantsGroup('employees') ? await safeDashboardQuery(
             () => pool.query(
                 `
                 SELECT
@@ -605,7 +629,7 @@ exports.getDashboardData = async (req, res) => {
             ),
             'employees query',
             []
-        );
+        ) : { rows: [] };
         const dealerStaffScopeClause = hasGlobalScope
             ? ''
             : isAgentLogin
@@ -616,7 +640,7 @@ exports.getDashboardData = async (req, res) => {
                         ? "WHERE COALESCE(u.dealer_id, e.dealer_id) = $1 AND COALESCE(r.role_name, '') <> 'SUPER_ADMIN'"
                         : 'WHERE COALESCE(u.dealer_id, e.dealer_id) = $1';
         const dealerStaffScopeParams = hasGlobalScope ? [] : [isAgentLogin ? req.user.id : effectiveDealerId];
-        const dealerStaffResult = await pool.query(
+        const dealerStaffResult = wantsGroup('employees') ? await pool.query(
             `
             SELECT
                 u.id,
@@ -641,13 +665,13 @@ exports.getDashboardData = async (req, res) => {
             LIMIT 300
             `,
             dealerStaffScopeParams
-        );
+        ) : { rows: [] };
 
-        const rolesResult = await pool.query('SELECT id, COALESCE(role_name, name) AS role_name FROM roles ORDER BY id');
-        const featuresResult = await pool.query('SELECT id, feature_key, display_name FROM features ORDER BY id');
+        const rolesResult = wantsGroup('roles') ? await pool.query('SELECT id, COALESCE(role_name, name) AS role_name FROM roles ORDER BY id') : { rows: [] };
+        const featuresResult = wantsGroup('features') ? await pool.query('SELECT id, feature_key, display_name FROM features ORDER BY id') : { rows: [] };
         const workflowDefinitionScopeClause = hasGlobalScope ? '' : 'WHERE wd.dealer_id = $1 OR wd.dealer_id IS NULL';
         const workflowDefinitionScopeParams = hasGlobalScope ? [] : [effectiveDealerId || null];
-        const workflowDefinitionsResult = canViewWorkflowDefinitions
+        const workflowDefinitionsResult = wantsGroup('workflowDefinitions') && canViewWorkflowDefinitions
             ? await pool.query(
                 `
                 SELECT
@@ -668,7 +692,7 @@ exports.getDashboardData = async (req, res) => {
             : { rows: [] };
         let workflowTaskScopeClause = '';
         let workflowTaskScopeParams = [];
-        if (canViewWorkflowTasks) {
+        if (wantsGroup('workflowTasks') && canViewWorkflowTasks) {
             if (isAgentLogin) {
                 workflowTaskScopeClause = 'WHERE wt.created_by = $1 OR wt.acted_by = $1';
                 workflowTaskScopeParams = [req.user.id];
@@ -682,7 +706,7 @@ exports.getDashboardData = async (req, res) => {
                 workflowTaskScopeParams = [req.user.role_name, effectiveDealerId || null, req.user.id];
             }
         }
-        const workflowTasksResult = canViewWorkflowTasks
+        const workflowTasksResult = wantsGroup('workflowTasks') && canViewWorkflowTasks
             ? await pool.query(
                 `
                 SELECT
@@ -750,7 +774,7 @@ exports.getDashboardData = async (req, res) => {
                     : 'WHERE e.dealer_id = $1';
         const commissionScopeParams = hasGlobalScope ? [] : [isAgentLogin ? req.user.id : effectiveDealerId];
 
-        const employeeCommissionsResult = await safeDashboardQuery(
+        const employeeCommissionsResult = wantsGroup('employeeFinancials') ? await safeDashboardQuery(
             () => pool.query(
                 `
                 SELECT
@@ -771,7 +795,7 @@ exports.getDashboardData = async (req, res) => {
             ),
             'employee commissions query',
             []
-        );
+        ) : { rows: [] };
         const advanceRoleJoin = isManagerLogin ? 'JOIN roles er ON er.id = e.role_id' : '';
         const advanceScopeClause = hasGlobalScope
             ? ''
@@ -782,7 +806,7 @@ exports.getDashboardData = async (req, res) => {
                     : 'WHERE e.dealer_id = $1';
         const advanceScopeParams = hasGlobalScope ? [] : [isAgentLogin ? req.user.id : effectiveDealerId];
 
-        const employeeAdvancesResult = await safeDashboardQuery(
+        const employeeAdvancesResult = wantsGroup('employeeFinancials') ? await safeDashboardQuery(
             () => pool.query(
                 `
                 SELECT
@@ -799,7 +823,7 @@ exports.getDashboardData = async (req, res) => {
             ),
             'employee advances query',
             []
-        );
+        ) : { rows: [] };
         const payrollRoleJoin = isManagerLogin ? 'JOIN roles er ON er.id = e.role_id' : '';
         const payrollScopeClause = hasGlobalScope
             ? ''
@@ -810,7 +834,7 @@ exports.getDashboardData = async (req, res) => {
                     : 'WHERE e.dealer_id = $1';
         const payrollScopeParams = hasGlobalScope ? [] : [isAgentLogin ? req.user.id : effectiveDealerId];
 
-        const employeePayrollsResult = await safeDashboardQuery(
+        const employeePayrollsResult = wantsGroup('employeeFinancials') ? await safeDashboardQuery(
             () => pool.query(
                 `
                 SELECT
@@ -827,8 +851,8 @@ exports.getDashboardData = async (req, res) => {
             ),
             'employee payrolls query',
             []
-        );
-        const dealersResult = await pool.query(
+        ) : { rows: [] };
+        const dealersResult = wantsGroup('dealers') ? await pool.query(
             `
             SELECT
                 d.id,
@@ -857,17 +881,17 @@ exports.getDashboardData = async (req, res) => {
             ORDER BY d.created_at DESC, d.dealer_name ASC
             LIMIT 50
             `
-        );
-        const vehicleTypesResult = await pool.query(
+        ) : { rows: [] };
+        const vehicleTypesResult = wantsGroup('vehicleTypes') ? await pool.query(
             `
             SELECT id, type_key, display_name, is_active, sort_order
             FROM vehicle_types
             WHERE is_active = TRUE
             ORDER BY sort_order ASC, display_name ASC
             `
-        );
-        const rolePermissions = await getRolePermissions();
-        const stockOrdersResult = await pool.query(
+        ) : { rows: [] };
+        const rolePermissions = wantsGroup('rolePermissions') ? await getRolePermissions() : [];
+        const stockOrdersResult = wantsGroup('stockOrders') ? await pool.query(
             `
             SELECT
                 so.*,
@@ -893,11 +917,11 @@ exports.getDashboardData = async (req, res) => {
             LIMIT 300
             `,
             isDealerScopedView ? [effectiveDealerId] : []
-        );
+        ) : { rows: [] };
         const adsScopeClause = effectiveDealerId ? 'AND (dealer_id = $1 OR dealer_id IS NULL)' : '';
         const adsScopeParams = effectiveDealerId ? [effectiveDealerId] : [];
         let adsResult = { rows: [] };
-        try {
+        if (wantsGroup('ads')) try {
             adsResult = await pool.query(
                 `
                 SELECT
@@ -924,7 +948,7 @@ exports.getDashboardData = async (req, res) => {
         } catch (adsError) {
             console.warn('Dashboard ads fallback:', adsError.message);
         }
-        const salesResult = canViewSalesTransactions
+        const salesResult = wantsGroup('salesTransactions') && canViewSalesTransactions
             ? await safeDashboardQuery(
                 () => pool.query(
                 `
