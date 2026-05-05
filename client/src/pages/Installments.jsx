@@ -13,7 +13,9 @@ export default function Installments() {
     setError('');
     API.get('/sales')
       .then((response) => !cancelled && setSales(Array.isArray(response.data) ? response.data : []))
-      .catch((err) => !cancelled && setError(err.response?.data?.message || 'Unable to load installments.'))
+      .catch(() => API.get('/admin/dashboard', { params: { page: 'installments' } })
+        .then((response) => !cancelled && setSales(Array.isArray(response.data?.salesTransactions) ? response.data.salesTransactions : []))
+        .catch((err) => !cancelled && setError(err.response?.data?.message || 'Unable to load installments.')))
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
   }, []);

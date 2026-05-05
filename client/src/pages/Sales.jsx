@@ -13,7 +13,9 @@ export default function Sales() {
     setError('');
     API.get('/sales')
       .then((response) => !cancelled && setRows(Array.isArray(response.data) ? response.data : []))
-      .catch((err) => !cancelled && setError(err.response?.data?.message || 'Unable to load sales.'))
+      .catch(() => API.get('/admin/dashboard', { params: { page: 'sales' } })
+        .then((response) => !cancelled && setRows(Array.isArray(response.data?.salesTransactions) ? response.data.salesTransactions : []))
+        .catch((err) => !cancelled && setError(err.response?.data?.message || 'Unable to load sales.')))
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
   }, []);

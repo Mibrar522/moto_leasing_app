@@ -38,7 +38,7 @@ export default function FeatureTablePage({
             <div className="empty-state"><p>{emptyMessage}</p></div>
           ) : (
             <div className="table-scroll">
-              <table className="data-table">
+              <table className="pro-table">
                 <thead>
                   <tr>
                     {columns.map(([label]) => <th key={label}>{label}</th>)}
