@@ -1,8 +1,52 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'secret';
+const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'moto-leasing-assets';
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const isSupabaseStorageConfigured = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+
+const safeStorageSegment = (value) =>
+    String(value || 'file')
+        .trim()
+        .replace(/\\/g, '/')
+        .split('/')
+        .pop()
+        .replace(/[^a-zA-Z0-9._-]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .toLowerCase() || 'file';
+
+const uploadProfileAssetToSupabaseStorage = async (file) => {
+    if (!isSupabaseStorageConfigured || !file?.path) {
+        return null;
+    }
+
+    const fileName = safeStorageSegment(file.filename || file.originalname);
+    const objectPath = `profile/${fileName}`;
+    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(SUPABASE_STORAGE_BUCKET)}/${objectPath}`;
+    const fileBuffer = fs.readFileSync(file.path);
+
+    const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            apikey: SUPABASE_SERVICE_ROLE_KEY,
+            'Content-Type': file.mimetype || 'application/octet-stream',
+            'x-upsert': 'true',
+        },
+        body: fileBuffer,
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        throw new Error(`Supabase Storage upload failed (${response.status}): ${errorBody || response.statusText}`);
+    }
+
+    return `${SUPABASE_URL}/storage/v1/object/public/${encodeURIComponent(SUPABASE_STORAGE_BUCKET)}/${objectPath}`;
+};
 
 const getDealerProfile = async (dealerId) => {
     if (!dealerId) {
@@ -547,8 +591,16 @@ exports.uploadProfileLogo = async (req, res) => {
         return res.status(400).json({ message: 'Logo file is required' });
     }
 
+    let durableUrl = null;
+
+    try {
+        durableUrl = await uploadProfileAssetToSupabaseStorage(req.file);
+    } catch (storageError) {
+        console.warn('Profile logo Supabase Storage upload skipped:', storageError.message);
+    }
+
     res.status(200).json({
-        url: `/uploads/profile/${req.file.filename}`,
+        url: durableUrl || `/uploads/profile/${req.file.filename}`,
         originalName: req.file.originalname,
     });
 };
