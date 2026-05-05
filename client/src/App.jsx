@@ -6,6 +6,30 @@ import './App.css';
 const Register = lazy(() => import('./pages/Register'));
 const DashboardRoutePage = lazy(() => import('./pages/dashboardPages/DashboardRoutePage'));
 const AdsManager = lazy(() => import('./pages/AdsManager'));
+const Customers = lazy(() => import('./pages/Customers'));
+const Employees = lazy(() => import('./pages/Employees'));
+const Applications = lazy(() => import('./pages/Applications'));
+const Sales = lazy(() => import('./pages/Sales'));
+const Installments = lazy(() => import('./pages/Installments'));
+const CompanyProfile = lazy(() => import('./pages/CompanyProfile'));
+const Stock = lazy(() => import('./pages/Stock'));
+const Products = lazy(() => import('./pages/Products'));
+const Workflow = lazy(() => import('./pages/Workflow'));
+const UserTasks = lazy(() => import('./pages/UserTasks'));
+const AccessControl = lazy(() => import('./pages/AccessControl'));
+const Dealers = lazy(() => import('./pages/Dealers'));
+const Reports = lazy(() => import('./pages/reports/Reports'));
+const StockInventoryReport = lazy(() => import('./pages/reports/StockInventoryReport'));
+const DailySalesReport = lazy(() => import('./pages/reports/DailySalesReport'));
+const StockReceivedReport = lazy(() => import('./pages/reports/StockReceivedReport'));
+const CustomersReport = lazy(() => import('./pages/reports/CustomersReport'));
+const CustomerTransactionsReport = lazy(() => import('./pages/reports/CustomerTransactionsReport'));
+const BusinessTransactionsReport = lazy(() => import('./pages/reports/BusinessTransactionsReport'));
+const InvoiceViewReport = lazy(() => import('./pages/reports/InvoiceViewReport'));
+const EmployeesReport = lazy(() => import('./pages/reports/EmployeesReport'));
+const SalaryReport = lazy(() => import('./pages/reports/SalaryReport'));
+const DealerInformationReport = lazy(() => import('./pages/reports/DealerInformationReport'));
+const DealerEmployeesReport = lazy(() => import('./pages/reports/DealerEmployeesReport'));
 
 const hasSessionToken = () => {
   const token = localStorage.getItem('token');
@@ -36,31 +60,31 @@ function App() {
 
           {/* Application Routes */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardRoutePage /></ProtectedRoute>} />
-          <Route path="/dashboard/applications" element={<ProtectedRoute><DashboardRoutePage pageKey="applications" /></ProtectedRoute>} />
-          <Route path="/dashboard/workflow" element={<ProtectedRoute><DashboardRoutePage pageKey="workflow" /></ProtectedRoute>} />
-          <Route path="/dashboard/user-tasks" element={<ProtectedRoute><DashboardRoutePage pageKey="user-tasks" /></ProtectedRoute>} />
-          <Route path="/dashboard/access" element={<ProtectedRoute><DashboardRoutePage pageKey="access" /></ProtectedRoute>} />
-          <Route path="/dashboard/customers" element={<ProtectedRoute><DashboardRoutePage pageKey="customers" /></ProtectedRoute>} />
-          <Route path="/dashboard/products" element={<ProtectedRoute><DashboardRoutePage pageKey="products" /></ProtectedRoute>} />
-          <Route path="/dashboard/stock" element={<ProtectedRoute><DashboardRoutePage pageKey="stock" /></ProtectedRoute>} />
-          <Route path="/dashboard/sales" element={<ProtectedRoute><DashboardRoutePage pageKey="sales" /></ProtectedRoute>} />
-          <Route path="/dashboard/installments" element={<ProtectedRoute><DashboardRoutePage pageKey="installments" /></ProtectedRoute>} />
-          <Route path="/dashboard/employees" element={<ProtectedRoute><DashboardRoutePage pageKey="employees" /></ProtectedRoute>} />
-          <Route path="/dashboard/dealers" element={<ProtectedRoute><DashboardRoutePage pageKey="dealers" /></ProtectedRoute>} />
-          <Route path="/dashboard/reports" element={<ProtectedRoute><DashboardRoutePage pageKey="reports" /></ProtectedRoute>} />
-          <Route path="/dashboard/transactions" element={<ProtectedRoute><DashboardRoutePage pageKey="transactions" /></ProtectedRoute>} />
-          <Route path="/dashboard/companies" element={<ProtectedRoute><DashboardRoutePage pageKey="companies" /></ProtectedRoute>} />
-          <Route path="/dashboard/report-stock-inventory" element={<ProtectedRoute><DashboardRoutePage pageKey="report-stock-inventory" /></ProtectedRoute>} />
-          <Route path="/dashboard/report-daily-sales" element={<ProtectedRoute><DashboardRoutePage pageKey="report-daily-sales" /></ProtectedRoute>} />
-          <Route path="/dashboard/report-stock-received" element={<ProtectedRoute><DashboardRoutePage pageKey="report-stock-received" /></ProtectedRoute>} />
-          <Route path="/dashboard/report-customers" element={<ProtectedRoute><DashboardRoutePage pageKey="report-customers" /></ProtectedRoute>} />
-          <Route path="/dashboard/report-customer-transactions" element={<ProtectedRoute><DashboardRoutePage pageKey="report-customer-transactions" /></ProtectedRoute>} />
-          <Route path="/dashboard/report-business-transactions" element={<ProtectedRoute><DashboardRoutePage pageKey="report-business-transactions" /></ProtectedRoute>} />
-          <Route path="/dashboard/report-invoice-view" element={<ProtectedRoute><DashboardRoutePage pageKey="report-invoice-view" /></ProtectedRoute>} />
-          <Route path="/dashboard/report-employees" element={<ProtectedRoute><DashboardRoutePage pageKey="report-employees" /></ProtectedRoute>} />
-          <Route path="/dashboard/report-salary" element={<ProtectedRoute><DashboardRoutePage pageKey="report-salary" /></ProtectedRoute>} />
-          <Route path="/dashboard/report-dealer-information" element={<ProtectedRoute><DashboardRoutePage pageKey="report-dealer-information" /></ProtectedRoute>} />
-          <Route path="/dashboard/report-dealer-employees" element={<ProtectedRoute><DashboardRoutePage pageKey="report-dealer-employees" /></ProtectedRoute>} />
+          <Route path="/dashboard/applications" element={<ProtectedRoute><Applications /></ProtectedRoute>} />
+          <Route path="/dashboard/workflow" element={<ProtectedRoute><Workflow /></ProtectedRoute>} />
+          <Route path="/dashboard/user-tasks" element={<ProtectedRoute><UserTasks /></ProtectedRoute>} />
+          <Route path="/dashboard/access" element={<ProtectedRoute><AccessControl /></ProtectedRoute>} />
+          <Route path="/dashboard/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+          <Route path="/dashboard/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+          <Route path="/dashboard/stock" element={<ProtectedRoute><Stock /></ProtectedRoute>} />
+          <Route path="/dashboard/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
+          <Route path="/dashboard/installments" element={<ProtectedRoute><Installments /></ProtectedRoute>} />
+          <Route path="/dashboard/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
+          <Route path="/dashboard/dealers" element={<ProtectedRoute><Dealers /></ProtectedRoute>} />
+          <Route path="/dashboard/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+          <Route path="/dashboard/transactions" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
+          <Route path="/dashboard/companies" element={<ProtectedRoute><CompanyProfile /></ProtectedRoute>} />
+          <Route path="/dashboard/report-stock-inventory" element={<ProtectedRoute><StockInventoryReport /></ProtectedRoute>} />
+          <Route path="/dashboard/report-daily-sales" element={<ProtectedRoute><DailySalesReport /></ProtectedRoute>} />
+          <Route path="/dashboard/report-stock-received" element={<ProtectedRoute><StockReceivedReport /></ProtectedRoute>} />
+          <Route path="/dashboard/report-customers" element={<ProtectedRoute><CustomersReport /></ProtectedRoute>} />
+          <Route path="/dashboard/report-customer-transactions" element={<ProtectedRoute><CustomerTransactionsReport /></ProtectedRoute>} />
+          <Route path="/dashboard/report-business-transactions" element={<ProtectedRoute><BusinessTransactionsReport /></ProtectedRoute>} />
+          <Route path="/dashboard/report-invoice-view" element={<ProtectedRoute><InvoiceViewReport /></ProtectedRoute>} />
+          <Route path="/dashboard/report-employees" element={<ProtectedRoute><EmployeesReport /></ProtectedRoute>} />
+          <Route path="/dashboard/report-salary" element={<ProtectedRoute><SalaryReport /></ProtectedRoute>} />
+          <Route path="/dashboard/report-dealer-information" element={<ProtectedRoute><DealerInformationReport /></ProtectedRoute>} />
+          <Route path="/dashboard/report-dealer-employees" element={<ProtectedRoute><DealerEmployeesReport /></ProtectedRoute>} />
           <Route path="/dashboard/:dashboardPage" element={<ProtectedRoute><DashboardRoutePage /></ProtectedRoute>} />
           <Route path="/ads" element={<ProtectedRoute><AdsManager /></ProtectedRoute>} />
 
