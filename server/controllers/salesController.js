@@ -1,5 +1,6 @@
 const path = require('path');
 const pool = require('../config/db');
+const { resolveDurableUploadUrl } = require('../utils/storage');
 const {
     findApplicableSalesWorkflowDefinition,
     queueSaleForWorkflow,
@@ -164,10 +165,13 @@ exports.uploadAgreement = async (req, res) => {
         return res.status(400).json({ message: 'Agreement PDF is required' });
     }
 
+    const fallbackUrl = `/uploads/agreements/${req.file.filename}`;
+    const url = await resolveDurableUploadUrl(req.file, 'agreements', fallbackUrl);
+
     res.status(201).json({
         fileName: req.file.filename,
         originalName: req.file.originalname,
-        url: `/uploads/agreements/${req.file.filename}`,
+        url,
     });
 };
 
@@ -176,11 +180,14 @@ exports.uploadSaleDocument = async (req, res) => {
         return res.status(400).json({ message: 'Sale document file is required' });
     }
 
+    const fallbackUrl = `/uploads/sale-documents/${req.file.filename}`;
+    const url = await resolveDurableUploadUrl(req.file, 'sale-documents', fallbackUrl);
+
     res.status(201).json({
         fileName: req.file.filename,
         originalName: req.file.originalname,
         mimeType: req.file.mimetype,
-        url: `/uploads/sale-documents/${req.file.filename}`,
+        url,
     });
 };
 

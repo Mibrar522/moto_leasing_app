@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { resolveDurableUploadUrl } = require('../utils/storage');
 
 const resolveEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
 
@@ -263,8 +264,11 @@ exports.uploadAdImage = async (req, res) => {
             return res.status(400).json({ message: 'No image uploaded' });
         }
 
+        const fallbackUrl = `/uploads/ads/${req.file.filename}`;
+        const url = await resolveDurableUploadUrl(req.file, 'ads', fallbackUrl);
+
         res.status(200).json({
-            url: `/uploads/ads/${req.file.filename}`,
+            url,
         });
     } catch (error) {
         res.status(500).json({ message: 'Failed to upload ad image', error: error.message });

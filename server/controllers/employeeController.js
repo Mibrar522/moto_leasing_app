@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { buildHtml, buildLocalAttachments, sendMailSafe } = require('../utils/mail');
+const { resolveDurableUploadUrl } = require('../utils/storage');
 
 const isSuperAdminSession = (user = {}) =>
     Number(user?.real_role_id || user?.role_id) === 1 ||
@@ -896,8 +897,11 @@ exports.uploadEmployeeDocument = async (req, res) => {
         return res.status(400).json({ message: 'Employee CNIC file is required' });
     }
 
+    const fallbackUrl = `/uploads/employees/${req.file.filename}`;
+    const url = await resolveDurableUploadUrl(req.file, 'employees', fallbackUrl);
+
     res.status(200).json({
-        url: `/uploads/employees/${req.file.filename}`,
+        url,
         originalName: req.file.originalname,
     });
 };

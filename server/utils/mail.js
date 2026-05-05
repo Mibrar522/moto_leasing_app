@@ -212,25 +212,40 @@ const sendWithResend = async ({ recipients, ccRecipients, subject, text, html, d
 const sendMailSafe = async ({ to = [], cc = [], subject, text, html, dealer = {}, attachments = [] }) => {
     const recipients = uniqueEmails(Array.isArray(to) ? to : [to]);
     const ccRecipients = uniqueEmails(Array.isArray(cc) ? cc : [cc]);
+    const providerErrors = [];
 
     if (recipients.length === 0) {
         return { sent: false, error: 'No email recipient available' };
     }
 
     try {
-        const apiResult = await sendWithBrevo({ recipients, ccRecipients, subject, text, html, dealer, attachments })
-            || await sendWithResend({ recipients, ccRecipients, subject, text, html, dealer, attachments });
+        const brevoResult = await sendWithBrevo({ recipients, ccRecipients, subject, text, html, dealer, attachments });
+        if (brevoResult?.sent) {
+            return brevoResult;
+        }
+        if (brevoResult?.error) {
+            providerErrors.push(brevoResult.error);
+        }
 
-        if (apiResult) {
-            return apiResult;
+        const resendResult = await sendWithResend({ recipients, ccRecipients, subject, text, html, dealer, attachments });
+        if (resendResult?.sent) {
+            return resendResult;
+        }
+        if (resendResult?.error) {
+            providerErrors.push(resendResult.error);
         }
     } catch (error) {
-        return { sent: false, error: error.message };
+        providerErrors.push(error.message);
     }
 
     const transporter = await createTransporter();
     if (!transporter) {
-        return { sent: false, error: 'Email API key or SMTP is not configured on the server' };
+        return {
+            sent: false,
+            error: providerErrors.length > 0
+                ? providerErrors.join('; ')
+                : 'Email API key or SMTP is not configured on the server',
+        };
     }
 
     try {
@@ -247,7 +262,8 @@ const sendMailSafe = async ({ to = [], cc = [], subject, text, html, dealer = {}
 
         return { sent: true, error: null };
     } catch (error) {
-        return { sent: false, error: error.message };
+        providerErrors.push(error.message);
+        return { sent: false, error: providerErrors.join('; ') };
     }
 };
 

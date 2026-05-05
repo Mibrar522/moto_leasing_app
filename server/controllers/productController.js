@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { resolveDurableUploadUrl } = require('../utils/storage');
 
 const ensureVehicleTypesTable = async () => {
     await pool.query(`
@@ -302,9 +303,12 @@ exports.uploadProductImage = async (req, res) => {
         return res.status(400).json({ message: 'Product image is required' });
     }
 
+    const fallbackUrl = `/uploads/products/${req.file.filename}`;
+    const url = await resolveDurableUploadUrl(req.file, 'products', fallbackUrl);
+
     res.status(201).json({
         fileName: req.file.filename,
         originalName: req.file.originalname,
-        url: `/uploads/products/${req.file.filename}`,
+        url,
     });
 };

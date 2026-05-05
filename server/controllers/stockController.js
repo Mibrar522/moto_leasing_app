@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { buildHtml, buildLocalAttachments, sendMailSafe } = require('../utils/mail');
+const { resolveDurableUploadUrl } = require('../utils/storage');
 
 const normalizeStockOrderId = (orderId) => String(orderId || '').replace(/-/g, '').toUpperCase();
 const buildStockRegistrationNumber = (orderId, pieceNumber) =>
@@ -297,10 +298,13 @@ exports.uploadBankSlip = async (req, res) => {
         return res.status(400).json({ message: 'Bank slip file is required' });
     }
 
+    const fallbackUrl = `/uploads/bank-slips/${req.file.filename}`;
+    const url = await resolveDurableUploadUrl(req.file, 'bank-slips', fallbackUrl);
+
     res.status(201).json({
         fileName: req.file.filename,
         originalName: req.file.originalname,
-        url: `/uploads/bank-slips/${req.file.filename}`,
+        url,
     });
 };
 
