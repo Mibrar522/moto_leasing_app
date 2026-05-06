@@ -111,7 +111,7 @@ const Login = () => {
               {loading ? 'Authenticating...' : 'Enter dashboard'}
             </button>
           </form>
-          //<p className="auth-api-hint">Backend API: {apiBaseUrl || 'not configured'}</p>//
+          /*<p className="auth-api-hint">Backend API: {apiBaseUrl || 'not configured'}</p>*/
 
           <div className="auth-support">
             <div className="auth-support-card">
