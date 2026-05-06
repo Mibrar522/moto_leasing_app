@@ -521,7 +521,7 @@ exports.getDashboardData = async (req, res) => {
                 pc.installment_markup_percent,
                 pc.installment_months,
                 pc.is_active,
-                pc.dealer_id,
+                COALESCE(pc.dealer_id, creator.dealer_id, stock_owner.dealer_id) AS dealer_id,
                 pc.created_at,
                 pc.updated_at
             FROM product_catalog pc
@@ -1007,7 +1007,7 @@ exports.getDashboardData = async (req, res) => {
             FROM stock_orders so
             LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
-            JOIN users u ON u.id = so.ordered_by
+            LEFT JOIN users u ON u.id = so.ordered_by
             LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id)
             ${hasDealerDataScope ? 'WHERE COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id) = $1' : ''}
             ORDER BY so.created_at DESC
