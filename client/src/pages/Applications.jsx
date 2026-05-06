@@ -1,5 +1,5 @@
-import DomainDataPage from './dashboardPages/DomainDataPage';
+import DashboardPageView from './DashboardPageView';
 
 export default function Applications() {
-  return <DomainDataPage pageKey="applications" />;
+  return <DashboardPageView pageKey="applications" />;
 }

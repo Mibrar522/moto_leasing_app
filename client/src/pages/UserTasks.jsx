@@ -1,5 +1,5 @@
-import DomainDataPage from './dashboardPages/DomainDataPage';
+import DashboardPageView from './DashboardPageView';
 
 export default function UserTasks() {
-  return <DomainDataPage pageKey="user-tasks" />;
+  return <DashboardPageView pageKey="user-tasks" />;
 }

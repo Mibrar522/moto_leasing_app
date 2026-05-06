@@ -1,5 +1,5 @@
-import DomainDataPage from './dashboardPages/DomainDataPage';
+import DashboardPageView from './DashboardPageView';
 
 export default function Workflow() {
-  return <DomainDataPage pageKey="workflow" />;
+  return <DashboardPageView pageKey="workflow" />;
 }
