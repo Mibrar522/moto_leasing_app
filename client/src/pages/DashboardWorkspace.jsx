@@ -1748,6 +1748,23 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const appBrandName = isSuperAdmin ? (user?.dealer_name || user?.brand_name || 'MotorLease') : (user?.dealer_name || 'MotorLease');
     const appBrandAddress = isSuperAdmin ? (user?.dealer_address || user?.brand_address || 'Head office address not set') : (user?.dealer_address || 'Head office address not set');
     const appBrandContact = [user?.mobile_country_code, user?.mobile_number].filter(Boolean).join(' ') || user?.contact_email || 'Contact details not set';
+    const getCustomerCreatedByLabel = (customer = {}) => {
+        const isCurrentUserCreator =
+            customer.created_by_agent &&
+            user?.id &&
+            String(customer.created_by_agent) === String(user.id);
+        const isCurrentUserApplicationAdmin = String(user?.role_name || '').toUpperCase() === 'APPLICATION_ADMIN';
+
+        if (isCurrentUserCreator && isCurrentUserApplicationAdmin) {
+            return user?.dealer_name || customer.dealer_name || user?.full_name || customer.created_by_name || user?.email || customer.created_by_email || 'Not set';
+        }
+
+        if (isCurrentUserCreator) {
+            return user?.full_name || customer.created_by_name || user?.email || customer.created_by_email || 'Not set';
+        }
+
+        return customer.created_by_name || customer.dealer_name || customer.created_by_email || 'Not set';
+    };
     const canViewDashboard = hasAnyFeature(user, ['FEAT_DASHBOARD_VIEW']) || Boolean(user);
     const canViewApplications = hasAnyFeature(user, ['FEAT_APPLICATIONS_VIEW']);
     const canViewWorkflow = hasAnyFeature(user, ['FEAT_WORKFLOW_VIEW']);
@@ -7542,7 +7559,7 @@ const selectedCustomer = useMemo(
                     </div>
                     <div>
                         <span className="meta-label">Created By</span>
-                        <p className="meta-value">{selectedCustomer.created_by_name || selectedCustomer.created_by_email || 'Not set'}</p>
+                        <p className="meta-value">{getCustomerCreatedByLabel(selectedCustomer)}</p>
                     </div>
                     <div>
                         <span className="meta-label">Assigned Dealer</span>

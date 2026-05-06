@@ -39,6 +39,24 @@ export default function Customers({ ctx }) {
     user,
   } = ctx;
 
+  const getCustomerCreatedByLabel = (customer = {}) => {
+    const isCurrentUserCreator =
+      customer.created_by_agent &&
+      user?.id &&
+      String(customer.created_by_agent) === String(user.id);
+    const isCurrentUserApplicationAdmin = String(user?.role_name || '').toUpperCase() === 'APPLICATION_ADMIN';
+
+    if (isCurrentUserCreator && isCurrentUserApplicationAdmin) {
+      return user?.dealer_name || customer.dealer_name || user?.full_name || customer.created_by_name || user?.email || customer.created_by_email || 'Not set';
+    }
+
+    if (isCurrentUserCreator) {
+      return user?.full_name || customer.created_by_name || user?.email || customer.created_by_email || 'Not set';
+    }
+
+    return customer.created_by_name || customer.dealer_name || customer.created_by_email || 'Not set';
+  };
+
 if (!canOpenCustomers) {
                     return <div className="feedback-card error">Your account does not have customer onboarding access.</div>;
                 }
@@ -106,7 +124,10 @@ if (!canOpenCustomers) {
                                                 ))}
                                             </select>
                                         ) : (
-                                            <input value={customerForm.id ? (selectedCustomer?.created_by_name || selectedCustomer?.created_by_email || 'Not set') : (user?.full_name || 'Current user')} disabled />
+                                            <input
+                                                value={customerForm.id ? getCustomerCreatedByLabel(selectedCustomer) : (String(user?.role_name || '').toUpperCase() === 'APPLICATION_ADMIN' ? (user?.dealer_name || user?.full_name || 'Current user') : (user?.full_name || 'Current user'))}
+                                                disabled
+                                            />
                                         )}
                                     </label>
                                     <label className="field">
@@ -368,7 +389,7 @@ if (!canOpenCustomers) {
                                                     <td>{ocrDetails.address || 'Not set'}</td>
                                                     <td>{ocrDetails.contact_email || 'No email'}<br />{ocrDetails.contact_phone || 'No phone'}</td>
                                                     <td>
-                                                        {customer.created_by_name || customer.dealer_name || customer.created_by_email || 'Not set'}
+                                                        {getCustomerCreatedByLabel(customer)}
                                                         {customer.dealer_name ? (
                                                             <>
                                                                 <br />
