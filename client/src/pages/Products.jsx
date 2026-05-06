@@ -1,3 +1,24 @@
+import { useState } from 'react';
+
+function ProductImage({ src, alt, buildAssetUrl }) {
+  const [failed, setFailed] = useState(false);
+  const imageSrc = src && !failed ? buildAssetUrl(src) : '';
+
+  if (!imageSrc) {
+    return <span className="product-thumb product-thumb-fallback">No image</span>;
+  }
+
+  return (
+    <img
+      src={imageSrc}
+      alt={alt}
+      className="product-thumb"
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export default function Products({
   canManageProducts,
   canViewProductForm,
@@ -125,7 +146,13 @@ export default function Products({
             <tbody>
               {filteredInventory.map((vehicle) => (
                 <tr key={vehicle.id}>
-                  <td>{vehicle.image_url ? <img src={buildAssetUrl(vehicle.image_url)} alt={`${vehicle.brand} ${vehicle.model}`} className="product-thumb" /> : <span className="feature-pill muted">No image</span>}</td>
+                  <td>
+                    <ProductImage
+                      src={vehicle.image_url}
+                      alt={`${vehicle.brand} ${vehicle.model}`.trim() || 'Product image'}
+                      buildAssetUrl={buildAssetUrl}
+                    />
+                  </td>
                   <td>{[vehicle.brand, vehicle.model].filter(Boolean).join(' ')}</td>
                   <td>{vehicle.vehicle_type || 'Not set'}</td>
                   <td>{vehicle.color || 'Not set'}</td>

@@ -2222,9 +2222,18 @@
     width: 78px;
     height: 58px;
     object-fit: cover;
-    border-radius: 14px;
+    border-radius: 8px;
     border: 1px solid rgba(34, 50, 76, 0.08);
     background: rgba(243, 246, 250, 0.9);
+}
+
+.product-thumb-fallback {
+    display: inline-grid;
+    place-items: center;
+    color: var(--dash-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-align: center;
 }
 
 .installment-hero {

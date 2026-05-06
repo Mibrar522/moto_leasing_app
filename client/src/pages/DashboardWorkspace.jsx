@@ -319,31 +319,32 @@ const ACCESS_PAGE_GROUPS = [
         key: 'products',
         label: 'Products',
         description: 'Product master and fleet product setup.',
-        featureKeys: ['FEAT_PRODUCT_FORM', 'FEAT_PRODUCT_TYPE_MGMT', 'FEAT_PRODUCT_REGISTER'],
+        featureKeys: ['FEAT_PRODUCT_MGMT', 'FEAT_FLEET_MGMT', 'FEAT_PRODUCT_FORM', 'FEAT_PRODUCT_TYPE_MGMT', 'FEAT_PRODUCT_REGISTER'],
     },
     {
         key: 'stock',
         label: 'Stock',
         description: 'Stock ordering, receiving, and company stock operations.',
-        featureKeys: ['FEAT_STOCK_ORDER_FORM', 'FEAT_STOCK_RECEIVED_VIEW', 'FEAT_STOCK_REGISTER'],
+        featureKeys: ['FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT', 'FEAT_STOCK_ORDER_FORM', 'FEAT_STOCK_RECEIVED_VIEW', 'FEAT_STOCK_REGISTER'],
     },
     {
         key: 'sales',
         label: 'Sales',
         description: 'Sale creation, sales register, and transaction register access.',
-        featureKeys: ['FEAT_SALES_AGREEMENT_FORM', 'FEAT_SALES_AGREEMENT_SUMMARY', 'FEAT_SALES_INSTALLMENT_PREVIEW', 'FEAT_SALES_REGISTER', 'FEAT_TRANSACTION_REGISTER'],
+        featureKeys: ['FEAT_SALES_CREATE', 'FEAT_SALES_MGMT', 'FEAT_SALES_AGREEMENT_FORM', 'FEAT_SALES_AGREEMENT_SUMMARY', 'FEAT_SALES_INSTALLMENT_PREVIEW', 'FEAT_SALES_REGISTER', 'FEAT_TRANSACTION_REGISTER'],
     },
     {
         key: 'installments',
         label: 'Installments',
         description: 'Installment collection and installment commission.',
-        featureKeys: ['FEAT_INSTALLMENT_OVERVIEW', 'FEAT_INSTALLMENT_COLLECTION'],
+        featureKeys: ['FEAT_INSTALLMENT_MGMT', 'FEAT_SALES_MGMT', 'FEAT_INSTALLMENT_OVERVIEW', 'FEAT_INSTALLMENT_COLLECTION'],
     },
     {
         key: 'employees',
         label: 'Employees',
         description: 'Employees, payroll, and user management.',
         featureKeys: [
+            'FEAT_USER_MGMT',
             'FEAT_EMPLOYEE_FORM',
             'FEAT_EMPLOYEE_EDIT',
             'FEAT_EMPLOYEE_SECURITY_UNLOCK',
@@ -805,6 +806,42 @@ const getDashboardPageFromSearch = (search) => {
     return legacyPage;
 };
 const getDashboardTokenForPage = (page) => DASHBOARD_PAGE_TOKENS[page] || DASHBOARD_PAGE_TOKENS.dashboard;
+const DASHBOARD_PAGE_PATHS = {
+    dashboard: '/dashboard',
+    applications: '/dashboard/applications',
+    workflow: '/dashboard/workflow',
+    'user-tasks': '/dashboard/user-tasks',
+    access: '/dashboard/access',
+    customers: '/dashboard/customers',
+    products: '/dashboard/products',
+    stock: '/dashboard/stock',
+    sales: '/dashboard/sales',
+    installments: '/dashboard/installments',
+    employees: '/dashboard/employees',
+    dealers: '/dashboard/dealers',
+    reports: '/dashboard/reports',
+    transactions: '/dashboard/transactions',
+    companies: '/dashboard/companies',
+    'report-stock-inventory': '/dashboard/report-stock-inventory',
+    'report-daily-sales': '/dashboard/report-daily-sales',
+    'report-stock-received': '/dashboard/report-stock-received',
+    'report-customers': '/dashboard/report-customers',
+    'report-customer-transactions': '/dashboard/report-customer-transactions',
+    'report-business-transactions': '/dashboard/report-business-transactions',
+    'report-invoice-view': '/dashboard/report-invoice-view',
+    'report-employees': '/dashboard/report-employees',
+    'report-salary': '/dashboard/report-salary',
+    'report-dealer-information': '/dashboard/report-dealer-information',
+    'report-dealer-employees': '/dashboard/report-dealer-employees',
+};
+const getDashboardPageFromPathname = (pathname) => {
+    const normalizedPath = String(pathname || '').replace(/\/+$/, '') || '/dashboard';
+    const match = Object.entries(DASHBOARD_PAGE_PATHS)
+        .find(([, path]) => path === normalizedPath);
+
+    return match?.[0] || '';
+};
+const getDashboardPathForPage = (page) => DASHBOARD_PAGE_PATHS[page] || DASHBOARD_PAGE_PATHS.dashboard;
 const normalizeIdentityNumber = (value) => String(value || '').replace(/\D/g, '');
 const normalizePreviewAssetPath = (value) => {
     const trimmed = String(value || '').trim();
@@ -1441,7 +1478,13 @@ const mapEmployeeFromApi = (employee) => ({
 const Dashboard = ({ pageKey, PageComponent }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [activePage, setActivePage] = useState(() => pageKey || getDashboardPageFromSearch(window.location.search) || 'dashboard');
+    const getCurrentRoutePage = () => (
+        pageKey ||
+        getDashboardPageFromPathname(location.pathname) ||
+        getDashboardPageFromSearch(location.search) ||
+        'dashboard'
+    );
+    const [activePage, setActivePage] = useState(() => getCurrentRoutePage());
     const [searchTerm, setSearchTerm] = useState('');
     const [dashboardData, setDashboardData] = useState({
         user: null,
@@ -1578,7 +1621,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const loadDashboard = async () => {
         try {
             setLoading(true);
-            const requestedDashboardPage = getDashboardPageFromSearch(location.search) || pageKey || activePage || 'dashboard';
+            const requestedDashboardPage = getCurrentRoutePage() || activePage || 'dashboard';
             const { data } = await API.get('/admin/dashboard', {
                 params: { page: requestedDashboardPage },
             });
@@ -1662,7 +1705,16 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         }
 
         loadDashboard();
-    }, [navigate, activePage, pageKey, location.search]);
+    }, [navigate, pageKey, location.pathname, location.search]);
+
+    const goToPage = (nextPage, options = {}) => {
+        if (!nextPage) {
+            return;
+        }
+
+        setActivePage(nextPage);
+        navigate(getDashboardPathForPage(nextPage), { replace: Boolean(options.replace) });
+    };
 
     const resetAdForm = () => {
         setAdForm(emptyAdForm);
@@ -2005,7 +2057,7 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
         { key: 'sales', label: 'Sales', visible: canOpenSalesWorkspace, featureRef: 'Sales function access' },
         { key: 'transactions', label: 'Adhoc Sales', visible: canViewTransactionRegister, featureRef: 'FEAT_TRANSACTION_REGISTER' },
         { key: 'reports', label: 'Reports', visible: canOpenReports, featureRef: 'Report function access' },
-        { key: 'installments', label: 'Installments', visible: canOpenInstallmentWorkspace && dashboardData.salesTransactions.filter((sale) => sale.sale_mode === 'INSTALLMENT').length > 0, featureRef: 'Installment function access' },
+        { key: 'installments', label: 'Installments', visible: canOpenInstallmentWorkspace, featureRef: 'Installment function access' },
         { key: 'companies', label: 'Company Profile', visible: canManageStock, featureRef: 'FEAT_STOCK_MGMT / FEAT_FLEET_MGMT' },
         { key: 'stock', label: 'Stock', visible: canManageStock, featureRef: 'FEAT_STOCK_MGMT / FEAT_FLEET_MGMT' },
         { key: 'products', label: 'Products', visible: canManageProducts, featureRef: 'FEAT_PRODUCT_MGMT / FEAT_FLEET_MGMT' },
@@ -2036,6 +2088,10 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
     }, [isReportPage]);
 
     useEffect(() => {
+        if (loading) {
+            return;
+        }
+
         const installmentTabVisible =
             canOpenInstallmentWorkspace &&
             dashboardData.salesTransactions.some((sale) => sale.sale_mode === 'INSTALLMENT');
@@ -2046,7 +2102,7 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
             workflow: canOpenWorkflowWorkspace,
             'user-tasks': canViewWorkflow && canViewWorkflowTasks,
             products: canManageProducts,
-            installments: installmentTabVisible,
+            installments: canOpenInstallmentWorkspace || installmentTabVisible,
             stock: canManageStock,
             companies: canManageStock,
             dealers: canManageDealers,
@@ -2076,7 +2132,7 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
         const fallbackPage = tabReferences.find((tab) => tab.visible)?.key;
 
         if (fallbackPage && fallbackPage !== activePage) {
-            setActivePage(fallbackPage);
+            goToPage(fallbackPage, { replace: true });
         }
     }, [
         activePage,
@@ -2099,38 +2155,16 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
         canViewReportDealerInformation,
         canViewTransactionRegister,
         dashboardData.salesTransactions,
+        loading,
         tabReferences,
     ]);
     useEffect(() => {
-        const pageFromSearch = getDashboardPageFromSearch(location.search) || pageKey || 'dashboard';
+        const pageFromLocation = getCurrentRoutePage();
 
-        if (pageFromSearch !== activePage) {
-            setActivePage(pageFromSearch);
+        if (pageFromLocation !== activePage) {
+            setActivePage(pageFromLocation);
         }
-    }, [location.search, pageKey]);
-    useEffect(() => {
-        const currentPage = getDashboardPageFromSearch(location.search) || 'dashboard';
-
-        if (currentPage === activePage) {
-            return;
-        }
-
-        const params = new URLSearchParams(location.search);
-
-        params.delete('page');
-
-        if (!activePage || activePage === 'dashboard') {
-            params.delete('v');
-        } else {
-            params.set('v', getDashboardTokenForPage(activePage));
-        }
-
-        const nextSearch = params.toString();
-        navigate({
-            pathname: '/dashboard',
-            search: nextSearch ? `?${nextSearch}` : '',
-        }, { replace: true });
-    }, [activePage, navigate]);
+    }, [location.pathname, location.search, pageKey]);
 
     const filteredApplications = useMemo(() => {
         const query = searchTerm.trim().toLowerCase();
@@ -4553,7 +4587,7 @@ const selectedCustomer = useMemo(
             is_active: dealer.is_active ?? true,
         });
         setDealerMessage(`Editing ${dealer.dealer_name}`);
-        setActivePage('dealers');
+        goToPage('dealers');
     };
 
     const handleDeleteDealer = async (dealer) => {
@@ -4627,7 +4661,7 @@ const selectedCustomer = useMemo(
             notes: company.notes || '',
         });
         setCompanyMessage(`Editing ${company.company_name}`);
-        setActivePage('companies');
+        goToPage('companies');
     };
 
     const handleDeleteCompany = async (company) => {
@@ -4994,7 +5028,7 @@ const selectedCustomer = useMemo(
         if (item.pageKey === 'user-tasks' && item.taskId) {
             setSelectedWorkflowTaskId(item.taskId);
         }
-        setActivePage(item.pageKey);
+        goToPage(item.pageKey);
         setNotificationsOpen(false);
         await markNotificationsAsSeen([item.id]);
     };
@@ -5022,7 +5056,7 @@ const selectedCustomer = useMemo(
         const mapped = mapCustomerFromApi(customer);
         setCustomerForm(mapped);
         setSelectedCustomerId(customer.id);
-        setActivePage('customers');
+        goToPage('customers');
         setCustomerMessage(`Editing ${customer.full_name}`);
     };
 
@@ -5034,7 +5068,7 @@ const selectedCustomer = useMemo(
 
         setEmployeeForm(mapEmployeeFromApi(employee));
         setSelectedEmployeeId(employee.id);
-        setActivePage('employees');
+        goToPage('employees');
         setEmployeeMessage(`Editing ${employee.full_name}`);
     };
 
@@ -5056,7 +5090,7 @@ const selectedCustomer = useMemo(
             status: product.status || 'AVAILABLE',
         });
         setProductMessage(`Editing ${[product.brand, product.model].filter(Boolean).join(' ')}`);
-        setActivePage('products');
+        goToPage('products');
     };
 
     const handleEditSale = (sale) => {
@@ -5108,7 +5142,7 @@ const selectedCustomer = useMemo(
             monthly_rate: sale.monthly_installment || 0,
         });
         setSaleFormReadOnly(false);
-        setActivePage('sales');
+        goToPage('sales');
         setSaleMessage(`Editing sale for ${sale.customer_name}`);
     };
 
@@ -5161,7 +5195,7 @@ const selectedCustomer = useMemo(
             monthly_rate: sale.monthly_installment || 0,
         });
         setSaleFormReadOnly(true);
-        setActivePage('sales');
+        goToPage('sales');
         setSaleMessage(`Viewing sale for ${sale.customer_name}`);
     };
 
@@ -6281,7 +6315,7 @@ const selectedCustomer = useMemo(
 
     const handleOpenInstallmentPage = (saleId) => {
         setSelectedInstallmentSaleId(saleId);
-        setActivePage('installments');
+        goToPage('installments');
     };
 
     const openPrintWindow = (title, bodyHtml) => {
@@ -6454,7 +6488,7 @@ const selectedCustomer = useMemo(
                 }
             }
 
-            setActivePage('transactions');
+            goToPage('transactions');
             setTransactionActionState({ saleId: '', action: '' });
         });
     };
@@ -7386,7 +7420,7 @@ const selectedCustomer = useMemo(
                             key={report.key}
                             type="button"
                             className="report-link-card"
-                            onClick={() => setActivePage(report.key)}
+                            onClick={() => goToPage(report.key)}
                         >
                             <span className="report-link-label">{report.label}</span>
                             <span className="report-link-arrow">Open</span>
@@ -8488,7 +8522,7 @@ const selectedCustomer = useMemo(
                                         className={`nav-btn nav-btn-parent ${isReportPage ? 'active' : ''}`}
                                         onClick={() => {
                                             setReportsMenuOpen((current) => !current);
-                                            setActivePage('reports');
+                                            goToPage('reports');
                                         }}
                                         title={tab.featureRef}
                                     >
@@ -8505,7 +8539,7 @@ const selectedCustomer = useMemo(
                                                     key={report.key}
                                                     type="button"
                                                     className={`nav-sub-btn ${activePage === report.key ? 'active' : ''}`}
-                                                    onClick={() => setActivePage(report.key)}
+                                                    onClick={() => goToPage(report.key)}
                                                 >
                                                     {report.label}
                                                 </button>
@@ -8520,7 +8554,7 @@ const selectedCustomer = useMemo(
                             <button
                                 key={tab.key}
                                 className={`nav-btn ${activePage === tab.key ? 'active' : ''}`}
-                                onClick={() => setActivePage(tab.key)}
+                                onClick={() => goToPage(tab.key)}
                                 title={tab.featureRef}
                             >
                                 <span className="nav-btn-content">
