@@ -345,6 +345,7 @@ if (!canOpenCustomers) {
                                             <th>Country</th>
                                             <th>Address</th>
                                             <th>Contact</th>
+                                            <th>Created By</th>
                                             <th>OCR</th>
                                             <th>Fingerprint</th>
                                             <th>Actions</th>
@@ -366,6 +367,15 @@ if (!canOpenCustomers) {
                                                     <td>{ocrDetails.country || 'Not set'}</td>
                                                     <td>{ocrDetails.address || 'Not set'}</td>
                                                     <td>{ocrDetails.contact_email || 'No email'}<br />{ocrDetails.contact_phone || 'No phone'}</td>
+                                                    <td>
+                                                        {customer.created_by_name || customer.created_by_email || 'Not set'}
+                                                        {customer.dealer_name ? (
+                                                            <>
+                                                                <br />
+                                                                <span className="meta-inline">{customer.dealer_name}</span>
+                                                            </>
+                                                        ) : null}
+                                                    </td>
                                                     <td>
                                                         <span className={getStatusClass(ocrDetails.raw_ocr_text ? 'READY' : 'DRAFT')}>
                                                             {ocrDetails.raw_ocr_text ? 'Scanned' : 'Pending'}
