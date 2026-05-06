@@ -109,6 +109,10 @@ const createWorkflowTask = async (client, {
 };
 
 const findApplicableSalesWorkflowDefinition = async (client, { roleName, dealerId }) => {
+    if (!dealerId) {
+        return null;
+    }
+
     const result = await client.query(
         `
         SELECT *
@@ -116,14 +120,11 @@ const findApplicableSalesWorkflowDefinition = async (client, { roleName, dealerI
         WHERE workflow_type = 'SALE_APPROVAL'
           AND requester_role_name = $1
           AND is_active = TRUE
-          AND (dealer_id = $2 OR dealer_id IS NULL)
-        ORDER BY
-            CASE WHEN dealer_id = $2 THEN 0 ELSE 1 END,
-            updated_at DESC,
-            created_at DESC
+          AND dealer_id = $2
+        ORDER BY updated_at DESC, created_at DESC
         LIMIT 1
         `,
-        [roleName, dealerId || null]
+        [roleName, dealerId]
     );
 
     return result.rows[0] || null;
@@ -159,7 +160,7 @@ const queueSaleForWorkflow = async (client, { sale, vehicleId, creator, workflow
         workflowDefinitionId: workflowDefinition.id,
         entityType: 'SALE',
         entityId: sale.id,
-        dealerId: creator.dealer_id || null,
+        dealerId: sale.dealer_id || creator.effective_dealer_id || creator.dealer_id || null,
         createdBy: creator.id,
         assignedRoleName: stepRoles[0],
         stepNumber: 1,

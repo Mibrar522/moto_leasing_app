@@ -1,6 +1,11 @@
 const pool = require('../config/db');
 
 const round2 = (value) => Math.round((Number(value || 0) || 0) * 100) / 100;
+const isSuperAdminSession = (user = {}) =>
+    Number(user?.real_role_id || user?.role_id) === 1 ||
+    (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
+const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
+const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
 
 exports.receiveCustomerOrderInstallment = async (req, res) => {
     try {
@@ -11,19 +16,28 @@ exports.receiveCustomerOrderInstallment = async (req, res) => {
         }
 
         const paidAmount = req.body?.paid_amount != null ? round2(req.body.paid_amount) : null;
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         if (paidAmount != null && paidAmount < 0) {
             return res.status(400).json({ message: 'paid_amount cannot be negative' });
         }
 
         const existing = await pool.query(
             `
-            SELECT id, status, amount, paid_amount
-            FROM customer_order_installments
-            WHERE order_id = $1
-              AND installment_number = $2
+            SELECT coi.id, coi.status, coi.amount, coi.paid_amount
+            FROM customer_order_installments coi
+            JOIN customer_orders co ON co.id = coi.order_id
+            JOIN customer_accounts ca ON ca.id = co.customer_account_id
+            LEFT JOIN vehicles v ON v.id = co.vehicle_id
+            LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
+            LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN users ou ON ou.id = so.ordered_by
+            WHERE coi.order_id = $1
+              AND coi.installment_number = $2
+              ${globalScope ? '' : 'AND COALESCE(ca.preferred_dealer_id, so.dealer_id, ou.dealer_id, pc.dealer_id) = $3'}
             LIMIT 1
             `,
-            [orderId, installmentNumber]
+            globalScope ? [orderId, installmentNumber] : [orderId, installmentNumber, dealerId]
         );
 
         if (existing.rows.length === 0) {
@@ -54,4 +68,3 @@ exports.receiveCustomerOrderInstallment = async (req, res) => {
         return res.status(500).json({ message: 'Failed to update installment', error: error.message });
     }
 };
-

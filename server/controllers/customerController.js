@@ -27,6 +27,8 @@ const OCR_UNAVAILABLE_MESSAGE = 'Automatic OCR is not ready on this server yet. 
 const isSuperAdminSession = (user = {}) =>
     Number(user?.real_role_id || user?.role_id) === 1 ||
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
+const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
+const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
 const hasFeature = (user = {}, featureKey) =>
     Array.isArray(user?.feature_keys) && user.feature_keys.includes(featureKey);
 
@@ -258,7 +260,8 @@ const sendCustomerCreatedEmails = async (customer, creatorId) => {
 
 exports.listCustomers = async (req, res) => {
     try {
-        const isSuperAdmin = isSuperAdminSession(req.user);
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         const result = await pool.query(
             `
             SELECT
@@ -289,10 +292,10 @@ exports.listCustomers = async (req, res) => {
             LEFT JOIN users creator ON creator.id = c.created_by_agent
             LEFT JOIN dealers d ON d.id = c.dealer_id
             LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
-            ${isSuperAdmin ? '' : 'WHERE c.dealer_id = $1'}
+            ${globalScope ? '' : 'WHERE c.dealer_id = $1'}
             ORDER BY c.full_name ASC
             `,
-            isSuperAdmin ? [] : [req.user.dealer_id]
+            globalScope ? [] : [dealerId]
         );
 
         res.status(200).json(result.rows.map(mapCustomerRow));
@@ -303,7 +306,8 @@ exports.listCustomers = async (req, res) => {
 
 exports.getCustomerById = async (req, res) => {
     try {
-        const isSuperAdmin = isSuperAdminSession(req.user);
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         const result = await pool.query(
             `
             SELECT
@@ -335,9 +339,9 @@ exports.getCustomerById = async (req, res) => {
             LEFT JOIN dealers d ON d.id = c.dealer_id
             LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
             WHERE c.id = $1
-            ${isSuperAdmin ? '' : 'AND c.dealer_id = $2'}
+            ${globalScope ? '' : 'AND c.dealer_id = $2'}
             `,
-            isSuperAdmin ? [req.params.id] : [req.params.id, req.user.dealer_id]
+            globalScope ? [req.params.id] : [req.params.id, dealerId]
         );
 
         if (result.rows.length === 0) {
@@ -352,7 +356,8 @@ exports.getCustomerById = async (req, res) => {
 
 exports.createCustomer = async (req, res) => {
     try {
-        const isSuperAdmin = isSuperAdminSession(req.user);
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         const canUnlockOwnership = hasFeature(req.user, 'FEAT_CUSTOMER_OWNERSHIP_UNLOCK');
         if (!req.body.full_name || !req.body.cnic_passport_number) {
             return res.status(400).json({ message: 'Full name and CNIC/Passport number are required' });
@@ -365,9 +370,9 @@ exports.createCustomer = async (req, res) => {
                 SELECT u.id, u.dealer_id
                 FROM users u
                 WHERE u.id = $1
-                ${isSuperAdmin ? '' : 'AND u.dealer_id = $2'}
+                ${globalScope ? '' : 'AND u.dealer_id = $2'}
                 `,
-                isSuperAdmin ? [req.body.created_by_agent] : [req.body.created_by_agent, req.user.dealer_id]
+                globalScope ? [req.body.created_by_agent] : [req.body.created_by_agent, dealerId]
             );
 
             if (ownerCheck.rows.length === 0) {
@@ -385,7 +390,7 @@ exports.createCustomer = async (req, res) => {
         );
         const effectiveDealerId = ownerDealerCheck.rows[0]?.dealer_id || null;
 
-        if (!canUnlockOwnership && !effectiveDealerId) {
+        if (!effectiveDealerId) {
             return res.status(400).json({ message: 'Customer ownership is locked for this account. Switch into a dealer profile or enable the unlock feature before creating a new customer.' });
         }
 
@@ -442,7 +447,8 @@ exports.createCustomer = async (req, res) => {
             let existingCustomer = null;
             if (isCnicUnique) {
                 try {
-                    const isSuperAdmin = isSuperAdminSession(req.user);
+                    const globalScope = hasGlobalScope(req.user);
+                    const dealerId = getEffectiveDealerId(req.user);
                     const existingResult = await pool.query(
                         `
                         SELECT
@@ -473,12 +479,12 @@ exports.createCustomer = async (req, res) => {
                         LEFT JOIN dealers d ON d.id = c.dealer_id
                         LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
                         WHERE c.cnic_passport_number = $1
-                          ${isSuperAdmin ? '' : 'AND c.dealer_id = $2'}
+                          ${globalScope ? '' : 'AND c.dealer_id = $2'}
                         LIMIT 1
                         `,
-                        isSuperAdmin
+                        globalScope
                             ? [req.body.cnic_passport_number]
-                            : [req.body.cnic_passport_number, req.user.dealer_id]
+                            : [req.body.cnic_passport_number, dealerId]
                     );
                     if (existingResult.rows.length > 0) {
                         existingCustomer = mapCustomerRow(existingResult.rows[0]);
@@ -502,7 +508,8 @@ exports.createCustomer = async (req, res) => {
 
 exports.updateCustomer = async (req, res) => {
     try {
-        const isSuperAdmin = isSuperAdminSession(req.user);
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         const canUnlockOwnership = hasFeature(req.user, 'FEAT_CUSTOMER_OWNERSHIP_UNLOCK');
         if (req.body.created_by_agent && !canUnlockOwnership) {
             return res.status(400).json({ message: 'Customer ownership is locked after creation.' });
@@ -513,9 +520,9 @@ exports.updateCustomer = async (req, res) => {
             SELECT c.*
             FROM customers c
             WHERE c.id = $1
-            ${isSuperAdmin ? '' : 'AND c.dealer_id = $2'}
+            ${globalScope ? '' : 'AND c.dealer_id = $2'}
             `,
-            isSuperAdmin ? [req.params.id] : [req.params.id, req.user.dealer_id]
+            globalScope ? [req.params.id] : [req.params.id, dealerId]
         );
 
         if (existing.rows.length === 0) {
@@ -530,9 +537,9 @@ exports.updateCustomer = async (req, res) => {
                 SELECT u.id, u.dealer_id
                 FROM users u
                 WHERE u.id = $1
-                ${isSuperAdmin ? '' : 'AND u.dealer_id = $2'}
+                ${globalScope ? '' : 'AND u.dealer_id = $2'}
                 `,
-                isSuperAdmin ? [req.body.created_by_agent] : [req.body.created_by_agent, req.user.dealer_id]
+                globalScope ? [req.body.created_by_agent] : [req.body.created_by_agent, dealerId]
             );
 
             if (ownerCheck.rows.length === 0) {
@@ -541,7 +548,13 @@ exports.updateCustomer = async (req, res) => {
 
             nextCreatedByAgent = ownerCheck.rows[0].id;
         }
-        const nextDealerId = req.body.dealer_id || current.dealer_id || req.user.dealer_id || null;
+        const nextDealerId = globalScope
+            ? (req.body.dealer_id || current.dealer_id || null)
+            : (current.dealer_id || dealerId || null);
+
+        if (!nextDealerId) {
+            return res.status(400).json({ message: 'Dealer assignment is required for customer records.' });
+        }
 
         const mergedBody = {
             ...current,
@@ -581,7 +594,8 @@ exports.updateCustomer = async (req, res) => {
             let existingCustomer = null;
             if (isCnicUnique) {
                 try {
-                    const isSuperAdmin = isSuperAdminSession(req.user);
+                    const globalScope = hasGlobalScope(req.user);
+                    const dealerId = getEffectiveDealerId(req.user);
                     const existingResult = await pool.query(
                         `
                         SELECT
@@ -612,12 +626,12 @@ exports.updateCustomer = async (req, res) => {
                         LEFT JOIN dealers d ON d.id = c.dealer_id
                         LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
                         WHERE c.cnic_passport_number = $1
-                          ${isSuperAdmin ? '' : 'AND c.dealer_id = $2'}
+                          ${globalScope ? '' : 'AND c.dealer_id = $2'}
                         LIMIT 1
                         `,
-                        isSuperAdmin
+                        globalScope
                             ? [req.body.cnic_passport_number]
-                            : [req.body.cnic_passport_number, req.user.dealer_id]
+                            : [req.body.cnic_passport_number, dealerId]
                     );
                     if (existingResult.rows.length > 0) {
                         existingCustomer = mapCustomerRow(existingResult.rows[0]);
@@ -641,15 +655,16 @@ exports.updateCustomer = async (req, res) => {
 
 exports.deleteCustomer = async (req, res) => {
     try {
-        const isSuperAdmin = isSuperAdminSession(req.user);
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         const result = await pool.query(
             `
             DELETE FROM customers c
             WHERE c.id = $1
-              ${isSuperAdmin ? '' : 'AND c.dealer_id = $2'}
+              ${globalScope ? '' : 'AND c.dealer_id = $2'}
             RETURNING c.id, c.full_name
             `,
-            isSuperAdmin ? [req.params.id] : [req.params.id, req.user.dealer_id]
+            globalScope ? [req.params.id] : [req.params.id, dealerId]
         );
 
         if (result.rows.length === 0) {

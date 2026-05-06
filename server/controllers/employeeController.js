@@ -6,6 +6,8 @@ const { resolveDurableUploadUrl } = require('../utils/storage');
 const isSuperAdminSession = (user = {}) =>
     Number(user?.real_role_id || user?.role_id) === 1 ||
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
+const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
+const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
 
 const hasFeature = (user = {}, featureKey) =>
     Array.isArray(user?.feature_keys) && user.feature_keys.includes(featureKey);
@@ -189,13 +191,14 @@ const sendEmployeeCreatedEmail = async ({ employee, password, dealerId, creatorI
     });
 };
 
-const getEmployeeScopeClause = (isSuperAdmin) => (isSuperAdmin ? 'WHERE e.id = $1' : 'WHERE e.id = $1 AND e.dealer_id = $2');
+const getEmployeeScopeClause = (globalScope) => (globalScope ? 'WHERE e.id = $1' : 'WHERE e.id = $1 AND e.dealer_id = $2');
 
 exports.createAdvance = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        const isSuperAdmin = isSuperAdminSession(req.user);
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         const { amount, reason, advance_date } = req.body;
 
         if (Number(amount || 0) <= 0) {
@@ -204,7 +207,7 @@ exports.createAdvance = async (req, res) => {
 
         const employeeCheck = await client.query(
             `SELECT id FROM employees e ${getEmployeeScopeClause(isSuperAdmin)}`,
-            isSuperAdmin ? [req.params.id] : [req.params.id, req.user.dealer_id]
+            globalScope ? [req.params.id] : [req.params.id, dealerId]
         );
 
         if (employeeCheck.rows.length === 0) {
@@ -232,7 +235,8 @@ exports.generateSalary = async (req, res) => {
     const client = await pool.connect();
 
     try {
-        const isSuperAdmin = isSuperAdminSession(req.user);
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         const payrollMonth = String(req.body?.payroll_month || '').trim();
         const notes = req.body?.notes || null;
 
@@ -246,10 +250,10 @@ exports.generateSalary = async (req, res) => {
             `
             SELECT e.id, e.base_salary
             FROM employees e
-            ${getEmployeeScopeClause(isSuperAdmin)}
+            ${getEmployeeScopeClause(globalScope)}
             FOR UPDATE
             `,
-            isSuperAdmin ? [req.params.id] : [req.params.id, req.user.dealer_id]
+            globalScope ? [req.params.id] : [req.params.id, dealerId]
         );
 
         if (employeeResult.rows.length === 0) {
@@ -333,9 +337,10 @@ exports.generateSalary = async (req, res) => {
 
 exports.listEmployees = async (req, res) => {
     try {
-        const isSuperAdmin = isSuperAdminSession(req.user);
-        const whereClause = isSuperAdmin ? '' : 'WHERE e.dealer_id = $1';
-        const params = isSuperAdmin ? [] : [req.user.dealer_id];
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
+        const whereClause = globalScope ? '' : 'WHERE e.dealer_id = $1';
+        const params = globalScope ? [] : [dealerId];
 
         const [employeesResult, rolesResult, featuresResult] = await Promise.all([
             pool.query(
@@ -366,7 +371,9 @@ exports.createEmployee = async (req, res) => {
     const client = await pool.connect();
 
     try {
+        const globalScope = hasGlobalScope(req.user);
         const isSuperAdmin = isSuperAdminSession(req.user);
+        const dealerScopeId = getEffectiveDealerId(req.user);
         const canUnlockSecurityFields = hasFeature(req.user, 'FEAT_EMPLOYEE_SECURITY_UNLOCK');
         const {
             user_id,
@@ -407,10 +414,10 @@ exports.createEmployee = async (req, res) => {
             `SELECT id FROM roles WHERE role_name = 'AGENT' LIMIT 1`
         );
         const defaultAgentRoleId = agentRoleResult.rows[0]?.id ? Number(agentRoleResult.rows[0].id) : null;
-        const requestedDealerId = isSuperAdmin ? (dealer_id || null) : req.user.dealer_id;
+        const requestedDealerId = globalScope ? (dealer_id || null) : dealerScopeId;
         const requestedRoleId = role_id ? Number(role_id) : null;
         const requestedIsActive = typeof is_active === 'boolean' ? is_active : true;
-        const lockedDealerId = req.user.dealer_id || null;
+        const lockedDealerId = dealerScopeId || null;
 
         if (!canUnlockSecurityFields && !lockedDealerId) {
             await client.query('ROLLBACK');
@@ -622,7 +629,9 @@ exports.updateEmployee = async (req, res) => {
     const client = await pool.connect();
 
     try {
+        const globalScope = hasGlobalScope(req.user);
         const isSuperAdmin = isSuperAdminSession(req.user);
+        const dealerScopeId = getEffectiveDealerId(req.user);
         const {
             user_id,
             password,
@@ -652,7 +661,7 @@ exports.updateEmployee = async (req, res) => {
 
         const exists = await client.query(
             `SELECT id, dealer_id FROM employees WHERE id = $1 ${isSuperAdmin ? '' : 'AND dealer_id = $2'}`,
-            isSuperAdmin ? [req.params.id] : [req.params.id, req.user.dealer_id]
+            globalScope ? [req.params.id] : [req.params.id, dealerScopeId]
         );
         if (exists.rows.length === 0) {
             await client.query('ROLLBACK');
@@ -667,7 +676,7 @@ exports.updateEmployee = async (req, res) => {
         const currentRoleId = currentEmployee.rows[0].role_id ? Number(currentEmployee.rows[0].role_id) : null;
         const currentDealerId = currentEmployee.rows[0].dealer_id || exists.rows[0].dealer_id || null;
         const requestedRoleId = role_id ? Number(role_id) : null;
-        const requestedDealerId = isSuperAdmin ? (dealer_id || currentDealerId || null) : req.user.dealer_id;
+        const requestedDealerId = globalScope ? (dealer_id || currentDealerId || null) : dealerScopeId;
         const currentIsActive = Boolean(currentEmployee.rows[0].is_active);
         const requestedIsActive = typeof is_active === 'boolean' ? is_active : currentIsActive;
         const canUnlockSecurityFields = hasFeature(req.user, 'FEAT_EMPLOYEE_SECURITY_UNLOCK');
@@ -872,10 +881,11 @@ exports.updateEmployee = async (req, res) => {
 
 exports.deleteEmployee = async (req, res) => {
     try {
-        const isSuperAdmin = isSuperAdminSession(req.user);
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         const result = await pool.query(
-            `DELETE FROM employees WHERE id = $1 ${isSuperAdmin ? '' : 'AND dealer_id = $2'} RETURNING id, user_id, full_name, employee_code`,
-            isSuperAdmin ? [req.params.id] : [req.params.id, req.user.dealer_id]
+            `DELETE FROM employees WHERE id = $1 ${globalScope ? '' : 'AND dealer_id = $2'} RETURNING id, user_id, full_name, employee_code`,
+            globalScope ? [req.params.id] : [req.params.id, dealerId]
         );
 
         if (result.rows.length === 0) {

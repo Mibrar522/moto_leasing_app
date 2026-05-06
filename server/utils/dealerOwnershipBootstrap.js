@@ -1,10 +1,17 @@
 const pool = require('../config/db');
 
 const OWNED_TABLES = [
+    'app_ads',
+    'customers',
+    'employees',
     'product_catalog',
     'company_profiles',
     'stock_orders',
     'sales_transactions',
+    'customer_orders',
+    'lease_applications',
+    'workflow_definitions',
+    'workflow_tasks',
 ];
 
 const run = (sql, params = []) => pool.query(sql, params);
@@ -63,6 +70,9 @@ const syncDealerOwnership = async () => {
     await ensureColumn('employees', 'created_by', 'UUID');
     await ensureColumn('workflow_definitions', 'dealer_id', 'UUID');
     await ensureColumn('workflow_tasks', 'dealer_id', 'UUID');
+    await ensureColumn('app_ads', 'dealer_id', 'UUID');
+    await ensureColumn('customer_orders', 'dealer_id', 'UUID');
+    await ensureColumn('lease_applications', 'dealer_id', 'UUID');
 
     await run(`
         UPDATE product_catalog pc
@@ -138,6 +148,33 @@ const syncDealerOwnership = async () => {
     `);
 
     await run(`
+        UPDATE customer_orders co
+        SET dealer_id = COALESCE(ca.preferred_dealer_id, so.dealer_id, order_user.dealer_id, pc.dealer_id)
+        FROM customer_accounts ca
+        LEFT JOIN vehicles v ON v.id = co.vehicle_id
+        LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
+        LEFT JOIN users order_user ON order_user.id = so.ordered_by
+        LEFT JOIN product_catalog pc ON pc.id = COALESCE(co.product_id, so.product_id)
+        WHERE ca.id = co.customer_account_id
+          AND co.dealer_id IS NULL
+          AND COALESCE(ca.preferred_dealer_id, so.dealer_id, order_user.dealer_id, pc.dealer_id) IS NOT NULL
+    `);
+
+    await run(`
+        UPDATE lease_applications la
+        SET dealer_id = COALESCE(c.dealer_id, agent.dealer_id, so.dealer_id, order_user.dealer_id, pc.dealer_id)
+        FROM customers c
+        LEFT JOIN users agent ON agent.id = la.agent_id
+        LEFT JOIN vehicles v ON v.id = la.vehicle_id
+        LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
+        LEFT JOIN users order_user ON order_user.id = so.ordered_by
+        LEFT JOIN product_catalog pc ON pc.id = so.product_id
+        WHERE c.id = la.customer_id
+          AND la.dealer_id IS NULL
+          AND COALESCE(c.dealer_id, agent.dealer_id, so.dealer_id, order_user.dealer_id, pc.dealer_id) IS NOT NULL
+    `);
+
+    await run(`
         UPDATE workflow_tasks wt
         SET dealer_id = wd.dealer_id
         FROM workflow_definitions wd
@@ -155,6 +192,9 @@ const syncDealerOwnership = async () => {
     await run('CREATE INDEX IF NOT EXISTS idx_workflow_definitions_dealer_id ON workflow_definitions(dealer_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_workflow_tasks_dealer_id ON workflow_tasks(dealer_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_vehicles_source_stock_order_id ON vehicles(source_stock_order_id)');
+    await run('CREATE INDEX IF NOT EXISTS idx_app_ads_dealer_id ON app_ads(dealer_id)');
+    await run('CREATE INDEX IF NOT EXISTS idx_customer_orders_dealer_id ON customer_orders(dealer_id)');
+    await run('CREATE INDEX IF NOT EXISTS idx_lease_applications_dealer_id ON lease_applications(dealer_id)');
 
     for (const table of OWNED_TABLES) {
         await ensureRequiredDealerConstraint(table);

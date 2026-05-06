@@ -158,7 +158,7 @@ exports.getDashboardData = async (req, res) => {
         const leaseMetricsWhereClause = isEmployeeLogin
             ? 'WHERE la.agent_id = $2'
             : isDealerScopedView
-                ? 'WHERE u.dealer_id = $2'
+                ? 'WHERE COALESCE(la.dealer_id, u.dealer_id) = $2'
                 : '';
         const applicationsParams = isEmployeeLogin || isDealerScopedView
             ? [PENDING_APPLICATION_STATUSES, isEmployeeLogin ? req.user.id : effectiveDealerId]
@@ -166,7 +166,7 @@ exports.getDashboardData = async (req, res) => {
         const applicationsListWhereClause = isEmployeeLogin
             ? 'WHERE la.agent_id = $1'
             : isDealerScopedView
-                ? 'WHERE u.dealer_id = $1'
+                ? 'WHERE COALESCE(la.dealer_id, u.dealer_id) = $1'
                 : '';
 
         const featureResult = (req.user.feature_keys || []).length > 0
@@ -295,7 +295,8 @@ exports.getDashboardData = async (req, res) => {
             ${isDealerScopedView ? `
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
             LEFT JOIN users vou ON vou.id = so.ordered_by
-            WHERE vou.dealer_id = $1
+            LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            WHERE COALESCE(so.dealer_id, vou.dealer_id, pc.dealer_id) = $1
             ` : ''}
             `,
             isDealerScopedView ? [effectiveDealerId] : []
@@ -309,7 +310,7 @@ exports.getDashboardData = async (req, res) => {
                 COALESCE(SUM(total_amount), 0)::numeric AS total_revenue
             FROM lease_applications
             ${isDealerScopedView ? 'JOIN users lu ON lu.id = lease_applications.agent_id' : ''}
-            ${isEmployeeLogin ? 'WHERE agent_id = $2' : isDealerScopedView ? 'WHERE lu.dealer_id = $2' : ''}
+            ${isEmployeeLogin ? 'WHERE agent_id = $2' : isDealerScopedView ? 'WHERE COALESCE(lease_applications.dealer_id, lu.dealer_id) = $2' : ''}
             `,
             applicationsParams
         ) : { rows: [{ pending_applications: 0, total_applications: 0, total_revenue: 0 }] };
@@ -337,7 +338,7 @@ exports.getDashboardData = async (req, res) => {
                 LEFT JOIN sale_installments si ON si.sale_id = st.id
                 WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
                   AND UPPER(COALESCE(st.approval_status, 'APPROVED')) = 'APPROVED'
-                  ${isEmployeeLogin ? 'AND st.agent_id = $1' : isDealerScopedView ? 'AND su.dealer_id = $1' : ''}
+                  ${isEmployeeLogin ? 'AND st.agent_id = $1' : isDealerScopedView ? 'AND COALESCE(st.dealer_id, su.dealer_id) = $1' : ''}
                 GROUP BY st.id
             ) AS installment_sales
             `,
@@ -356,8 +357,9 @@ exports.getDashboardData = async (req, res) => {
                     WHERE UPPER(COALESCE(status, '')) <> 'RECEIVED'
                 )::int AS pending_sales,
                 COALESCE(SUM(vehicle_price), 0)::numeric AS total_sales_revenue
-            FROM sales_transactions
-            ${isEmployeeLogin ? 'WHERE agent_id = $1' : isDealerScopedView ? 'WHERE agent_id IN (SELECT id FROM users WHERE dealer_id = $1)' : ''}
+            FROM sales_transactions st
+            LEFT JOIN users su ON su.id = st.agent_id
+            ${isEmployeeLogin ? 'WHERE st.agent_id = $1' : isDealerScopedView ? 'WHERE COALESCE(st.dealer_id, su.dealer_id) = $1' : ''}
             `,
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
         ) : { rows: [{ total_sales: 0, active_installment_sales: 0, pending_sales: 0, total_sales_revenue: 0 }] };
@@ -370,7 +372,7 @@ exports.getDashboardData = async (req, res) => {
             JOIN sales_transactions st ON st.id = si.sale_id
             LEFT JOIN users stu ON stu.id = st.agent_id
             WHERE UPPER(COALESCE(si.status, '')) <> 'RECEIVED'
-            ${isEmployeeLogin ? 'AND st.agent_id = $1' : isDealerScopedView ? 'AND stu.dealer_id = $1' : ''}
+            ${isEmployeeLogin ? 'AND st.agent_id = $1' : isDealerScopedView ? 'AND COALESCE(st.dealer_id, stu.dealer_id) = $1' : ''}
             `,
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
         ) : { rows: [{ pending_installments: 0 }] };
@@ -763,7 +765,7 @@ exports.getDashboardData = async (req, res) => {
 
         const rolesResult = wantsGroup('roles') ? await pool.query('SELECT id, COALESCE(role_name, name) AS role_name FROM roles ORDER BY id') : { rows: [] };
         const featuresResult = wantsGroup('features') ? await pool.query('SELECT id, feature_key, display_name FROM features ORDER BY id') : { rows: [] };
-        const workflowDefinitionScopeClause = hasGlobalScope ? '' : 'WHERE wd.dealer_id = $1 OR wd.dealer_id IS NULL';
+        const workflowDefinitionScopeClause = hasGlobalScope ? '' : 'WHERE wd.dealer_id = $1';
         const workflowDefinitionScopeParams = hasGlobalScope ? [] : [effectiveDealerId || null];
         const workflowDefinitionsResult = wantsGroup('workflowDefinitions') && canViewWorkflowDefinitions
             ? await pool.query(
@@ -793,7 +795,7 @@ exports.getDashboardData = async (req, res) => {
             } else if (!hasGlobalScope) {
                 workflowTaskScopeClause = `
                     WHERE (
-                        (wt.assigned_role_name = $1 AND (wt.dealer_id = $2 OR wt.dealer_id IS NULL))
+                        (wt.assigned_role_name = $1 AND wt.dealer_id = $2)
                         OR wt.acted_by = $3
                     )
                 `;
@@ -1016,7 +1018,7 @@ exports.getDashboardData = async (req, res) => {
             'stock orders query',
             []
         ) : { rows: [] };
-        const adsScopeClause = effectiveDealerId ? 'AND (dealer_id = $1 OR dealer_id IS NULL)' : '';
+        const adsScopeClause = effectiveDealerId ? 'AND dealer_id = $1' : '';
         const adsScopeParams = effectiveDealerId ? [effectiveDealerId] : [];
         let adsResult = { rows: [] };
         if (wantsGroup('ads')) try {

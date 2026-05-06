@@ -4,6 +4,12 @@ const {
     rejectWorkflowTask,
 } = require('../services/workflowService');
 
+const isSuperAdminSession = (user = {}) =>
+    Number(user?.real_role_id || user?.role_id) === 1 ||
+    (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
+const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
+const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
+
 exports.saveWorkflowDefinition = async (req, res) => {
     try {
         const {
@@ -16,6 +22,9 @@ exports.saveWorkflowDefinition = async (req, res) => {
             second_approver_role_name,
             is_active = true,
         } = req.body;
+        const globalScope = hasGlobalScope(req.user);
+        const effectiveDealerId = getEffectiveDealerId(req.user);
+        const workflowDealerId = globalScope ? (dealer_id || null) : effectiveDealerId;
 
         if (!String(definition_name || '').trim()) {
             return res.status(400).json({ message: 'Workflow name is required.' });
@@ -25,10 +34,14 @@ exports.saveWorkflowDefinition = async (req, res) => {
             return res.status(400).json({ message: 'Requester role and first approver role are required.' });
         }
 
+        if (!workflowDealerId) {
+            return res.status(400).json({ message: 'Dealer assignment is required for workflow definitions.' });
+        }
+
         const normalizedPayload = [
             String(definition_name || '').trim(),
             String(workflow_type || 'SALE_APPROVAL').trim().toUpperCase(),
-            dealer_id || null,
+            workflowDealerId,
             String(requester_role_name || '').trim().toUpperCase(),
             String(first_approver_role_name || '').trim().toUpperCase(),
             String(second_approver_role_name || '').trim().toUpperCase() || null,
@@ -51,9 +64,10 @@ exports.saveWorkflowDefinition = async (req, res) => {
                     updated_by = $8,
                     updated_at = NOW()
                 WHERE id = $9
+                  ${globalScope ? '' : 'AND dealer_id = $10'}
                 RETURNING *
                 `,
-                [...normalizedPayload, req.user.id, id]
+                globalScope ? [...normalizedPayload, req.user.id, id] : [...normalizedPayload, req.user.id, id, workflowDealerId]
             );
         } else {
             result = await pool.query(

@@ -60,7 +60,9 @@ exports.listAds = async (req, res) => {
 
         if (dealerId) {
             params.push(dealerId);
-            where.push(`(dealer_id = $${params.length} OR dealer_id IS NULL)`);
+            where.push(`dealer_id = $${params.length}`);
+        } else {
+            return res.status(200).json({ ads: [] });
         }
 
         const result = await pool.query(
@@ -89,8 +91,13 @@ exports.listAds = async (req, res) => {
     }
 };
 
-exports.listProducts = async (_req, res) => {
+exports.listProducts = async (req, res) => {
     try {
+        const dealerId = req.query.dealer_id ? String(req.query.dealer_id) : null;
+        if (!dealerId) {
+            return res.status(200).json({ products: [] });
+        }
+
         const result = await pool.query(
             `
             SELECT
@@ -112,8 +119,10 @@ exports.listProducts = async (_req, res) => {
                 updated_at
             FROM product_catalog
             WHERE is_active = true
+              AND dealer_id = $1
             ORDER BY created_at DESC, brand ASC, model ASC
-            `
+            `,
+            [dealerId]
         );
 
         const products = result.rows.map((row) => {
@@ -164,7 +173,9 @@ exports.listAvailableVehicles = async (req, res) => {
 
         if (dealerId) {
             params.push(dealerId);
-            where.push(`d.id = $${params.length}`);
+            where.push(`COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id) = $${params.length}`);
+        } else {
+            return res.status(200).json({ vehicles: [] });
         }
 
         const result = await pool.query(
@@ -195,8 +206,8 @@ exports.listAvailableVehicles = async (req, res) => {
             FROM vehicles v
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
             LEFT JOIN users ou ON ou.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = ou.dealer_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id)
             ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
             ORDER BY v.created_at DESC NULLS LAST, v.brand ASC, v.model ASC
             `,

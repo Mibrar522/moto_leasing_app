@@ -139,6 +139,7 @@ const ensureCustomerOrdersColumns = async (client) => {
     // Existing DBs may have an older customer_orders table. Ensure columns used by the API exist.
     await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS product_id uuid;`);
     await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS vehicle_id uuid;`);
+    await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS dealer_id uuid;`);
     await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS down_payment numeric(12,2) DEFAULT 0 NOT NULL;`);
     await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS financed_amount numeric(12,2) DEFAULT 0 NOT NULL;`);
     await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS first_due_date date NULL;`);
@@ -182,8 +183,9 @@ exports.createOrder = async (req, res) => {
             FROM vehicles v
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN users ordered_by_user ON ordered_by_user.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = ordered_by_user.dealer_id
+            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, ordered_by_user.dealer_id, pc.dealer_id, cp.dealer_id)
             WHERE v.id = $1
             LIMIT 1
             `,
@@ -195,6 +197,9 @@ exports.createOrder = async (req, res) => {
         }
 
         const vehicle = vehicleResult.rows[0];
+        if (!vehicle.dealer_id || (req.customer.preferred_dealer_id && String(vehicle.dealer_id) !== String(req.customer.preferred_dealer_id))) {
+            return res.status(403).json({ message: 'This vehicle is not available for your selected dealer.' });
+        }
         const vehicleStatus = String(vehicle.status || '').toUpperCase();
         if (vehicleStatus !== 'AVAILABLE') {
             return res.status(400).json({ message: 'Only available vehicles can be purchased.' });
@@ -245,6 +250,7 @@ exports.createOrder = async (req, res) => {
                 customer_account_id,
                 product_id,
                 vehicle_id,
+                dealer_id,
                 purchase_mode,
                 base_price,
                 markup_percent,
@@ -256,13 +262,14 @@ exports.createOrder = async (req, res) => {
                 first_due_date,
                 status
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'ACTIVE')
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'ACTIVE')
             RETURNING *
             `,
             [
                 customerAccountId,
                 vehicle.product_id || null,
                 vehicle.id,
+                vehicle.dealer_id,
                 purchaseMode,
                 basePrice,
                 markupPercent,
@@ -386,9 +393,10 @@ exports.listOrders = async (req, res) => {
                 GROUP BY order_id
             ) inst ON inst.order_id = o.id
             WHERE o.customer_account_id = $1
+              AND (o.dealer_id IS NULL OR o.dealer_id = $2)
             ORDER BY o.created_at DESC
             `,
-            [customerAccountId]
+            [customerAccountId, req.customer.preferred_dealer_id || null]
         );
 
         return res.status(200).json({ orders: result.rows });
@@ -419,9 +427,10 @@ exports.getOrder = async (req, res) => {
             LEFT JOIN vehicles v ON v.id = o.vehicle_id
             WHERE o.id = $1
               AND o.customer_account_id = $2
+              AND (o.dealer_id IS NULL OR o.dealer_id = $3)
             LIMIT 1
             `,
-            [orderId, customerAccountId]
+            [orderId, customerAccountId, req.customer.preferred_dealer_id || null]
         );
 
         if (orderResult.rows.length === 0) {
@@ -463,9 +472,10 @@ exports.receiveInstallment = async (req, res) => {
             FROM customer_orders
             WHERE id = $1
               AND customer_account_id = $2
+              AND (dealer_id IS NULL OR dealer_id = $3)
             LIMIT 1
             `,
-            [orderId, customerAccountId]
+            [orderId, customerAccountId, req.customer.preferred_dealer_id || null]
         );
 
         if (orderCheck.rows.length === 0) {

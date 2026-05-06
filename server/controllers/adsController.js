@@ -5,6 +5,7 @@ const resolveEffectiveDealerId = (user = {}) => user.effective_dealer_id || user
 
 const isSuperAdmin = (user = {}) =>
     Number(user.role_id) === 1 || user.role_name === 'SUPER_ADMIN' || user.real_role_name === 'SUPER_ADMIN';
+const hasGlobalScope = (user = {}) => isSuperAdmin(user) && !resolveEffectiveDealerId(user);
 
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
 const httpError = (status, message) => {
@@ -40,11 +41,11 @@ const resolveDealerIdInput = async (dealerInput) => {
 exports.listAds = async (req, res) => {
     try {
         const effectiveDealerId = resolveEffectiveDealerId(req.user);
-        const adminScope = isSuperAdmin(req.user);
+        const adminScope = hasGlobalScope(req.user);
         const params = [];
         const dealerClause = adminScope
             ? ''
-            : 'WHERE (dealer_id = $1 OR dealer_id IS NULL)';
+            : 'WHERE dealer_id = $1';
         if (!adminScope) params.push(effectiveDealerId);
 
         const adsResult = await pool.query(
@@ -78,7 +79,7 @@ exports.listAds = async (req, res) => {
 
 exports.createAd = async (req, res) => {
     try {
-        const adminScope = isSuperAdmin(req.user);
+        const adminScope = hasGlobalScope(req.user);
         const effectiveDealerId = resolveEffectiveDealerId(req.user);
         const {
             title,
@@ -104,6 +105,9 @@ exports.createAd = async (req, res) => {
         const resolvedDealerId = adminScope
             ? await resolveDealerIdInput(dealer_id)
             : effectiveDealerId;
+        if (!resolvedDealerId) {
+            throw httpError(400, 'Dealer assignment is required for ads.');
+        }
 
         const result = await pool.query(
             `
@@ -146,7 +150,7 @@ exports.createAd = async (req, res) => {
 
 exports.updateAd = async (req, res) => {
     try {
-        const adminScope = isSuperAdmin(req.user);
+        const adminScope = hasGlobalScope(req.user);
         const effectiveDealerId = resolveEffectiveDealerId(req.user);
         const { id } = req.params;
         const {
@@ -162,7 +166,7 @@ exports.updateAd = async (req, res) => {
             dealer_id,
         } = req.body;
 
-        const allowedDealerClause = adminScope ? '' : 'AND (dealer_id = $2 OR dealer_id IS NULL)';
+        const allowedDealerClause = adminScope ? '' : 'AND dealer_id = $2';
         const params = [
             id,
         ];
@@ -232,11 +236,11 @@ exports.updateAd = async (req, res) => {
 
 exports.deleteAd = async (req, res) => {
     try {
-        const adminScope = isSuperAdmin(req.user);
+        const adminScope = hasGlobalScope(req.user);
         const effectiveDealerId = resolveEffectiveDealerId(req.user);
         const { id } = req.params;
         const params = adminScope ? [id] : [id, effectiveDealerId];
-        const dealerClause = adminScope ? '' : 'AND (dealer_id = $2 OR dealer_id IS NULL)';
+        const dealerClause = adminScope ? '' : 'AND dealer_id = $2';
 
         const result = await pool.query(
             `
