@@ -38,32 +38,34 @@ const safeDashboardQuery = async (runner, label, fallbackRows = []) => {
 
 const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies, wantsStockOrders) => {
     try {
-        if (wantsStockOrders) {
-            await pool.query(`
-                ALTER TABLE stock_orders
-                    ADD COLUMN IF NOT EXISTS dealer_id UUID
-            `);
-            await pool.query(`
-                UPDATE stock_orders so
-                SET dealer_id = u.dealer_id
-                FROM users u
-                WHERE u.id = so.ordered_by
-                  AND so.dealer_id IS NULL
-                  AND u.dealer_id IS NOT NULL
-            `);
-        }
-        if (wantsProducts) {
+        if (wantsProducts || wantsStockOrders) {
             await pool.query(`
                 ALTER TABLE product_catalog
                     ADD COLUMN IF NOT EXISTS dealer_id UUID,
                     ADD COLUMN IF NOT EXISTS created_by UUID
             `);
         }
-        if (wantsCompanies) {
+        if (wantsCompanies || wantsStockOrders) {
             await pool.query(`
                 ALTER TABLE company_profiles
                     ADD COLUMN IF NOT EXISTS dealer_id UUID,
                     ADD COLUMN IF NOT EXISTS created_by UUID
+            `);
+        }
+        if (wantsStockOrders || wantsProducts || wantsCompanies) {
+            await pool.query(`
+                ALTER TABLE stock_orders
+                    ADD COLUMN IF NOT EXISTS dealer_id UUID
+            `);
+            await pool.query(`
+                UPDATE stock_orders so
+                SET dealer_id = COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id)
+                FROM users u
+                LEFT JOIN product_catalog pc ON pc.id = so.product_id
+                LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
+                WHERE u.id = so.ordered_by
+                  AND so.dealer_id IS NULL
+                  AND COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
             `);
         }
         return true;
@@ -482,9 +484,10 @@ exports.getDashboardData = async (req, res) => {
             FROM vehicles v
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN users ou ON ou.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, ou.dealer_id)
-            ${hasDealerDataScope ? 'WHERE COALESCE(so.dealer_id, ou.dealer_id) = $1' : ''}
+            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id)
+            ${hasDealerDataScope ? 'WHERE COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id) = $1' : ''}
             ORDER BY v.created_at DESC NULLS LAST, v.brand ASC, v.model ASC
             LIMIT 500
             `,
@@ -498,30 +501,40 @@ exports.getDashboardData = async (req, res) => {
             () => pool.query(
             `
             SELECT
-                id,
-                brand,
-                model,
-                serial_number,
-                registration_number,
-                vehicle_type,
-                chassis_number,
-                engine_number,
-                color,
-                description,
-                image_url,
-                monthly_rate,
-                purchase_price,
-                cash_markup_percent,
-                cash_markup_value,
-                installment_markup_percent,
-                installment_months,
-                is_active,
-                created_at,
-                updated_at
-            FROM product_catalog
-            WHERE is_active = TRUE
-              ${hasDealerDataScope ? 'AND dealer_id = $1' : ''}
-            ORDER BY created_at DESC, brand ASC, model ASC
+                pc.id,
+                pc.brand,
+                pc.model,
+                pc.serial_number,
+                pc.registration_number,
+                pc.vehicle_type,
+                pc.chassis_number,
+                pc.engine_number,
+                pc.color,
+                pc.description,
+                pc.image_url,
+                pc.monthly_rate,
+                pc.purchase_price,
+                pc.cash_markup_percent,
+                pc.cash_markup_value,
+                pc.installment_markup_percent,
+                pc.installment_months,
+                pc.is_active,
+                pc.created_at,
+                pc.updated_at
+            FROM product_catalog pc
+            LEFT JOIN users creator ON creator.id = pc.created_by
+            LEFT JOIN LATERAL (
+                SELECT COALESCE(so.dealer_id, u.dealer_id) AS dealer_id
+                FROM stock_orders so
+                LEFT JOIN users u ON u.id = so.ordered_by
+                WHERE so.product_id = pc.id
+                  AND COALESCE(so.dealer_id, u.dealer_id) IS NOT NULL
+                ORDER BY so.created_at DESC
+                LIMIT 1
+            ) stock_owner ON true
+            WHERE pc.is_active = TRUE
+              ${hasDealerDataScope ? 'AND COALESCE(pc.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $1' : ''}
+            ORDER BY pc.created_at DESC, pc.brand ASC, pc.model ASC
             LIMIT 500
             `,
             hasDealerDataScope ? [effectiveDealerId] : []
@@ -534,20 +547,30 @@ exports.getDashboardData = async (req, res) => {
             () => pool.query(
             `
             SELECT
-                id,
-                company_name,
-                company_email,
-                contact_person,
-                phone,
-                address,
-                notes,
-                is_active,
-                created_at,
-                updated_at
-            FROM company_profiles
-            WHERE is_active = TRUE
-              ${hasDealerDataScope ? 'AND dealer_id = $1' : ''}
-            ORDER BY company_name ASC
+                cp.id,
+                cp.company_name,
+                cp.company_email,
+                cp.contact_person,
+                cp.phone,
+                cp.address,
+                cp.notes,
+                cp.is_active,
+                cp.created_at,
+                cp.updated_at
+            FROM company_profiles cp
+            LEFT JOIN users creator ON creator.id = cp.created_by
+            LEFT JOIN LATERAL (
+                SELECT COALESCE(so.dealer_id, u.dealer_id) AS dealer_id
+                FROM stock_orders so
+                LEFT JOIN users u ON u.id = so.ordered_by
+                WHERE so.company_profile_id = cp.id
+                  AND COALESCE(so.dealer_id, u.dealer_id) IS NOT NULL
+                ORDER BY so.created_at DESC
+                LIMIT 1
+            ) stock_owner ON true
+            WHERE cp.is_active = TRUE
+              ${hasDealerDataScope ? 'AND COALESCE(cp.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $1' : ''}
+            ORDER BY cp.company_name ASC
             LIMIT 300
             `,
             hasDealerDataScope ? [effectiveDealerId] : []
@@ -982,8 +1005,8 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             JOIN users u ON u.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, u.dealer_id)
-            ${hasDealerDataScope ? 'WHERE COALESCE(so.dealer_id, u.dealer_id) = $1' : ''}
+            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id)
+            ${hasDealerDataScope ? 'WHERE COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id) = $1' : ''}
             ORDER BY so.created_at DESC
             LIMIT 300
             `,

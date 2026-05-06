@@ -12,6 +12,19 @@ const ensureCompanyDealerColumns = async () => {
             ADD COLUMN IF NOT EXISTS dealer_id UUID,
             ADD COLUMN IF NOT EXISTS created_by UUID
     `);
+    await pool.query(`
+        ALTER TABLE stock_orders
+            ADD COLUMN IF NOT EXISTS dealer_id UUID
+    `);
+
+    await pool.query(`
+        UPDATE company_profiles cp
+        SET dealer_id = creator.dealer_id
+        FROM users creator
+        WHERE creator.id = cp.created_by
+          AND cp.dealer_id IS NULL
+          AND creator.dealer_id IS NOT NULL
+    `);
 
     await pool.query(`
         UPDATE company_profiles cp
@@ -19,11 +32,11 @@ const ensureCompanyDealerColumns = async () => {
         FROM (
             SELECT DISTINCT ON (so.company_profile_id)
                 so.company_profile_id,
-                u.dealer_id
+                COALESCE(so.dealer_id, u.dealer_id) AS dealer_id
             FROM stock_orders so
             JOIN users u ON u.id = so.ordered_by
             WHERE so.company_profile_id IS NOT NULL
-              AND u.dealer_id IS NOT NULL
+              AND COALESCE(so.dealer_id, u.dealer_id) IS NOT NULL
             ORDER BY so.company_profile_id, so.created_at DESC
         ) scoped
         WHERE cp.id = scoped.company_profile_id
@@ -39,20 +52,30 @@ exports.listCompanies = async (req, res) => {
         const result = await pool.query(
             `
             SELECT
-                id,
-                company_name,
-                company_email,
-                contact_person,
-                phone,
-                address,
-                notes,
-                is_active,
-                created_at,
-                updated_at
-            FROM company_profiles
-            WHERE is_active = TRUE
-              ${globalScope ? '' : 'AND dealer_id = $1'}
-            ORDER BY company_name ASC, created_at DESC
+                cp.id,
+                cp.company_name,
+                cp.company_email,
+                cp.contact_person,
+                cp.phone,
+                cp.address,
+                cp.notes,
+                cp.is_active,
+                cp.created_at,
+                cp.updated_at
+            FROM company_profiles cp
+            LEFT JOIN users creator ON creator.id = cp.created_by
+            LEFT JOIN LATERAL (
+                SELECT COALESCE(so.dealer_id, u.dealer_id) AS dealer_id
+                FROM stock_orders so
+                LEFT JOIN users u ON u.id = so.ordered_by
+                WHERE so.company_profile_id = cp.id
+                  AND COALESCE(so.dealer_id, u.dealer_id) IS NOT NULL
+                ORDER BY so.created_at DESC
+                LIMIT 1
+            ) stock_owner ON true
+            WHERE cp.is_active = TRUE
+              ${globalScope ? '' : 'AND COALESCE(cp.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $1'}
+            ORDER BY cp.company_name ASC, cp.created_at DESC
             `,
             globalScope ? [] : [dealerId]
         );

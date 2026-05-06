@@ -15,11 +15,13 @@ const ensureStockScopedColumns = async () => {
     `);
     await pool.query(`
         UPDATE stock_orders so
-        SET dealer_id = u.dealer_id
+        SET dealer_id = COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id)
         FROM users u
+        LEFT JOIN product_catalog pc ON pc.id = so.product_id
+        LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
         WHERE u.id = so.ordered_by
           AND so.dealer_id IS NULL
-          AND u.dealer_id IS NOT NULL
+          AND COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
     `);
     await pool.query(`
         ALTER TABLE product_catalog
@@ -182,7 +184,7 @@ const getStockOrderEmailContext = async (orderId, user = {}) => {
         LEFT JOIN product_catalog pc ON pc.id = so.product_id
         LEFT JOIN users u ON u.id = so.ordered_by
         WHERE so.id = $1
-          ${globalScope ? '' : 'AND COALESCE(so.dealer_id, u.dealer_id) = $2'}
+          ${globalScope ? '' : 'AND COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id) = $2'}
         LIMIT 1
         `,
         globalScope ? [orderId] : [orderId, dealerId]
@@ -421,8 +423,8 @@ exports.listStockOrders = async (req, res) => {
             LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             JOIN users u ON u.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, u.dealer_id)
-            ${globalScope ? '' : 'WHERE COALESCE(so.dealer_id, u.dealer_id) = $1'}
+            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id)
+            ${globalScope ? '' : 'WHERE COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id) = $1'}
             ORDER BY so.created_at DESC
             `,
             globalScope ? [] : [dealerId]
@@ -463,11 +465,21 @@ exports.createStockOrder = async (req, res) => {
 
         const companyResult = await pool.query(
             `
-            SELECT id, company_name, company_email
-            FROM company_profiles
-            WHERE id = $1
-              AND is_active = TRUE
-              ${globalScope ? '' : 'AND dealer_id = $2'}
+            SELECT cp.id, cp.company_name, cp.company_email
+            FROM company_profiles cp
+            LEFT JOIN users creator ON creator.id = cp.created_by
+            LEFT JOIN LATERAL (
+                SELECT COALESCE(so.dealer_id, u.dealer_id) AS dealer_id
+                FROM stock_orders so
+                LEFT JOIN users u ON u.id = so.ordered_by
+                WHERE so.company_profile_id = cp.id
+                  AND COALESCE(so.dealer_id, u.dealer_id) IS NOT NULL
+                ORDER BY so.created_at DESC
+                LIMIT 1
+            ) stock_owner ON true
+            WHERE cp.id = $1
+              AND cp.is_active = TRUE
+              ${globalScope ? '' : 'AND COALESCE(cp.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $2'}
             `,
             globalScope ? [company_profile_id] : [company_profile_id, dealerId]
         );
@@ -478,11 +490,21 @@ exports.createStockOrder = async (req, res) => {
 
         const productResult = await pool.query(
             `
-            SELECT id, brand, model, serial_number, vehicle_type, image_url, monthly_rate, purchase_price, color, description
-            FROM product_catalog
-            WHERE id = $1
-              AND is_active = TRUE
-              ${globalScope ? '' : 'AND dealer_id = $2'}
+            SELECT pc.id, pc.brand, pc.model, pc.serial_number, pc.vehicle_type, pc.image_url, pc.monthly_rate, pc.purchase_price, pc.color, pc.description
+            FROM product_catalog pc
+            LEFT JOIN users creator ON creator.id = pc.created_by
+            LEFT JOIN LATERAL (
+                SELECT COALESCE(so.dealer_id, u.dealer_id) AS dealer_id
+                FROM stock_orders so
+                LEFT JOIN users u ON u.id = so.ordered_by
+                WHERE so.product_id = pc.id
+                  AND COALESCE(so.dealer_id, u.dealer_id) IS NOT NULL
+                ORDER BY so.created_at DESC
+                LIMIT 1
+            ) stock_owner ON true
+            WHERE pc.id = $1
+              AND pc.is_active = TRUE
+              ${globalScope ? '' : 'AND COALESCE(pc.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $2'}
             `,
             globalScope ? [product_id] : [product_id, dealerId]
         );
@@ -622,7 +644,7 @@ exports.updateStockOrder = async (req, res) => {
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             LEFT JOIN users u ON u.id = so.ordered_by
             WHERE so.id = $1
-              ${globalScope ? '' : 'AND COALESCE(so.dealer_id, u.dealer_id) = $2'}
+              ${globalScope ? '' : 'AND COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id) = $2'}
             FOR UPDATE OF so
             `,
             globalScope ? [req.params.id] : [req.params.id, dealerId]

@@ -13,6 +13,19 @@ const ensureProductDealerColumns = async () => {
             ADD COLUMN IF NOT EXISTS dealer_id UUID,
             ADD COLUMN IF NOT EXISTS created_by UUID
     `);
+    await pool.query(`
+        ALTER TABLE stock_orders
+            ADD COLUMN IF NOT EXISTS dealer_id UUID
+    `);
+
+    await pool.query(`
+        UPDATE product_catalog pc
+        SET dealer_id = creator.dealer_id
+        FROM users creator
+        WHERE creator.id = pc.created_by
+          AND pc.dealer_id IS NULL
+          AND creator.dealer_id IS NOT NULL
+    `);
 
     await pool.query(`
         UPDATE product_catalog pc
@@ -20,14 +33,14 @@ const ensureProductDealerColumns = async () => {
         FROM (
             SELECT DISTINCT ON (so.product_id)
                 so.product_id,
-                u.dealer_id
+                COALESCE(so.dealer_id, u.dealer_id) AS dealer_id
             FROM stock_orders so
             JOIN users u ON u.id = so.ordered_by
             WHERE so.product_id IS NOT NULL
-              AND u.dealer_id IS NOT NULL
+              AND COALESCE(so.dealer_id, u.dealer_id) IS NOT NULL
             ORDER BY so.product_id, so.created_at DESC
         ) scoped
-        WHERE pc.id = scoped.product_id
+        WHERE scoped.product_id = pc.id
           AND pc.dealer_id IS NULL
     `);
 };
@@ -69,30 +82,40 @@ exports.listProducts = async (req, res) => {
         const result = await pool.query(
             `
             SELECT
-                id,
-                brand,
-                model,
-                serial_number,
-                registration_number,
-                vehicle_type,
-                chassis_number,
-                engine_number,
-                color,
-                description,
-                image_url,
-                monthly_rate,
-                purchase_price,
-                cash_markup_percent,
-                cash_markup_value,
-                installment_markup_percent,
-                installment_months,
-                is_active,
-                created_at,
-                updated_at
-            FROM product_catalog
-            WHERE is_active = TRUE
-              ${globalScope ? '' : 'AND dealer_id = $1'}
-            ORDER BY created_at DESC, brand ASC, model ASC
+                pc.id,
+                pc.brand,
+                pc.model,
+                pc.serial_number,
+                pc.registration_number,
+                pc.vehicle_type,
+                pc.chassis_number,
+                pc.engine_number,
+                pc.color,
+                pc.description,
+                pc.image_url,
+                pc.monthly_rate,
+                pc.purchase_price,
+                pc.cash_markup_percent,
+                pc.cash_markup_value,
+                pc.installment_markup_percent,
+                pc.installment_months,
+                pc.is_active,
+                pc.created_at,
+                pc.updated_at
+            FROM product_catalog pc
+            LEFT JOIN users creator ON creator.id = pc.created_by
+            LEFT JOIN LATERAL (
+                SELECT COALESCE(so.dealer_id, u.dealer_id) AS dealer_id
+                FROM stock_orders so
+                LEFT JOIN users u ON u.id = so.ordered_by
+                WHERE so.product_id = pc.id
+                  AND COALESCE(so.dealer_id, u.dealer_id) IS NOT NULL
+                ORDER BY so.created_at DESC
+                LIMIT 1
+            ) stock_owner ON true
+            WHERE pc.is_active = TRUE
+              ${globalScope ? '' : 'AND COALESCE(pc.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $1'}
+            ORDER BY pc.created_at DESC, pc.brand ASC, pc.model ASC
             `,
             globalScope ? [] : [dealerId]
         );
