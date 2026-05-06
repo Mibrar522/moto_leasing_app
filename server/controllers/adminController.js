@@ -36,8 +36,22 @@ const safeDashboardQuery = async (runner, label, fallbackRows = []) => {
     }
 };
 
-const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies) => {
+const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies, wantsStockOrders) => {
     try {
+        if (wantsStockOrders) {
+            await pool.query(`
+                ALTER TABLE stock_orders
+                    ADD COLUMN IF NOT EXISTS dealer_id UUID
+            `);
+            await pool.query(`
+                UPDATE stock_orders so
+                SET dealer_id = u.dealer_id
+                FROM users u
+                WHERE u.id = so.ordered_by
+                  AND so.dealer_id IS NULL
+                  AND u.dealer_id IS NOT NULL
+            `);
+        }
         if (wantsProducts) {
             await pool.query(`
                 ALTER TABLE product_catalog
@@ -264,7 +278,11 @@ exports.getDashboardData = async (req, res) => {
             ...(reportPageRequested ? ['salesTransactions', 'stockOrders', 'customers', 'employees', 'products', 'inventory', 'dealers', 'employeeFinancials'] : []),
         ]);
         const wantsGroup = (groupKey) => requestedGroups.has(groupKey);
-        const dealerScopeColumnsReady = await ensureDashboardDealerScopeColumns(wantsGroup('products'), wantsGroup('companies'));
+        const dealerScopeColumnsReady = await ensureDashboardDealerScopeColumns(
+            wantsGroup('products'),
+            wantsGroup('companies'),
+            wantsGroup('stockOrders') || wantsGroup('inventory')
+        );
 
         const metricsResult = wantsGroup('metrics') ? await pool.query(
             `
@@ -465,8 +483,8 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             LEFT JOIN users ou ON ou.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = ou.dealer_id
-            ${hasDealerDataScope ? 'WHERE d.id = $1' : ''}
+            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, ou.dealer_id)
+            ${hasDealerDataScope ? 'WHERE COALESCE(so.dealer_id, ou.dealer_id) = $1' : ''}
             ORDER BY v.created_at DESC NULLS LAST, v.brand ASC, v.model ASC
             LIMIT 500
             `,
@@ -964,8 +982,8 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             JOIN users u ON u.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = u.dealer_id
-            ${hasDealerDataScope ? 'WHERE d.id = $1' : ''}
+            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, u.dealer_id)
+            ${hasDealerDataScope ? 'WHERE COALESCE(so.dealer_id, u.dealer_id) = $1' : ''}
             ORDER BY so.created_at DESC
             LIMIT 300
             `,

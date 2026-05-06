@@ -10,6 +10,18 @@ const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffective
 
 const ensureStockScopedColumns = async () => {
     await pool.query(`
+        ALTER TABLE stock_orders
+            ADD COLUMN IF NOT EXISTS dealer_id UUID
+    `);
+    await pool.query(`
+        UPDATE stock_orders so
+        SET dealer_id = u.dealer_id
+        FROM users u
+        WHERE u.id = so.ordered_by
+          AND so.dealer_id IS NULL
+          AND u.dealer_id IS NOT NULL
+    `);
+    await pool.query(`
         ALTER TABLE product_catalog
             ADD COLUMN IF NOT EXISTS dealer_id UUID,
             ADD COLUMN IF NOT EXISTS created_by UUID
@@ -68,11 +80,11 @@ const getDealerMailContext = async (userId, fallbackUser = {}) => {
             u.email AS user_email,
             u.full_name AS user_name
         FROM users u
-        LEFT JOIN dealers d ON d.id = u.dealer_id
+        LEFT JOIN dealers d ON d.id = COALESCE(u.dealer_id, $2::uuid)
         WHERE u.id = $1
         LIMIT 1
         `,
-        [userId]
+        [userId, fallbackUser.effective_dealer_id || fallbackUser.dealer_id || null]
     );
 
     const row = result.rows[0] || {};
@@ -152,6 +164,7 @@ const sendStockOrderEmailInBackground = (payload) => {
 };
 
 const getStockOrderEmailContext = async (orderId, user = {}) => {
+    await ensureStockScopedColumns();
     const globalScope = hasGlobalScope(user);
     const dealerId = getEffectiveDealerId(user);
     const result = await pool.query(
@@ -169,7 +182,7 @@ const getStockOrderEmailContext = async (orderId, user = {}) => {
         LEFT JOIN product_catalog pc ON pc.id = so.product_id
         LEFT JOIN users u ON u.id = so.ordered_by
         WHERE so.id = $1
-          ${globalScope ? '' : 'AND u.dealer_id = $2'}
+          ${globalScope ? '' : 'AND COALESCE(so.dealer_id, u.dealer_id) = $2'}
         LIMIT 1
         `,
         globalScope ? [orderId] : [orderId, dealerId]
@@ -383,6 +396,7 @@ exports.uploadBankSlip = async (req, res) => {
 
 exports.listStockOrders = async (req, res) => {
     try {
+        await ensureStockScopedColumns();
         const globalScope = hasGlobalScope(req.user);
         const dealerId = getEffectiveDealerId(req.user);
         await reconcileReceivedStockOrders();
@@ -407,8 +421,8 @@ exports.listStockOrders = async (req, res) => {
             LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             JOIN users u ON u.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = u.dealer_id
-            ${globalScope ? '' : 'WHERE d.id = $1'}
+            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, u.dealer_id)
+            ${globalScope ? '' : 'WHERE COALESCE(so.dealer_id, u.dealer_id) = $1'}
             ORDER BY so.created_at DESC
             `,
             globalScope ? [] : [dealerId]
@@ -483,15 +497,16 @@ exports.createStockOrder = async (req, res) => {
         const result = await pool.query(
             `
             INSERT INTO stock_orders (
-                ordered_by, company_profile_id, company_name, company_email, product_id, vehicle_type, brand, model,
+                ordered_by, dealer_id, company_profile_id, company_name, company_email, product_id, vehicle_type, brand, model,
                 chassis_number, engine_number, serial_number, quantity, unit_price, total_amount, product_description,
                 expected_delivery_date, bank_slip_url, notes, order_status
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
             RETURNING *
             `,
             [
                 req.user.id,
+                globalScope ? null : dealerId,
                 company.id,
                 company.company_name,
                 company.company_email || null,
@@ -583,6 +598,7 @@ exports.updateStockOrder = async (req, res) => {
     try {
         const globalScope = hasGlobalScope(req.user);
         const dealerId = getEffectiveDealerId(req.user);
+        await ensureStockScopedColumns();
         const {
             order_status,
             received_quantity,
@@ -606,7 +622,7 @@ exports.updateStockOrder = async (req, res) => {
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             LEFT JOIN users u ON u.id = so.ordered_by
             WHERE so.id = $1
-              ${globalScope ? '' : 'AND u.dealer_id = $2'}
+              ${globalScope ? '' : 'AND COALESCE(so.dealer_id, u.dealer_id) = $2'}
             FOR UPDATE OF so
             `,
             globalScope ? [req.params.id] : [req.params.id, dealerId]
