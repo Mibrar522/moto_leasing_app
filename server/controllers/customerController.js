@@ -270,7 +270,17 @@ exports.listCustomers = async (req, res) => {
                 c.identity_doc_url,
                 c.dealer_id,
                 c.created_by_agent,
-                creator.full_name AS created_by_name,
+                COALESCE(
+                    CASE
+                        WHEN UPPER(COALESCE(creator_role.role_name, '')) = 'APPLICATION_ADMIN'
+                            THEN NULLIF(d.dealer_name, '')
+                        ELSE NULL
+                    END,
+                    NULLIF(creator.full_name, ''),
+                    NULLIF(creator.brand_name, ''),
+                    NULLIF(d.dealer_name, ''),
+                    creator.email
+                ) AS created_by_name,
                 creator.email AS created_by_email,
                 creator.dealer_id AS creator_dealer_id,
                 d.dealer_name,
@@ -278,6 +288,7 @@ exports.listCustomers = async (req, res) => {
             FROM customers c
             LEFT JOIN users creator ON creator.id = c.created_by_agent
             LEFT JOIN dealers d ON d.id = c.dealer_id
+            LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
             ${isSuperAdmin ? '' : 'WHERE c.dealer_id = $1'}
             ORDER BY c.full_name ASC
             `,
@@ -304,7 +315,17 @@ exports.getCustomerById = async (req, res) => {
                 c.identity_doc_url,
                 c.dealer_id,
                 c.created_by_agent,
-                creator.full_name AS created_by_name,
+                COALESCE(
+                    CASE
+                        WHEN UPPER(COALESCE(creator_role.role_name, '')) = 'APPLICATION_ADMIN'
+                            THEN NULLIF(d.dealer_name, '')
+                        ELSE NULL
+                    END,
+                    NULLIF(creator.full_name, ''),
+                    NULLIF(creator.brand_name, ''),
+                    NULLIF(d.dealer_name, ''),
+                    creator.email
+                ) AS created_by_name,
                 creator.email AS created_by_email,
                 creator.dealer_id AS creator_dealer_id,
                 d.dealer_name,
@@ -312,6 +333,7 @@ exports.getCustomerById = async (req, res) => {
             FROM customers c
             LEFT JOIN users creator ON creator.id = c.created_by_agent
             LEFT JOIN dealers d ON d.id = c.dealer_id
+            LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
             WHERE c.id = $1
             ${isSuperAdmin ? '' : 'AND c.dealer_id = $2'}
             `,
@@ -432,13 +454,24 @@ exports.createCustomer = async (req, res) => {
                             c.identity_doc_url,
                             c.dealer_id,
                             c.created_by_agent,
-                            creator.full_name AS created_by_name,
+                            COALESCE(
+                                CASE
+                                    WHEN UPPER(COALESCE(creator_role.role_name, '')) = 'APPLICATION_ADMIN'
+                                        THEN NULLIF(d.dealer_name, '')
+                                    ELSE NULL
+                                END,
+                                NULLIF(creator.full_name, ''),
+                                NULLIF(creator.brand_name, ''),
+                                NULLIF(d.dealer_name, ''),
+                                creator.email
+                            ) AS created_by_name,
                             creator.email AS created_by_email,
                             d.dealer_name,
                             d.dealer_code
                         FROM customers c
                         LEFT JOIN users creator ON creator.id = c.created_by_agent
                         LEFT JOIN dealers d ON d.id = c.dealer_id
+                        LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
                         WHERE c.cnic_passport_number = $1
                           ${isSuperAdmin ? '' : 'AND c.dealer_id = $2'}
                         LIMIT 1
@@ -560,13 +593,24 @@ exports.updateCustomer = async (req, res) => {
                             c.identity_doc_url,
                             c.dealer_id,
                             c.created_by_agent,
-                            creator.full_name AS created_by_name,
+                            COALESCE(
+                                CASE
+                                    WHEN UPPER(COALESCE(creator_role.role_name, '')) = 'APPLICATION_ADMIN'
+                                        THEN NULLIF(d.dealer_name, '')
+                                    ELSE NULL
+                                END,
+                                NULLIF(creator.full_name, ''),
+                                NULLIF(creator.brand_name, ''),
+                                NULLIF(d.dealer_name, ''),
+                                creator.email
+                            ) AS created_by_name,
                             creator.email AS created_by_email,
                             d.dealer_name,
                             d.dealer_code
                         FROM customers c
                         LEFT JOIN users creator ON creator.id = c.created_by_agent
                         LEFT JOIN dealers d ON d.id = c.dealer_id
+                        LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
                         WHERE c.cnic_passport_number = $1
                           ${isSuperAdmin ? '' : 'AND c.dealer_id = $2'}
                         LIMIT 1

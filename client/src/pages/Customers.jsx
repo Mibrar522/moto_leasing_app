@@ -368,7 +368,7 @@ if (!canOpenCustomers) {
                                                     <td>{ocrDetails.address || 'Not set'}</td>
                                                     <td>{ocrDetails.contact_email || 'No email'}<br />{ocrDetails.contact_phone || 'No phone'}</td>
                                                     <td>
-                                                        {customer.created_by_name || customer.created_by_email || 'Not set'}
+                                                        {customer.created_by_name || customer.dealer_name || customer.created_by_email || 'Not set'}
                                                         {customer.dealer_name ? (
                                                             <>
                                                                 <br />

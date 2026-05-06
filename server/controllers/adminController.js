@@ -508,7 +508,17 @@ exports.getDashboardData = async (req, res) => {
                     c.biometric_hash,
                     c.identity_doc_url,
                     c.created_by_agent,
-                    creator.full_name AS created_by_name,
+                    COALESCE(
+                        CASE
+                            WHEN UPPER(COALESCE(creator_role.role_name, '')) = 'APPLICATION_ADMIN'
+                                THEN NULLIF(d.dealer_name, '')
+                            ELSE NULL
+                        END,
+                        NULLIF(creator.full_name, ''),
+                        NULLIF(creator.brand_name, ''),
+                        NULLIF(d.dealer_name, ''),
+                        creator.email
+                    ) AS created_by_name,
                     creator.email AS created_by_email,
                     COALESCE(c.dealer_id, creator.dealer_id) AS dealer_id,
                     d.dealer_name,
@@ -516,6 +526,7 @@ exports.getDashboardData = async (req, res) => {
                 FROM customers c
                 LEFT JOIN users creator ON creator.id = c.created_by_agent
                 LEFT JOIN dealers d ON d.id = COALESCE(c.dealer_id, creator.dealer_id)
+                LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
                 ${isDealerScopedView ? 'WHERE COALESCE(c.dealer_id, creator.dealer_id) = $1' : ''}
                 ORDER BY c.full_name ASC
                 LIMIT 2000
