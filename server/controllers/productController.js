@@ -6,6 +6,7 @@ const isSuperAdminSession = (user = {}) =>
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
 const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
 const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
+const resolveWriteDealerId = (req) => getEffectiveDealerId(req.user) || req.body?.dealer_id || null;
 
 const ensureProductDealerColumns = async () => {
     await pool.query(`
@@ -212,9 +213,9 @@ exports.createProduct = async (req, res) => {
     try {
         await ensureProductDealerColumns();
         const globalScope = hasGlobalScope(req.user);
-        const dealerId = getEffectiveDealerId(req.user);
-        if (!globalScope && !dealerId) {
-            return res.status(403).json({ message: 'Dealer scope is required to create products.' });
+        const dealerId = resolveWriteDealerId(req);
+        if (!dealerId) {
+            return res.status(403).json({ message: 'Select a dealer before creating products. Products cannot be saved as global records.' });
         }
 
         const {
@@ -278,7 +279,7 @@ exports.createProduct = async (req, res) => {
                 cash_markup_value || 0,
                 installment_markup_percent || 0,
                 installment_months || 12,
-                globalScope ? null : dealerId,
+                dealerId,
                 req.user.id,
             ]
         );

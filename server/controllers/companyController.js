@@ -5,6 +5,7 @@ const isSuperAdminSession = (user = {}) =>
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
 const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
 const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
+const resolveWriteDealerId = (req) => getEffectiveDealerId(req.user) || req.body?.dealer_id || null;
 
 const ensureCompanyDealerColumns = async () => {
     await pool.query(`
@@ -90,9 +91,9 @@ exports.createCompany = async (req, res) => {
     try {
         await ensureCompanyDealerColumns();
         const globalScope = hasGlobalScope(req.user);
-        const dealerId = getEffectiveDealerId(req.user);
-        if (!globalScope && !dealerId) {
-            return res.status(403).json({ message: 'Dealer scope is required to save company profiles.' });
+        const dealerId = resolveWriteDealerId(req);
+        if (!dealerId) {
+            return res.status(403).json({ message: 'Select a dealer before saving company profiles. Company profiles cannot be saved as global records.' });
         }
 
         const {
@@ -117,7 +118,7 @@ exports.createCompany = async (req, res) => {
             String(address || '').trim() || null,
             String(notes || '').trim() || null,
             typeof is_active === 'boolean' ? is_active : true,
-            globalScope ? null : dealerId,
+            dealerId,
             req.user.id,
         ];
 
@@ -126,10 +127,10 @@ exports.createCompany = async (req, res) => {
             SELECT id
             FROM company_profiles
             WHERE UPPER(TRIM(company_name)) = UPPER(TRIM($1::varchar))
-              AND ${globalScope ? 'dealer_id IS NULL' : 'dealer_id = $2'}
+              AND dealer_id = $2
             LIMIT 1
             `,
-            globalScope ? [values[0]] : [values[0], dealerId]
+            [values[0], dealerId]
         );
 
         const result = existingCompany.rows.length > 0

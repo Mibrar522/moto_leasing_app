@@ -7,6 +7,7 @@ const isSuperAdminSession = (user = {}) =>
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
 const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
 const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
+const resolveWriteDealerId = (req) => getEffectiveDealerId(req.user) || req.body?.dealer_id || null;
 
 const ensureStockScopedColumns = async () => {
     await pool.query(`
@@ -440,9 +441,9 @@ exports.createStockOrder = async (req, res) => {
     try {
         await ensureStockScopedColumns();
         const globalScope = hasGlobalScope(req.user);
-        const dealerId = getEffectiveDealerId(req.user);
-        if (!globalScope && !dealerId) {
-            return res.status(403).json({ message: 'Dealer scope is required to create stock orders.' });
+        const dealerId = resolveWriteDealerId(req);
+        if (!dealerId) {
+            return res.status(403).json({ message: 'Select a dealer before creating stock orders. Stock cannot be saved as global records.' });
         }
 
         const {
@@ -479,9 +480,9 @@ exports.createStockOrder = async (req, res) => {
             ) stock_owner ON true
             WHERE cp.id = $1
               AND cp.is_active = TRUE
-              ${globalScope ? '' : 'AND COALESCE(cp.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $2'}
+              AND COALESCE(cp.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $2
             `,
-            globalScope ? [company_profile_id] : [company_profile_id, dealerId]
+            [company_profile_id, dealerId]
         );
 
         if (companyResult.rows.length === 0) {
@@ -504,9 +505,9 @@ exports.createStockOrder = async (req, res) => {
             ) stock_owner ON true
             WHERE pc.id = $1
               AND pc.is_active = TRUE
-              ${globalScope ? '' : 'AND COALESCE(pc.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $2'}
+              AND COALESCE(pc.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $2
             `,
-            globalScope ? [product_id] : [product_id, dealerId]
+            [product_id, dealerId]
         );
 
         if (productResult.rows.length === 0) {
@@ -528,7 +529,7 @@ exports.createStockOrder = async (req, res) => {
             `,
             [
                 req.user.id,
-                globalScope ? null : dealerId,
+                dealerId,
                 company.id,
                 company.company_name,
                 company.company_email || null,

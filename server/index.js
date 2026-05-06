@@ -30,6 +30,7 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const { syncAccessControlDefaults } = require('./utils/accessBootstrap');
 const { syncCustomerAppSchema } = require('./utils/customerAppBootstrap');
 const { syncCustomerCoreSchema } = require('./utils/customerCoreBootstrap');
+const { syncDealerOwnership } = require('./utils/dealerOwnershipBootstrap');
 
 const app = express();
 
@@ -145,6 +146,13 @@ const startServer = async () => {
             console.log('Access-control defaults verified.');
         } catch (bootstrapError) {
             console.warn('Access-control bootstrap skipped:', bootstrapError.message);
+        }
+
+        try {
+            await syncDealerOwnership();
+            console.log('Dealer ownership scope verified.');
+        } catch (ownershipError) {
+            console.warn('Dealer ownership bootstrap skipped:', ownershipError.message);
         }
         // await syncCustomerAppSchema();
         // await syncCustomerCoreSchema();
