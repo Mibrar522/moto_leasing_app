@@ -11,13 +11,13 @@ const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffective
 const ensureStockScopedColumns = async () => {
     await pool.query(`
         ALTER TABLE product_catalog
-            ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id),
-            ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)
+            ADD COLUMN IF NOT EXISTS dealer_id UUID,
+            ADD COLUMN IF NOT EXISTS created_by UUID
     `);
     await pool.query(`
         ALTER TABLE company_profiles
-            ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id),
-            ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)
+            ADD COLUMN IF NOT EXISTS dealer_id UUID,
+            ADD COLUMN IF NOT EXISTS created_by UUID
     `);
 };
 

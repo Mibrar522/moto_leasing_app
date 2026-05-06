@@ -36,6 +36,29 @@ const safeDashboardQuery = async (runner, label, fallbackRows = []) => {
     }
 };
 
+const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies) => {
+    try {
+        if (wantsProducts) {
+            await pool.query(`
+                ALTER TABLE product_catalog
+                    ADD COLUMN IF NOT EXISTS dealer_id UUID,
+                    ADD COLUMN IF NOT EXISTS created_by UUID
+            `);
+        }
+        if (wantsCompanies) {
+            await pool.query(`
+                ALTER TABLE company_profiles
+                    ADD COLUMN IF NOT EXISTS dealer_id UUID,
+                    ADD COLUMN IF NOT EXISTS created_by UUID
+            `);
+        }
+        return true;
+    } catch (error) {
+        console.warn('Dashboard dealer scope column setup skipped:', error.message);
+        return false;
+    }
+};
+
 const getRolePermissions = async () => {
     const rolePermissionsResult = await pool.query(
         `
@@ -241,20 +264,7 @@ exports.getDashboardData = async (req, res) => {
             ...(reportPageRequested ? ['salesTransactions', 'stockOrders', 'customers', 'employees', 'products', 'inventory', 'dealers', 'employeeFinancials'] : []),
         ]);
         const wantsGroup = (groupKey) => requestedGroups.has(groupKey);
-        if (wantsGroup('products')) {
-            await pool.query(`
-                ALTER TABLE product_catalog
-                    ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id),
-                    ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)
-            `);
-        }
-        if (wantsGroup('companies')) {
-            await pool.query(`
-                ALTER TABLE company_profiles
-                    ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id),
-                    ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)
-            `);
-        }
+        const dealerScopeColumnsReady = await ensureDashboardDealerScopeColumns(wantsGroup('products'), wantsGroup('companies'));
 
         const metricsResult = wantsGroup('metrics') ? await pool.query(
             `
@@ -425,7 +435,8 @@ exports.getDashboardData = async (req, res) => {
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
         ) : { rows: [] };
 
-        const inventoryResult = wantsGroup('inventory') ? await pool.query(
+        const inventoryResult = wantsGroup('inventory') && (!hasDealerDataScope || dealerScopeColumnsReady) ? await safeDashboardQuery(
+            () => pool.query(
             `
             SELECT
                 v.id,
@@ -460,9 +471,13 @@ exports.getDashboardData = async (req, res) => {
             LIMIT 500
             `,
             hasDealerDataScope ? [effectiveDealerId] : []
+            ),
+            'inventory query',
+            []
         ) : { rows: [] };
 
-        const productsResult = wantsGroup('products') ? await pool.query(
+        const productsResult = wantsGroup('products') && (!hasDealerDataScope || dealerScopeColumnsReady) ? await safeDashboardQuery(
+            () => pool.query(
             `
             SELECT
                 id,
@@ -492,9 +507,13 @@ exports.getDashboardData = async (req, res) => {
             LIMIT 500
             `,
             hasDealerDataScope ? [effectiveDealerId] : []
+            ),
+            'products query',
+            []
         ) : { rows: [] };
 
-        const companiesResult = wantsGroup('companies') ? await pool.query(
+        const companiesResult = wantsGroup('companies') && (!hasDealerDataScope || dealerScopeColumnsReady) ? await safeDashboardQuery(
+            () => pool.query(
             `
             SELECT
                 id,
@@ -514,6 +533,9 @@ exports.getDashboardData = async (req, res) => {
             LIMIT 300
             `,
             hasDealerDataScope ? [effectiveDealerId] : []
+            ),
+            'companies query',
+            []
         ) : { rows: [] };
 
         const customersResult = wantsGroup('customers') ? await safeDashboardQuery(
@@ -921,7 +943,8 @@ exports.getDashboardData = async (req, res) => {
             `
         ) : { rows: [] };
         const rolePermissions = wantsGroup('rolePermissions') ? await getRolePermissions() : [];
-        const stockOrdersResult = wantsGroup('stockOrders') ? await pool.query(
+        const stockOrdersResult = wantsGroup('stockOrders') && (!hasDealerDataScope || dealerScopeColumnsReady) ? await safeDashboardQuery(
+            () => pool.query(
             `
             SELECT
                 so.*,
@@ -947,6 +970,9 @@ exports.getDashboardData = async (req, res) => {
             LIMIT 300
             `,
             hasDealerDataScope ? [effectiveDealerId] : []
+            ),
+            'stock orders query',
+            []
         ) : { rows: [] };
         const adsScopeClause = effectiveDealerId ? 'AND (dealer_id = $1 OR dealer_id IS NULL)' : '';
         const adsScopeParams = effectiveDealerId ? [effectiveDealerId] : [];
