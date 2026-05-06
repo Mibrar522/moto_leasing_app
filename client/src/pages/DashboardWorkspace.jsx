@@ -2205,11 +2205,28 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
         [dashboardData.ads]
     );
 
+    const scopedProductRows = useMemo(() => {
+        const products = dashboardData.products || [];
+        if (realIsSuperAdmin && !isDealerProfileSwitchActive) {
+            return products;
+        }
+
+        const scopedDealerId = String(currentProfileDealerId || user?.dealer_id || '').trim();
+        if (!scopedDealerId) {
+            return products;
+        }
+
+        return products.filter((product) => {
+            const productDealerId = String(product?.dealer_id || '').trim();
+            return !productDealerId || productDealerId === scopedDealerId;
+        });
+    }, [currentProfileDealerId, dashboardData.products, isDealerProfileSwitchActive, realIsSuperAdmin, user?.dealer_id]);
+
     const filteredInventory = useMemo(() => {
         const query = searchTerm.trim().toLowerCase();
-        if (!query) return dashboardData.products;
+        if (!query) return scopedProductRows;
 
-        return dashboardData.products.filter((vehicle) =>
+        return scopedProductRows.filter((vehicle) =>
             [
                 vehicle.brand,
                 vehicle.model,
@@ -2219,7 +2236,7 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
                 .filter(Boolean)
                 .some((value) => value.toLowerCase().includes(query))
         );
-    }, [dashboardData.products, searchTerm]);
+    }, [scopedProductRows, searchTerm]);
     const formatSaleDealerIdentity = (sale) =>
         [sale?.dealer_name || 'Not set', sale?.dealer_code || 'No dealer code'].filter(Boolean).join(' / ');
 

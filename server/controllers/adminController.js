@@ -519,6 +519,7 @@ exports.getDashboardData = async (req, res) => {
                 pc.installment_markup_percent,
                 pc.installment_months,
                 pc.is_active,
+                pc.dealer_id,
                 pc.created_at,
                 pc.updated_at
             FROM product_catalog pc
