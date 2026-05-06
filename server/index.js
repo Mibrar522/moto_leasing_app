@@ -24,6 +24,7 @@ const workflowRoutes = require('./routes/workflowRoutes');
 const appAuthRoutes = require('./routes/appAuthRoutes');
 const appPublicRoutes = require('./routes/appPublicRoutes');
 const appOrderRoutes = require('./routes/appOrderRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 
 // Import utilities
 const { syncAccessControlDefaults } = require('./utils/accessBootstrap');
@@ -91,6 +92,7 @@ app.use('/api/v1/stock', stockRoutes);
 app.use('/api/v1/dealers', dealerRoutes);
 app.use('/api/v1/companies', companyRoutes);
 app.use('/api/v1/workflow', workflowRoutes);
+app.use('/api/v1/uploads', uploadRoutes);
 app.use('/api/v1/app/auth', appAuthRoutes);
 app.use('/api/v1/app', appPublicRoutes);
 app.use('/api/v1/app/orders', appOrderRoutes);
@@ -108,6 +110,7 @@ app.use('/stock', stockRoutes);
 app.use('/dealers', dealerRoutes);
 app.use('/companies', companyRoutes);
 app.use('/workflow', workflowRoutes);
+app.use('/uploads/db', uploadRoutes);
 app.use('/app/auth', appAuthRoutes);
 app.use('/app/orders', appOrderRoutes);
 app.use('/app', appPublicRoutes);

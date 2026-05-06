@@ -5,7 +5,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { syncCustomerCoreSchema } = require('../utils/customerCoreBootstrap');
 const { buildHtml, buildLocalAttachments, sendMailSafe } = require('../utils/mail');
-const { uploadFileToSupabaseStorage } = require('../utils/storage');
+const { resolveDurableUploadUrl } = require('../utils/storage');
 
 const LOCAL_TESSDATA_DIR = path.join(__dirname, '..', 'tessdata');
 const OCR_LANGS = ['eng', 'urd'];
@@ -678,16 +678,14 @@ exports.uploadCustomerAsset = async (req, res) => {
             }
         }
 
-        let durableUrl = null;
-
-        try {
-            durableUrl = await uploadFileToSupabaseStorage(req.file, 'customers');
-        } catch (storageError) {
-            console.warn('Customer asset Supabase Storage upload skipped:', storageError.message);
-        }
+        const durableUrl = await resolveDurableUploadUrl(
+            req.file,
+            'customers',
+            `/uploads/customers/${req.file.filename}`
+        );
 
         res.status(201).json({
-            url: durableUrl || `/uploads/customers/${req.file.filename}`,
+            url: durableUrl,
             originalName: req.file.originalname,
             mimetype: req.file.mimetype,
             ocr,
