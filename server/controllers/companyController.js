@@ -1,7 +1,41 @@
 const pool = require('../config/db');
 
-exports.listCompanies = async (_req, res) => {
+const isSuperAdminSession = (user = {}) =>
+    Number(user?.real_role_id || user?.role_id) === 1 ||
+    (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
+const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
+const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
+
+const ensureCompanyDealerColumns = async () => {
+    await pool.query(`
+        ALTER TABLE company_profiles
+            ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id),
+            ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)
+    `);
+
+    await pool.query(`
+        UPDATE company_profiles cp
+        SET dealer_id = scoped.dealer_id
+        FROM (
+            SELECT DISTINCT ON (so.company_profile_id)
+                so.company_profile_id,
+                u.dealer_id
+            FROM stock_orders so
+            JOIN users u ON u.id = so.ordered_by
+            WHERE so.company_profile_id IS NOT NULL
+              AND u.dealer_id IS NOT NULL
+            ORDER BY so.company_profile_id, so.created_at DESC
+        ) scoped
+        WHERE cp.id = scoped.company_profile_id
+          AND cp.dealer_id IS NULL
+    `);
+};
+
+exports.listCompanies = async (req, res) => {
     try {
+        await ensureCompanyDealerColumns();
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         const result = await pool.query(
             `
             SELECT
@@ -17,8 +51,10 @@ exports.listCompanies = async (_req, res) => {
                 updated_at
             FROM company_profiles
             WHERE is_active = TRUE
+              ${globalScope ? '' : 'AND dealer_id = $1'}
             ORDER BY company_name ASC, created_at DESC
-            `
+            `,
+            globalScope ? [] : [dealerId]
         );
 
         res.status(200).json(result.rows);
@@ -29,6 +65,13 @@ exports.listCompanies = async (_req, res) => {
 
 exports.createCompany = async (req, res) => {
     try {
+        await ensureCompanyDealerColumns();
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
+        if (!globalScope && !dealerId) {
+            return res.status(403).json({ message: 'Dealer scope is required to save company profiles.' });
+        }
+
         const {
             company_name,
             company_email,
@@ -51,6 +94,8 @@ exports.createCompany = async (req, res) => {
             String(address || '').trim() || null,
             String(notes || '').trim() || null,
             typeof is_active === 'boolean' ? is_active : true,
+            globalScope ? null : dealerId,
+            req.user.id,
         ];
 
         const existingCompany = await pool.query(
@@ -58,9 +103,10 @@ exports.createCompany = async (req, res) => {
             SELECT id
             FROM company_profiles
             WHERE UPPER(TRIM(company_name)) = UPPER(TRIM($1::varchar))
+              AND ${globalScope ? 'dealer_id IS NULL' : 'dealer_id = $2'}
             LIMIT 1
             `,
-            [values[0]]
+            globalScope ? [values[0]] : [values[0], dealerId]
         );
 
         const result = existingCompany.rows.length > 0
@@ -75,6 +121,8 @@ exports.createCompany = async (req, res) => {
                     address = $6,
                     notes = $7,
                     is_active = $8,
+                    dealer_id = $9,
+                    created_by = COALESCE(created_by, $10),
                     updated_at = NOW()
                 WHERE id = $1
                 RETURNING *
@@ -84,9 +132,9 @@ exports.createCompany = async (req, res) => {
             : await pool.query(
                 `
                 INSERT INTO company_profiles (
-                    company_name, company_email, contact_person, phone, address, notes, is_active
+                    company_name, company_email, contact_person, phone, address, notes, is_active, dealer_id, created_by
                 )
-                VALUES ($1,$2,$3,$4,$5,$6,$7)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
                 RETURNING *
                 `,
                 values
@@ -104,6 +152,10 @@ exports.createCompany = async (req, res) => {
 
 exports.updateCompany = async (req, res) => {
     try {
+        await ensureCompanyDealerColumns();
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
+
         const {
             company_name,
             company_email,
@@ -131,6 +183,7 @@ exports.updateCompany = async (req, res) => {
                 is_active = $8,
                 updated_at = NOW()
             WHERE id = $1
+              ${globalScope ? '' : 'AND dealer_id = $9'}
             RETURNING *
             `,
             [
@@ -142,6 +195,7 @@ exports.updateCompany = async (req, res) => {
                 String(address || '').trim() || null,
                 String(notes || '').trim() || null,
                 typeof is_active === 'boolean' ? is_active : true,
+                ...(globalScope ? [] : [dealerId]),
             ]
         );
 
@@ -157,9 +211,19 @@ exports.updateCompany = async (req, res) => {
 
 exports.deleteCompany = async (req, res) => {
     try {
+        await ensureCompanyDealerColumns();
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
+
         const linkedOrders = await pool.query(
-            'SELECT COUNT(*)::int AS total FROM stock_orders WHERE company_profile_id = $1',
-            [req.params.id]
+            `
+            SELECT COUNT(*)::int AS total
+            FROM stock_orders so
+            JOIN users u ON u.id = so.ordered_by
+            WHERE so.company_profile_id = $1
+              ${globalScope ? '' : 'AND u.dealer_id = $2'}
+            `,
+            globalScope ? [req.params.id] : [req.params.id, dealerId]
         );
 
         if (Number(linkedOrders.rows[0]?.total || 0) > 0) {
@@ -168,9 +232,10 @@ exports.deleteCompany = async (req, res) => {
                 UPDATE company_profiles
                 SET is_active = FALSE, updated_at = NOW()
                 WHERE id = $1
+                  ${globalScope ? '' : 'AND dealer_id = $2'}
                 RETURNING *
                 `,
-                [req.params.id]
+                globalScope ? [req.params.id] : [req.params.id, dealerId]
             );
 
             if (result.rows.length === 0) {
@@ -181,8 +246,13 @@ exports.deleteCompany = async (req, res) => {
         }
 
         const result = await pool.query(
-            'DELETE FROM company_profiles WHERE id = $1 RETURNING id',
-            [req.params.id]
+            `
+            DELETE FROM company_profiles
+            WHERE id = $1
+              ${globalScope ? '' : 'AND dealer_id = $2'}
+            RETURNING id
+            `,
+            globalScope ? [req.params.id] : [req.params.id, dealerId]
         );
 
         if (result.rows.length === 0) {

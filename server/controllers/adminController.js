@@ -112,6 +112,7 @@ exports.getDashboardData = async (req, res) => {
 
         const hasGlobalScope = isSuperAdmin && !req.user.effective_dealer_id;
         const isDealerScopedView = Boolean(effectiveDealerId) && !isEmployeeLogin && !hasGlobalScope;
+        const hasDealerDataScope = Boolean(effectiveDealerId) && !hasGlobalScope;
         const canViewWorkflowWorkspace = hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_VIEW']);
         const canViewWorkflowDefinitions = canViewWorkflowWorkspace && hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_CONFIG']);
         const canViewWorkflowTasks = canViewWorkflowWorkspace && hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_TASKS']);
@@ -240,6 +241,20 @@ exports.getDashboardData = async (req, res) => {
             ...(reportPageRequested ? ['salesTransactions', 'stockOrders', 'customers', 'employees', 'products', 'inventory', 'dealers', 'employeeFinancials'] : []),
         ]);
         const wantsGroup = (groupKey) => requestedGroups.has(groupKey);
+        if (wantsGroup('products')) {
+            await pool.query(`
+                ALTER TABLE product_catalog
+                    ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id),
+                    ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)
+            `);
+        }
+        if (wantsGroup('companies')) {
+            await pool.query(`
+                ALTER TABLE company_profiles
+                    ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id),
+                    ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)
+            `);
+        }
 
         const metricsResult = wantsGroup('metrics') ? await pool.query(
             `
@@ -440,11 +455,11 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             LEFT JOIN users ou ON ou.id = so.ordered_by
             LEFT JOIN dealers d ON d.id = ou.dealer_id
-            ${isDealerScopedView ? 'WHERE d.id = $1' : ''}
+            ${hasDealerDataScope ? 'WHERE d.id = $1' : ''}
             ORDER BY v.created_at DESC NULLS LAST, v.brand ASC, v.model ASC
             LIMIT 500
             `,
-            isDealerScopedView ? [effectiveDealerId] : []
+            hasDealerDataScope ? [effectiveDealerId] : []
         ) : { rows: [] };
 
         const productsResult = wantsGroup('products') ? await pool.query(
@@ -472,9 +487,11 @@ exports.getDashboardData = async (req, res) => {
                 updated_at
             FROM product_catalog
             WHERE is_active = TRUE
+              ${hasDealerDataScope ? 'AND dealer_id = $1' : ''}
             ORDER BY created_at DESC, brand ASC, model ASC
             LIMIT 500
-            `
+            `,
+            hasDealerDataScope ? [effectiveDealerId] : []
         ) : { rows: [] };
 
         const companiesResult = wantsGroup('companies') ? await pool.query(
@@ -492,9 +509,11 @@ exports.getDashboardData = async (req, res) => {
                 updated_at
             FROM company_profiles
             WHERE is_active = TRUE
+              ${hasDealerDataScope ? 'AND dealer_id = $1' : ''}
             ORDER BY company_name ASC
             LIMIT 300
-            `
+            `,
+            hasDealerDataScope ? [effectiveDealerId] : []
         ) : { rows: [] };
 
         const customersResult = wantsGroup('customers') ? await safeDashboardQuery(
@@ -923,11 +942,11 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             JOIN users u ON u.id = so.ordered_by
             LEFT JOIN dealers d ON d.id = u.dealer_id
-            ${isDealerScopedView ? 'WHERE d.id = $1' : ''}
+            ${hasDealerDataScope ? 'WHERE d.id = $1' : ''}
             ORDER BY so.created_at DESC
             LIMIT 300
             `,
-            isDealerScopedView ? [effectiveDealerId] : []
+            hasDealerDataScope ? [effectiveDealerId] : []
         ) : { rows: [] };
         const adsScopeClause = effectiveDealerId ? 'AND (dealer_id = $1 OR dealer_id IS NULL)' : '';
         const adsScopeParams = effectiveDealerId ? [effectiveDealerId] : [];

@@ -2,6 +2,25 @@ const pool = require('../config/db');
 const { buildHtml, buildLocalAttachments, sendMailSafe } = require('../utils/mail');
 const { resolveDurableUploadUrl } = require('../utils/storage');
 
+const isSuperAdminSession = (user = {}) =>
+    Number(user?.real_role_id || user?.role_id) === 1 ||
+    (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
+const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
+const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
+
+const ensureStockScopedColumns = async () => {
+    await pool.query(`
+        ALTER TABLE product_catalog
+            ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id),
+            ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)
+    `);
+    await pool.query(`
+        ALTER TABLE company_profiles
+            ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id),
+            ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)
+    `);
+};
+
 const normalizeStockOrderId = (orderId) => String(orderId || '').replace(/-/g, '').toUpperCase();
 const buildStockRegistrationNumber = (orderId, pieceNumber) =>
     `STK-${normalizeStockOrderId(orderId)}-${String(pieceNumber).padStart(3, '0')}`;
@@ -132,7 +151,9 @@ const sendStockOrderEmailInBackground = (payload) => {
     });
 };
 
-const getStockOrderEmailContext = async (orderId) => {
+const getStockOrderEmailContext = async (orderId, user = {}) => {
+    const globalScope = hasGlobalScope(user);
+    const dealerId = getEffectiveDealerId(user);
     const result = await pool.query(
         `
         SELECT
@@ -146,10 +167,12 @@ const getStockOrderEmailContext = async (orderId) => {
         FROM stock_orders so
         LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
         LEFT JOIN product_catalog pc ON pc.id = so.product_id
+        LEFT JOIN users u ON u.id = so.ordered_by
         WHERE so.id = $1
+          ${globalScope ? '' : 'AND u.dealer_id = $2'}
         LIMIT 1
         `,
-        [orderId]
+        globalScope ? [orderId] : [orderId, dealerId]
     );
 
     const order = result.rows[0];
@@ -358,8 +381,10 @@ exports.uploadBankSlip = async (req, res) => {
     });
 };
 
-exports.listStockOrders = async (_req, res) => {
+exports.listStockOrders = async (req, res) => {
     try {
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         await reconcileReceivedStockOrders();
 
         const result = await pool.query(
@@ -382,8 +407,11 @@ exports.listStockOrders = async (_req, res) => {
             LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             JOIN users u ON u.id = so.ordered_by
+            LEFT JOIN dealers d ON d.id = u.dealer_id
+            ${globalScope ? '' : 'WHERE d.id = $1'}
             ORDER BY so.created_at DESC
-            `
+            `,
+            globalScope ? [] : [dealerId]
         );
 
         res.status(200).json(result.rows);
@@ -394,6 +422,13 @@ exports.listStockOrders = async (_req, res) => {
 
 exports.createStockOrder = async (req, res) => {
     try {
+        await ensureStockScopedColumns();
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
+        if (!globalScope && !dealerId) {
+            return res.status(403).json({ message: 'Dealer scope is required to create stock orders.' });
+        }
+
         const {
             company_profile_id,
             product_id,
@@ -416,9 +451,11 @@ exports.createStockOrder = async (req, res) => {
             `
             SELECT id, company_name, company_email
             FROM company_profiles
-            WHERE id = $1 AND is_active = TRUE
+            WHERE id = $1
+              AND is_active = TRUE
+              ${globalScope ? '' : 'AND dealer_id = $2'}
             `,
-            [company_profile_id]
+            globalScope ? [company_profile_id] : [company_profile_id, dealerId]
         );
 
         if (companyResult.rows.length === 0) {
@@ -429,9 +466,11 @@ exports.createStockOrder = async (req, res) => {
             `
             SELECT id, brand, model, serial_number, vehicle_type, image_url, monthly_rate, purchase_price, color, description
             FROM product_catalog
-            WHERE id = $1 AND is_active = TRUE
+            WHERE id = $1
+              AND is_active = TRUE
+              ${globalScope ? '' : 'AND dealer_id = $2'}
             `,
-            [product_id]
+            globalScope ? [product_id] : [product_id, dealerId]
         );
 
         if (productResult.rows.length === 0) {
@@ -499,7 +538,7 @@ exports.createStockOrder = async (req, res) => {
 
 exports.resendStockOrderEmail = async (req, res) => {
     try {
-        const context = await getStockOrderEmailContext(req.params.id);
+        const context = await getStockOrderEmailContext(req.params.id, req.user);
 
         if (!context) {
             return res.status(404).json({ message: 'Stock order not found' });
@@ -542,6 +581,8 @@ exports.updateStockOrder = async (req, res) => {
     const client = await pool.connect();
 
     try {
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
         const {
             order_status,
             received_quantity,
@@ -563,10 +604,12 @@ exports.updateStockOrder = async (req, res) => {
                 pc.description AS product_description
             FROM stock_orders so
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN users u ON u.id = so.ordered_by
             WHERE so.id = $1
+              ${globalScope ? '' : 'AND u.dealer_id = $2'}
             FOR UPDATE OF so
             `,
-            [req.params.id]
+            globalScope ? [req.params.id] : [req.params.id, dealerId]
         );
 
         if (currentOrderResult.rows.length === 0) {

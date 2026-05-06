@@ -1,6 +1,37 @@
 const pool = require('../config/db');
 const { resolveDurableUploadUrl } = require('../utils/storage');
 
+const isSuperAdminSession = (user = {}) =>
+    Number(user?.real_role_id || user?.role_id) === 1 ||
+    (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
+const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
+const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
+
+const ensureProductDealerColumns = async () => {
+    await pool.query(`
+        ALTER TABLE product_catalog
+            ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id),
+            ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)
+    `);
+
+    await pool.query(`
+        UPDATE product_catalog pc
+        SET dealer_id = scoped.dealer_id
+        FROM (
+            SELECT DISTINCT ON (so.product_id)
+                so.product_id,
+                u.dealer_id
+            FROM stock_orders so
+            JOIN users u ON u.id = so.ordered_by
+            WHERE so.product_id IS NOT NULL
+              AND u.dealer_id IS NOT NULL
+            ORDER BY so.product_id, so.created_at DESC
+        ) scoped
+        WHERE pc.id = scoped.product_id
+          AND pc.dealer_id IS NULL
+    `);
+};
+
 const ensureVehicleTypesTable = async () => {
     await pool.query(`
         CREATE TABLE IF NOT EXISTS vehicle_types (
@@ -29,8 +60,12 @@ const getNextVehicleTypeId = async () => {
     return Number(result.rows[0]?.next_id || 1);
 };
 
-exports.listProducts = async (_req, res) => {
+exports.listProducts = async (req, res) => {
     try {
+        await ensureProductDealerColumns();
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
+
         const result = await pool.query(
             `
             SELECT
@@ -56,8 +91,10 @@ exports.listProducts = async (_req, res) => {
                 updated_at
             FROM product_catalog
             WHERE is_active = TRUE
+              ${globalScope ? '' : 'AND dealer_id = $1'}
             ORDER BY created_at DESC, brand ASC, model ASC
-            `
+            `,
+            globalScope ? [] : [dealerId]
         );
 
         res.status(200).json(result.rows);
@@ -149,6 +186,13 @@ exports.createVehicleType = async (req, res) => {
 
 exports.createProduct = async (req, res) => {
     try {
+        await ensureProductDealerColumns();
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
+        if (!globalScope && !dealerId) {
+            return res.status(403).json({ message: 'Dealer scope is required to create products.' });
+        }
+
         const {
             brand,
             model,
@@ -190,9 +234,11 @@ exports.createProduct = async (req, res) => {
                 cash_markup_percent,
                 cash_markup_value,
                 installment_markup_percent,
-                installment_months
+                installment_months,
+                dealer_id,
+                created_by
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
             RETURNING *
             `,
             [
@@ -208,6 +254,8 @@ exports.createProduct = async (req, res) => {
                 cash_markup_value || 0,
                 installment_markup_percent || 0,
                 installment_months || 12,
+                globalScope ? null : dealerId,
+                req.user.id,
             ]
         );
 
@@ -219,6 +267,10 @@ exports.createProduct = async (req, res) => {
 
 exports.updateProduct = async (req, res) => {
     try {
+        await ensureProductDealerColumns();
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
+
         const {
             brand,
             model,
@@ -269,6 +321,7 @@ exports.updateProduct = async (req, res) => {
                 installment_months = $12,
                 updated_at = NOW()
             WHERE id = $13
+              ${globalScope ? '' : 'AND dealer_id = $14'}
             RETURNING *
             `,
             [
@@ -285,6 +338,7 @@ exports.updateProduct = async (req, res) => {
                 installment_markup_percent || 0,
                 installment_months || 12,
                 req.params.id,
+                ...(globalScope ? [] : [dealerId]),
             ]
         );
 
