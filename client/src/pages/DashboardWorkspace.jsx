@@ -6308,6 +6308,25 @@ const selectedCustomer = useMemo(
         }
     };
 
+    const handleResendStockOrderEmail = async (orderId) => {
+        if (!orderId) {
+            return;
+        }
+
+        try {
+            setSavingStock(true);
+            const { data } = await API.post(`/stock/orders/${orderId}/resend-email`);
+            setStockMessage(data.message || 'Stock order email sent successfully.');
+            await loadDashboard();
+        } catch (err) {
+            const errorDetail = err.response?.data?.error;
+            setStockMessage(errorDetail || err.response?.data?.message || 'Unable to resend stock order email.');
+            await loadDashboard();
+        } finally {
+            setSavingStock(false);
+        }
+    };
+
     const openStockReceiveModal = (order) => {
         setReceivingStockOrder(order);
         setStockReceiveItems([createEmptyReceiveItem(order.product_color || order.color || '')]);
@@ -8249,6 +8268,7 @@ const selectedCustomer = useMemo(
                     formatCurrency={formatCurrency}
                     buildAssetUrl={buildAssetUrl}
                     openStockReceiveModal={openStockReceiveModal}
+                    handleResendStockOrderEmail={handleResendStockOrderEmail}
                 />;
 
             case 'installments':

@@ -18,7 +18,25 @@ export default function Stock({
   formatCurrency,
   buildAssetUrl,
   openStockReceiveModal,
+  handleResendStockOrderEmail,
 }) {
+  const getStockEmailStatus = (order) => {
+    if (order.email_sent) {
+      return 'Sent';
+    }
+
+    const message = String(order.email_error || '').trim();
+    if (!message) {
+      return 'Pending email send';
+    }
+
+    if (message.toLowerCase().includes('resend email failed (403)')) {
+      return 'Previous email failed. Click Resend Email after Render redeploy.';
+    }
+
+    return message;
+  };
+
   if (!canManageStock) {
     return <div className="feedback-card error">Your account does not have stock and fleet management access.</div>;
   }
@@ -139,7 +157,14 @@ export default function Stock({
                   <td>{order.brand} {order.model}<br />{order.vehicle_type}{order.product_color ? ` / ${order.product_color}` : ''}<br />{order.product_description || 'No description'}</td>
                   <td>{formatCurrency(order.total_amount)}</td>
                   <td>{order.expected_delivery_date || 'Not set'}</td>
-                  <td>{order.email_sent ? 'Sent' : order.email_error || 'Pending config'}</td>
+                  <td>
+                    <div>{getStockEmailStatus(order)}</div>
+                    {!order.email_sent && handleResendStockOrderEmail ? (
+                      <button type="button" className="view-btn compact-action" onClick={() => handleResendStockOrderEmail(order.id)} disabled={savingStock}>
+                        Resend Email
+                      </button>
+                    ) : null}
+                  </td>
                   <td>{order.bank_slip_url ? <a href={buildAssetUrl(order.bank_slip_url)} target="_blank" rel="noreferrer">View Slip</a> : 'No slip'}</td>
                   <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>
                   <td><button type="button" className="view-btn" onClick={() => openStockReceiveModal(order)} disabled={savingStock}>Receive Stock</button></td>

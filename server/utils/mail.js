@@ -209,6 +209,26 @@ const sendWithResend = async ({ recipients, ccRecipients, subject, text, html, d
     return { sent: true, error: null };
 };
 
+const sendWithSmtp = async ({ recipients, ccRecipients, subject, text, html, dealer, attachments }) => {
+    const transporter = await createTransporter();
+    if (!transporter) {
+        return null;
+    }
+
+    await transporter.sendMail({
+        from: getMailerFrom(dealer),
+        replyTo: normalizeEmail(dealer.email || dealer.contact_email || dealer.admin_email) || undefined,
+        to: recipients.join(', '),
+        cc: ccRecipients.length > 0 ? ccRecipients.join(', ') : undefined,
+        subject,
+        text,
+        html,
+        attachments,
+    });
+
+    return { sent: true, error: null };
+};
+
 const sendMailSafe = async ({ to = [], cc = [], subject, text, html, dealer = {}, attachments = [] }) => {
     const recipients = uniqueEmails(Array.isArray(to) ? to : [to]);
     const ccRecipients = uniqueEmails(Array.isArray(cc) ? cc : [cc]);
@@ -218,53 +238,49 @@ const sendMailSafe = async ({ to = [], cc = [], subject, text, html, dealer = {}
         return { sent: false, error: 'No email recipient available' };
     }
 
-    try {
-        const brevoResult = await sendWithBrevo({ recipients, ccRecipients, subject, text, html, dealer, attachments });
-        if (brevoResult?.sent) {
-            return brevoResult;
-        }
-        if (brevoResult?.error) {
-            providerErrors.push(brevoResult.error);
-        }
+    const preferredProvider = String(process.env.MAIL_PROVIDER || process.env.EMAIL_PROVIDER || '').trim().toLowerCase();
+    const providerOrder =
+        preferredProvider === 'resend'
+            ? ['resend', 'brevo', 'smtp']
+            : preferredProvider === 'smtp'
+                ? ['smtp', 'brevo', 'resend']
+                : preferredProvider === 'brevo'
+                    ? ['brevo', 'smtp', 'resend']
+                    : ['brevo', 'smtp', 'resend'];
 
-        const resendResult = await sendWithResend({ recipients, ccRecipients, subject, text, html, dealer, attachments });
-        if (resendResult?.sent) {
-            return resendResult;
-        }
-        if (resendResult?.error) {
-            providerErrors.push(resendResult.error);
+    try {
+        for (const provider of providerOrder) {
+            let result = null;
+
+            if (provider === 'brevo') {
+                result = await sendWithBrevo({ recipients, ccRecipients, subject, text, html, dealer, attachments });
+            } else if (provider === 'smtp') {
+                try {
+                    result = await sendWithSmtp({ recipients, ccRecipients, subject, text, html, dealer, attachments });
+                } catch (error) {
+                    result = { sent: false, error: error.message };
+                }
+            } else if (provider === 'resend') {
+                result = await sendWithResend({ recipients, ccRecipients, subject, text, html, dealer, attachments });
+            }
+
+            if (result?.sent) {
+                return result;
+            }
+            if (result?.error) {
+                providerErrors.push(result.error);
+            }
         }
     } catch (error) {
         providerErrors.push(error.message);
     }
 
-    const transporter = await createTransporter();
-    if (!transporter) {
-        return {
-            sent: false,
-            error: providerErrors.length > 0
-                ? providerErrors.join('; ')
-                : 'Email API key or SMTP is not configured on the server',
-        };
-    }
-
-    try {
-        await transporter.sendMail({
-            from: getMailerFrom(dealer),
-            replyTo: normalizeEmail(dealer.email || dealer.contact_email || dealer.admin_email) || undefined,
-            to: recipients.join(', '),
-            cc: ccRecipients.length > 0 ? ccRecipients.join(', ') : undefined,
-            subject,
-            text,
-            html,
-            attachments,
-        });
-
-        return { sent: true, error: null };
-    } catch (error) {
-        providerErrors.push(error.message);
-        return { sent: false, error: providerErrors.join('; ') };
-    }
+    return {
+        sent: false,
+        error: providerErrors.length > 0
+            ? providerErrors.join('; ')
+            : 'Email API key or SMTP is not configured on the server',
+    };
 };
 
 module.exports = {

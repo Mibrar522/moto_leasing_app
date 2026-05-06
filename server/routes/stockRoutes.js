@@ -8,6 +8,7 @@ router.use(protect, requireDealerScope);
 
 router.get('/orders', restrictToFeature('FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT'), stockController.listStockOrders);
 router.post('/orders', restrictToFeature('FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT'), stockController.createStockOrder);
+router.post('/orders/:id/resend-email', restrictToFeature('FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT'), stockController.resendStockOrderEmail);
 router.patch('/orders/:id', restrictToFeature('FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT'), stockController.updateStockOrder);
 router.post('/upload-slip', restrictToFeature('FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT'), uploadBankSlip.single('bankSlip'), stockController.uploadBankSlip);
 
