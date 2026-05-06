@@ -1,5 +1,14 @@
-import ReportDataPage from './ReportDataPage';
+export default function Reports({ ctx }) {
+  const {
+    canManageSales,
+    canManageStock,
+    renderReportsSelector,
+  } = ctx;
 
-export default function Reports() {
-  return <ReportDataPage pageKey="reports" />;
+if (!canManageSales && !canManageStock) {
+                    return <div className="feedback-card error">Your account does not have report access.</div>;
+                }
+
+                return renderReportsSelector();
+
 }

@@ -1,7 +1,7 @@
 import { lazy } from 'react';
 
-const Dashboard = lazy(() => import('../Dashboard'));
+const DashboardWorkspace = lazy(() => import('../DashboardWorkspace'));
 
-export default function DashboardRoutePage() {
-  return <Dashboard pageKey="dashboard" />;
+export default function DashboardRoutePage({ pageKey = 'dashboard', PageComponent }) {
+  return <DashboardWorkspace pageKey={pageKey} PageComponent={PageComponent} />;
 }

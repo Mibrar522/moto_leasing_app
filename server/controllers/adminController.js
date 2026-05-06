@@ -223,7 +223,7 @@ exports.getDashboardData = async (req, res) => {
             dashboard: ['metrics', 'applications', 'ads', 'notifications', 'dealers'],
             customers: ['customers', 'dealers'],
             employees: ['employees', 'dealers', 'roles', 'features', 'employeeFinancials'],
-            dealers: ['dealers'],
+            dealers: ['dealers', 'roles'],
             access: ['roles', 'features', 'rolePermissions'],
             applications: ['applications'],
             workflow: ['workflowDefinitions', 'workflowTasks', 'salesTransactions'],
