@@ -1480,8 +1480,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const location = useLocation();
     const getCurrentRoutePage = () => (
         pageKey ||
-        getDashboardPageFromPathname(location.pathname) ||
         getDashboardPageFromSearch(location.search) ||
+        getDashboardPageFromPathname(location.pathname) ||
         'dashboard'
     );
     const [activePage, setActivePage] = useState(() => getCurrentRoutePage());

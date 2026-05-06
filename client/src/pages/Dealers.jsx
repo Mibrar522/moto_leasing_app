@@ -23,6 +23,9 @@ export default function Dealers({
   handleEditDealer,
   handleDeleteDealer,
 }) {
+  const dealerAdminRoles = (dashboardData.roles || [])
+    .filter((role) => String(role.role_name || '').toUpperCase() !== 'SUPER_ADMIN');
+
   return (
     <>
       <div className="page-heading">
@@ -73,8 +76,11 @@ export default function Dealers({
             <label className="field"><span>Dealer Admin Email</span><input name="admin_email" value={dealerForm.admin_email} onChange={handleDealerChange} type="email" /></label>
             <label className="field">
               <span>Dealer Admin Role</span>
-              <select name="admin_role_id" value={dealerForm.admin_role_id} onChange={handleDealerChange}>
-                {(dashboardData.roles || []).filter((role) => role.role_name !== 'SUPER_ADMIN').map((role) => (
+              <select name="admin_role_id" value={dealerForm.admin_role_id} onChange={handleDealerChange} disabled={dealerAdminRoles.length === 0}>
+                {dealerAdminRoles.length === 0 ? (
+                  <option value="">No roles loaded</option>
+                ) : null}
+                {dealerAdminRoles.map((role) => (
                   <option key={`dealer-admin-role-${role.id}`} value={role.id}>{role.role_name}</option>
                 ))}
               </select>
