@@ -1121,7 +1121,7 @@ exports.getDashboardData = async (req, res) => {
                 JOIN users u ON u.id = st.agent_id
                 LEFT JOIN dealers d ON d.id = COALESCE(st.dealer_id, c.dealer_id, u.dealer_id)
                 LEFT JOIN sale_installments si ON si.sale_id = st.id
-                ${isEmployeeLogin ? 'WHERE st.agent_id = $1' : isDealerScopedView ? 'WHERE d.id = $1' : ''}
+                ${isEmployeeLogin ? 'WHERE st.agent_id = $1' : isDealerScopedView ? 'WHERE COALESCE(st.dealer_id, c.dealer_id, u.dealer_id) = $1' : ''}
                 GROUP BY
                     st.id,
                     st.customer_id,

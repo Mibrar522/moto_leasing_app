@@ -26,13 +26,16 @@ const getSalesScopeContext = (user = {}) => {
     };
 };
 
+const getSaleDealerExpression = () => 'COALESCE(st.dealer_id, c.dealer_id, u.dealer_id)';
+const getVehicleDealerExpression = () => 'COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id)';
+
 const buildScopedSalesWhereClause = ({ isEmployeeLogin, isDealerScopedView }) => {
     if (isEmployeeLogin) {
         return 'WHERE st.agent_id = $1';
     }
 
     if (isDealerScopedView) {
-        return 'WHERE d.id = $1';
+        return `WHERE ${getSaleDealerExpression()} = $1`;
     }
 
     return '';
@@ -235,7 +238,7 @@ exports.listSales = async (req, res) => {
             JOIN customers c ON c.id = st.customer_id
             JOIN vehicles v ON v.id = st.vehicle_id
             JOIN users u ON u.id = st.agent_id
-            LEFT JOIN dealers d ON d.id = COALESCE(st.dealer_id, c.dealer_id, u.dealer_id)
+            LEFT JOIN dealers d ON d.id = ${getSaleDealerExpression()}
             LEFT JOIN sale_installments si ON si.sale_id = st.id
             ${buildScopedSalesWhereClause(scope)}
             GROUP BY st.id, c.full_name, c.cnic_passport_number, v.brand, v.model, v.image_url, v.vehicle_type, v.serial_number, v.registration_number, v.chassis_number, v.engine_number, v.purchase_price, u.full_name, d.id, d.dealer_name, d.dealer_code
@@ -331,8 +334,10 @@ exports.createSale = async (req, res) => {
                 d.id AS dealer_id
             FROM vehicles v
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
+            LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN users ou ON ou.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = ou.dealer_id
+            LEFT JOIN dealers d ON d.id = ${getVehicleDealerExpression()}
             WHERE v.id = $1
             FOR UPDATE OF v
             `,
@@ -525,11 +530,10 @@ exports.updateSale = async (req, res) => {
             `
             SELECT
                 st.*,
-                COALESCE(st.dealer_id, c.dealer_id, d.id) AS dealer_id
+                ${getSaleDealerExpression()} AS dealer_id
             FROM sales_transactions st
             JOIN customers c ON c.id = st.customer_id
             JOIN users u ON u.id = st.agent_id
-            LEFT JOIN dealers d ON d.id = COALESCE(u.dealer_id, c.dealer_id)
             WHERE st.id = $1
             FOR UPDATE OF st
             `,
@@ -582,8 +586,10 @@ exports.updateSale = async (req, res) => {
                 d.id AS dealer_id
             FROM vehicles v
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
+            LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN users ou ON ou.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = ou.dealer_id
+            LEFT JOIN dealers d ON d.id = ${getVehicleDealerExpression()}
             WHERE v.id = $1
             FOR UPDATE OF v
             `,
@@ -741,11 +747,11 @@ exports.receiveInstallment = async (req, res) => {
             SELECT
                 si.*,
                 st.agent_id,
-                d.id AS dealer_id
+                ${getSaleDealerExpression()} AS dealer_id
             FROM sale_installments si
             JOIN sales_transactions st ON st.id = si.sale_id
+            JOIN customers c ON c.id = st.customer_id
             JOIN users u ON u.id = st.agent_id
-            LEFT JOIN dealers d ON d.id = u.dealer_id
             WHERE si.id = $1
             `,
             [req.params.id]
