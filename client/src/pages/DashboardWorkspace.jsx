@@ -2442,14 +2442,51 @@ const selectedCustomer = useMemo(
 );
     const customerOwnershipCandidates = useMemo(() => {
         const targetDealerId = String(customerForm.dealer_id || selectedCustomer?.dealer_id || user?.dealer_id || '');
-        return (dashboardData.dealerStaff || [])
+        const candidatesById = new Map();
+        const addCandidate = (staff) => {
+            if (!staff?.id || staff.is_active === false) return;
+            const staffDealerId = String(staff.dealer_id || '');
+            if (targetDealerId && staffDealerId && staffDealerId !== targetDealerId) return;
+            candidatesById.set(String(staff.id), staff);
+        };
+
+        if (user?.id) {
+            const currentUserIsApplicationAdmin = String(user?.role_name || '').toUpperCase() === 'APPLICATION_ADMIN';
+            addCandidate({
+                id: user.id,
+                dealer_id: currentProfileDealerId || user?.dealer_id || '',
+                full_name: currentUserIsApplicationAdmin
+                    ? (user?.dealer_name || user?.full_name || user?.email || 'Current user')
+                    : (user?.full_name || user?.dealer_name || user?.email || 'Current user'),
+                job_title: user?.role_name || '',
+                dealer_name: user?.dealer_name || '',
+                email: user?.email || '',
+                is_active: true,
+            });
+        }
+
+        (dashboardData.dealerStaff || [])
             .filter((staff) => {
                 if (!staff?.id || !staff?.is_active) return false;
                 const staffDealerId = String(staff.dealer_id || '');
                 return !targetDealerId || staffDealerId === targetDealerId;
             })
+            .forEach(addCandidate);
+
+        return Array.from(candidatesById.values())
             .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || '')));
-    }, [customerForm.dealer_id, dashboardData.dealerStaff, selectedCustomer?.dealer_id, user?.dealer_id]);
+    }, [
+        currentProfileDealerId,
+        customerForm.dealer_id,
+        dashboardData.dealerStaff,
+        selectedCustomer?.dealer_id,
+        user?.dealer_id,
+        user?.dealer_name,
+        user?.email,
+        user?.full_name,
+        user?.id,
+        user?.role_name,
+    ]);
 
     const filteredEmployees = useMemo(() => {
         const query = searchTerm.trim().toLowerCase();
