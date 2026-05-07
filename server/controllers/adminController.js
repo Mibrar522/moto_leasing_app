@@ -75,6 +75,31 @@ const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies, 
     }
 };
 
+const productDealerScopeClause = (paramIndex = 1) => `
+    AND (
+        pc.dealer_id = $${paramIndex}
+        OR creator.dealer_id = $${paramIndex}
+        OR stock_owner.dealer_id = $${paramIndex}
+    )
+`;
+
+const companyDealerScopeClause = (paramIndex = 1) => `
+    AND (
+        cp.dealer_id = $${paramIndex}
+        OR creator.dealer_id = $${paramIndex}
+        OR stock_owner.dealer_id = $${paramIndex}
+    )
+`;
+
+const stockOrderDealerScopeClause = (paramIndex = 1) => `
+    WHERE (
+        so.dealer_id = $${paramIndex}
+        OR u.dealer_id = $${paramIndex}
+        OR pc.dealer_id = $${paramIndex}
+        OR cp.dealer_id = $${paramIndex}
+    )
+`;
+
 const getRolePermissions = async () => {
     const rolePermissionsResult = await pool.query(
         `
@@ -538,7 +563,7 @@ exports.getDashboardData = async (req, res) => {
                 LIMIT 1
             ) stock_owner ON true
             WHERE pc.is_active = TRUE
-              ${hasDealerDataScope ? 'AND COALESCE(pc.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $1' : ''}
+              ${hasDealerDataScope ? productDealerScopeClause(1) : ''}
             ORDER BY pc.created_at DESC, pc.brand ASC, pc.model ASC
             LIMIT 500
             `,
@@ -574,7 +599,7 @@ exports.getDashboardData = async (req, res) => {
                 LIMIT 1
             ) stock_owner ON true
             WHERE cp.is_active = TRUE
-              ${hasDealerDataScope ? 'AND COALESCE(cp.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $1' : ''}
+              ${hasDealerDataScope ? companyDealerScopeClause(1) : ''}
             ORDER BY cp.company_name ASC
             LIMIT 300
             `,
@@ -1011,7 +1036,7 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             LEFT JOIN users u ON u.id = so.ordered_by
             LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id)
-            ${hasDealerDataScope ? 'WHERE COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id) = $1' : ''}
+            ${hasDealerDataScope ? stockOrderDealerScopeClause(1) : ''}
             ORDER BY so.created_at DESC
             LIMIT 300
             `,

@@ -116,7 +116,11 @@ exports.listProducts = async (req, res) => {
                 LIMIT 1
             ) stock_owner ON true
             WHERE pc.is_active = TRUE
-              ${globalScope ? '' : 'AND COALESCE(pc.dealer_id, creator.dealer_id, stock_owner.dealer_id) = $1'}
+              ${globalScope ? '' : `AND (
+                  pc.dealer_id = $1
+                  OR creator.dealer_id = $1
+                  OR stock_owner.dealer_id = $1
+              )`}
             ORDER BY pc.created_at DESC, pc.brand ASC, pc.model ASC
             `,
             globalScope ? [] : [dealerId]

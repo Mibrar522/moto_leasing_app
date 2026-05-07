@@ -423,9 +423,14 @@ exports.listStockOrders = async (req, res) => {
             FROM stock_orders so
             LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
-            JOIN users u ON u.id = so.ordered_by
+            LEFT JOIN users u ON u.id = so.ordered_by
             LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id)
-            ${globalScope ? '' : 'WHERE COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id) = $1'}
+            ${globalScope ? '' : `WHERE (
+                so.dealer_id = $1
+                OR u.dealer_id = $1
+                OR pc.dealer_id = $1
+                OR cp.dealer_id = $1
+            )`}
             ORDER BY so.created_at DESC
             `,
             globalScope ? [] : [dealerId]
