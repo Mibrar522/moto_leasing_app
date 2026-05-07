@@ -133,9 +133,9 @@ exports.listProducts = async (req, res) => {
             ) stock_owner ON true
             WHERE pc.is_active = TRUE
               ${globalScope ? '' : `AND (
-                  pc.dealer_id = ${resolvedDealerScopeSql(1, 2)}
-                  OR creator.dealer_id = ${resolvedDealerScopeSql(1, 2)}
-                  OR stock_owner.dealer_id = ${resolvedDealerScopeSql(1, 2)}
+                  pc.dealer_id = $1::uuid
+                  OR creator.dealer_id = $1::uuid
+                  OR stock_owner.dealer_id = $1::uuid
                   OR pc.created_by = $2::uuid
               )`}
             ORDER BY pc.created_at DESC, pc.brand ASC, pc.model ASC

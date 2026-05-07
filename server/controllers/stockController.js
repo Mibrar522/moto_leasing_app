@@ -26,20 +26,20 @@ const resolvedDealerScopeSql = (dealerParamIndex = 1, userParamIndex = 2) => `
 
 const stockOrderDealerScopeClause = (dealerParamIndex = 1, userParamIndex = 2) => `
     WHERE (
-        so.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
-        OR u.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
-        OR pc.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
-        OR cp.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        so.dealer_id = $${dealerParamIndex}::uuid
+        OR u.dealer_id = $${dealerParamIndex}::uuid
+        OR pc.dealer_id = $${dealerParamIndex}::uuid
+        OR cp.dealer_id = $${dealerParamIndex}::uuid
         OR so.ordered_by = $${userParamIndex}::uuid
         OR so.ordered_by IN (
             SELECT dealer_user.id
             FROM users dealer_user
-            WHERE dealer_user.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+            WHERE dealer_user.dealer_id = $${dealerParamIndex}::uuid
         )
         OR so.ordered_by IN (
             SELECT dealer_employee.user_id
             FROM employees dealer_employee
-            WHERE dealer_employee.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+            WHERE dealer_employee.dealer_id = $${dealerParamIndex}::uuid
               AND dealer_employee.user_id IS NOT NULL
         )
     )
@@ -47,20 +47,20 @@ const stockOrderDealerScopeClause = (dealerParamIndex = 1, userParamIndex = 2) =
 
 const stockOrderDealerScopeAndClause = (dealerParamIndex = 2, userParamIndex = 3) => `
     AND (
-        so.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
-        OR u.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
-        OR pc.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
-        OR cp.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        so.dealer_id = $${dealerParamIndex}::uuid
+        OR u.dealer_id = $${dealerParamIndex}::uuid
+        OR pc.dealer_id = $${dealerParamIndex}::uuid
+        OR cp.dealer_id = $${dealerParamIndex}::uuid
         OR so.ordered_by = $${userParamIndex}::uuid
         OR so.ordered_by IN (
             SELECT dealer_user.id
             FROM users dealer_user
-            WHERE dealer_user.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+            WHERE dealer_user.dealer_id = $${dealerParamIndex}::uuid
         )
         OR so.ordered_by IN (
             SELECT dealer_employee.user_id
             FROM employees dealer_employee
-            WHERE dealer_employee.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+            WHERE dealer_employee.dealer_id = $${dealerParamIndex}::uuid
               AND dealer_employee.user_id IS NOT NULL
         )
     )
@@ -477,13 +477,43 @@ exports.listStockOrders = async (req, res) => {
                 pc.image_url AS product_image_url,
                 pc.monthly_rate AS product_monthly_rate,
                 pc.purchase_price AS product_purchase_price,
-                u.full_name AS ordered_by_name
+                u.full_name AS ordered_by_name,
+                stock_scope.resolved_dealer_id,
+                stock_scope.ownership_source
             FROM stock_orders so
             LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             LEFT JOIN users u ON u.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id)
-            ${globalScope ? '' : stockOrderDealerScopeClause(1, 2)}
+            LEFT JOIN employees ordered_employee ON ordered_employee.user_id = u.id
+            LEFT JOIN dealers ordered_admin_dealer ON ordered_admin_dealer.admin_user_id = u.id
+            LEFT JOIN dealers ordered_email_dealer ON LOWER(ordered_email_dealer.contact_email) = LOWER(u.email)
+            LEFT JOIN LATERAL (
+                SELECT
+                    COALESCE(
+                        so.dealer_id,
+                        pc.dealer_id,
+                        cp.dealer_id,
+                        u.dealer_id,
+                        ordered_employee.dealer_id,
+                        ordered_admin_dealer.id,
+                        ordered_email_dealer.id
+                    ) AS resolved_dealer_id,
+                    CASE
+                        WHEN so.dealer_id IS NOT NULL THEN 'stock_order'
+                        WHEN pc.dealer_id IS NOT NULL THEN 'product'
+                        WHEN cp.dealer_id IS NOT NULL THEN 'company'
+                        WHEN u.dealer_id IS NOT NULL THEN 'ordered_by_user'
+                        WHEN ordered_employee.dealer_id IS NOT NULL THEN 'ordered_by_employee'
+                        WHEN ordered_admin_dealer.id IS NOT NULL THEN 'ordered_by_admin_dealer'
+                        WHEN ordered_email_dealer.id IS NOT NULL THEN 'ordered_by_email_dealer'
+                        ELSE 'unmapped'
+                    END AS ownership_source
+            ) stock_scope ON true
+            LEFT JOIN dealers d ON d.id = stock_scope.resolved_dealer_id
+            ${globalScope ? '' : `WHERE (
+                stock_scope.resolved_dealer_id = $1::uuid
+                OR so.ordered_by = $2::uuid
+            )`}
             ORDER BY so.created_at DESC
             `,
             globalScope ? [] : [dealerId, req.user.id]
