@@ -10,7 +10,6 @@ const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffective
 const resolveWriteDealerId = (req) => getEffectiveDealerId(req.user) || req.body?.dealer_id || null;
 const resolvedDealerScopeSql = (dealerParamIndex = 1, userParamIndex = 2) => `
     COALESCE(
-        $${dealerParamIndex}::uuid,
         (
             SELECT COALESCE(current_user_scope.dealer_id, current_employee_scope.dealer_id, current_admin_dealer.id, current_email_dealer.id)
             FROM users current_user_scope
@@ -19,7 +18,8 @@ const resolvedDealerScopeSql = (dealerParamIndex = 1, userParamIndex = 2) => `
             LEFT JOIN dealers current_email_dealer ON LOWER(current_email_dealer.contact_email) = LOWER(current_user_scope.email)
             WHERE current_user_scope.id = $${userParamIndex}::uuid
             LIMIT 1
-        )
+        ),
+        $${dealerParamIndex}::uuid
     )
 `;
 

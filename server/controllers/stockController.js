@@ -11,7 +11,6 @@ const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffective
 const resolveWriteDealerId = (req) => getEffectiveDealerId(req.user) || req.body?.dealer_id || null;
 const resolvedDealerScopeSql = (dealerParamIndex = 1, userParamIndex = 2) => `
     COALESCE(
-        $${dealerParamIndex}::uuid,
         (
             SELECT COALESCE(current_user_scope.dealer_id, current_employee_scope.dealer_id, current_admin_dealer.id, current_email_dealer.id)
             FROM users current_user_scope
@@ -20,12 +19,34 @@ const resolvedDealerScopeSql = (dealerParamIndex = 1, userParamIndex = 2) => `
             LEFT JOIN dealers current_email_dealer ON LOWER(current_email_dealer.contact_email) = LOWER(current_user_scope.email)
             WHERE current_user_scope.id = $${userParamIndex}::uuid
             LIMIT 1
-        )
+        ),
+        $${dealerParamIndex}::uuid
     )
 `;
 
 const stockOrderDealerScopeClause = (dealerParamIndex = 1, userParamIndex = 2) => `
     WHERE (
+        so.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR u.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR pc.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR cp.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR so.ordered_by = $${userParamIndex}::uuid
+        OR so.ordered_by IN (
+            SELECT dealer_user.id
+            FROM users dealer_user
+            WHERE dealer_user.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        )
+        OR so.ordered_by IN (
+            SELECT dealer_employee.user_id
+            FROM employees dealer_employee
+            WHERE dealer_employee.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+              AND dealer_employee.user_id IS NOT NULL
+        )
+    )
+`;
+
+const stockOrderDealerScopeAndClause = (dealerParamIndex = 2, userParamIndex = 3) => `
+    AND (
         so.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
         OR u.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
         OR pc.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
@@ -221,10 +242,10 @@ const getStockOrderEmailContext = async (orderId, user = {}) => {
         LEFT JOIN product_catalog pc ON pc.id = so.product_id
         LEFT JOIN users u ON u.id = so.ordered_by
         WHERE so.id = $1
-          ${globalScope ? '' : 'AND COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id) = $2'}
+          ${globalScope ? '' : stockOrderDealerScopeAndClause(2, 3)}
         LIMIT 1
         `,
-        globalScope ? [orderId] : [orderId, dealerId]
+        globalScope ? [orderId] : [orderId, dealerId, user.id]
     );
 
     const order = result.rows[0];
@@ -680,12 +701,13 @@ exports.updateStockOrder = async (req, res) => {
                 pc.description AS product_description
             FROM stock_orders so
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN users u ON u.id = so.ordered_by
             WHERE so.id = $1
-              ${globalScope ? '' : 'AND COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id) = $2'}
+              ${globalScope ? '' : stockOrderDealerScopeAndClause(2, 3)}
             FOR UPDATE OF so
             `,
-            globalScope ? [req.params.id] : [req.params.id, dealerId]
+            globalScope ? [req.params.id] : [req.params.id, dealerId, req.user.id]
         );
 
         if (currentOrderResult.rows.length === 0) {

@@ -79,7 +79,6 @@ const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies, 
 
 const resolvedDealerScopeSql = (dealerParamIndex = 1, userParamIndex = 2) => `
     COALESCE(
-        $${dealerParamIndex}::uuid,
         (
             SELECT COALESCE(current_user_scope.dealer_id, current_employee_scope.dealer_id, current_admin_dealer.id, current_email_dealer.id)
             FROM users current_user_scope
@@ -88,7 +87,8 @@ const resolvedDealerScopeSql = (dealerParamIndex = 1, userParamIndex = 2) => `
             LEFT JOIN dealers current_email_dealer ON LOWER(current_email_dealer.contact_email) = LOWER(current_user_scope.email)
             WHERE current_user_scope.id = $${userParamIndex}::uuid
             LIMIT 1
-        )
+        ),
+        $${dealerParamIndex}::uuid
     )
 `;
 
@@ -203,8 +203,12 @@ exports.getDashboardData = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        if (!effectiveDealerId) {
-            effectiveDealerId = userResult.rows[0].dealer_id || null;
+        const databaseDealerId = userResult.rows[0].dealer_id || null;
+        const isSwitchedSuperAdminProfile = Boolean(req.user.switched_profile && req.user.effective_dealer_id);
+        if (databaseDealerId && !isSwitchedSuperAdminProfile) {
+            effectiveDealerId = databaseDealerId;
+        } else if (!effectiveDealerId) {
+            effectiveDealerId = databaseDealerId;
         }
 
         const hasGlobalScope = isSuperAdmin && !req.user.effective_dealer_id;
