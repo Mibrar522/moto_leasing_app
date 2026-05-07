@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 const { reconcileReceivedStockOrders } = require('./stockController');
 const { syncAccessCatalogDefaults } = require('../utils/accessBootstrap');
-const { syncDealerOwnership } = require('../utils/dealerOwnershipBootstrap');
+const { syncDealerOwnership, syncDealerOwnershipForRequest } = require('../utils/dealerOwnershipBootstrap');
 
 const PENDING_APPLICATION_STATUSES = ['PENDING', 'SUBMITTED', 'UNDER_REVIEW'];
 const hasAnyFeature = (featureKeys = [], requiredKeys = []) => requiredKeys.some((featureKey) => featureKeys.includes(featureKey));
@@ -315,7 +315,7 @@ exports.getDashboardData = async (req, res) => {
             wantsGroup('stockOrders') || wantsGroup('inventory')
         );
         if (wantsGroup('products') || wantsGroup('companies') || wantsGroup('stockOrders') || wantsGroup('inventory')) {
-            await syncDealerOwnership();
+            await syncDealerOwnershipForRequest();
         }
 
         const metricsResult = wantsGroup('metrics') ? await pool.query(

@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 const { resolveDurableUploadUrl } = require('../utils/storage');
-const { syncDealerOwnership } = require('../utils/dealerOwnershipBootstrap');
+const { syncDealerOwnershipForRequest } = require('../utils/dealerOwnershipBootstrap');
 
 const isSuperAdminSession = (user = {}) =>
     Number(user?.real_role_id || user?.role_id) === 1 ||
@@ -78,7 +78,7 @@ const getNextVehicleTypeId = async () => {
 exports.listProducts = async (req, res) => {
     try {
         await ensureProductDealerColumns();
-        await syncDealerOwnership();
+        await syncDealerOwnershipForRequest();
         const globalScope = hasGlobalScope(req.user);
         const dealerId = getEffectiveDealerId(req.user);
 

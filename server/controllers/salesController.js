@@ -241,7 +241,7 @@ exports.listSales = async (req, res) => {
             LEFT JOIN dealers d ON d.id = ${getSaleDealerExpression()}
             LEFT JOIN sale_installments si ON si.sale_id = st.id
             ${buildScopedSalesWhereClause(scope)}
-            GROUP BY st.id, c.full_name, c.cnic_passport_number, v.brand, v.model, v.image_url, v.vehicle_type, v.serial_number, v.registration_number, v.chassis_number, v.engine_number, v.purchase_price, u.full_name, d.id, d.dealer_name, d.dealer_code
+            GROUP BY st.id, c.full_name, c.cnic_passport_number, v.brand, v.model, v.image_url, v.vehicle_type, v.serial_number, v.registration_number, v.chassis_number, v.engine_number, v.purchase_price, u.full_name, d.id, d.dealer_name, d.dealer_code, d.dealer_signature_url
             ORDER BY st.created_at DESC
             `,
             getScopedSalesParams({
