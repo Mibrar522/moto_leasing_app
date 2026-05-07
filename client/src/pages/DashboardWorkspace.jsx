@@ -7546,8 +7546,13 @@ const selectedCustomer = useMemo(
                 return;
             }
 
+            if (receivedAmount > Number(receiptContext.remainingAmount || 0)) {
+                showInstallmentPopupMessage('Received amount is not correct or greater than the total remaining amount.');
+                return;
+            }
+
             if (!receiptContext.nextMonthDate && receivedAmount < Number(receiptContext.remainingAmount || 0)) {
-                showInstallmentPopupMessage(`Final pending installment must be paid in full. Remaining amount is ${formatCurrency(receiptContext.remainingAmount)}.`);
+                showInstallmentPopupMessage(`Please enter the full remaining amount for the last installment: ${formatCurrency(receiptContext.remainingAmount)}.`);
                 return;
             }
 

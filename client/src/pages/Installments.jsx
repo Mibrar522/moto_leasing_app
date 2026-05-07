@@ -35,23 +35,12 @@ if (!canManageInstallments) {
                 }
                 if (!selectedInstallmentSale) {
                     return (
-                        <>
-                            <div className="page-heading">
-                                <h1>Installment Page</h1>
-                                <p>Track received and pending monthly installments for financed vehicle sales.</p>
-                            </div>
-                            <div className="feedback-card">No installment sales are available yet.</div>
-                        </>
+                        <div className="feedback-card">No installment sales are available yet.</div>
                     );
                 }
 
                 return (
                     <>
-                        <div className="page-heading">
-                            <h1>Installment Page</h1>
-                            <p>View the customer, vehicle, and monthly installment collection status in one place.</p>
-                        </div>
-
                         {saleMessage ? <div className="notice-banner">{saleMessage}</div> : null}
 
                         {canViewInstallmentOverview ? (

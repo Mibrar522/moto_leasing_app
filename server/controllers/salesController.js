@@ -65,6 +65,7 @@ const resolveSaleDealerId = (scope, reqUser, customerDealerId = null, vehicleDea
     || null;
 
 const formatCurrencyAmount = (value) => `Rs ${Number(value || 0).toFixed(2)}`;
+const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100;
 
 const isScopedDealerMatch = (scope, dealerId) => {
     if (!scope.isDealerScopedView) {
@@ -810,6 +811,11 @@ exports.receiveInstallment = async (req, res) => {
             return res.status(400).json({ message: 'Received amount must be greater than zero.' });
         }
 
+        if (receivedAmount > totalRemainingAmount) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Received amount is not correct or greater than the total remaining amount.' });
+        }
+
         const futureInstallmentsResult = await client.query(
             `
             SELECT *
@@ -827,15 +833,9 @@ exports.receiveInstallment = async (req, res) => {
         const carryForwardAmount = Math.max(expectedAmount - receivedAmount, 0);
         const extraAdvanceAmount = Math.max(receivedAmount - expectedAmount, 0);
 
-        if (carryForwardAmount > 0 && futureInstallments.length === 0) {
+        if (futureInstallments.length === 0 && receivedAmount < totalRemainingAmount) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ message: `Final pending installment must be paid in full. Remaining amount is ${formatCurrencyAmount(totalRemainingAmount)}.` });
-        }
-
-        const futureOutstandingAmount = futureInstallments.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-        if (extraAdvanceAmount > futureOutstandingAmount) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ message: 'Received amount cannot exceed the total remaining installment balance.' });
+            return res.status(400).json({ message: `Please enter the full remaining amount for the last installment: ${formatCurrencyAmount(totalRemainingAmount)}.` });
         }
 
         const installmentResult = await client.query(
@@ -857,64 +857,9 @@ exports.receiveInstallment = async (req, res) => {
             ]
         );
 
-        if (carryForwardAmount > 0) {
-            await client.query(
-                `
-                UPDATE sale_installments
-                SET amount = amount + $2
-                WHERE id = $1
-                `,
-                [futureInstallments[0].id, carryForwardAmount]
-            );
-        } else if (extraAdvanceAmount > 0) {
-            let remainingAdvance = extraAdvanceAmount;
-
-            for (const futureInstallment of futureInstallments) {
-                if (remainingAdvance <= 0) {
-                    break;
-                }
-
-                const installmentAmount = Number(futureInstallment.amount || 0);
-                if (installmentAmount <= 0) {
-                    continue;
-                }
-
-                if (remainingAdvance >= installmentAmount) {
-                    await client.query(
-                        `
-                        UPDATE sale_installments
-                        SET
-                            amount = 0,
-                            received_amount = 0,
-                            carry_forward_amount = 0,
-                            status = 'RECEIVED',
-                            paid_date = CURRENT_DATE
-                        WHERE id = $1
-                        `,
-                        [futureInstallment.id]
-                    );
-                    remainingAdvance -= installmentAmount;
-                } else {
-                    await client.query(
-                        `
-                        UPDATE sale_installments
-                        SET
-                            amount = amount - $2,
-                            carry_forward_amount = 0,
-                            status = 'PENDING',
-                            paid_date = NULL
-                        WHERE id = $1
-                        `,
-                        [futureInstallment.id, remainingAdvance]
-                    );
-                    remainingAdvance = 0;
-                }
-            }
-        }
-
         const saleBalanceResult = await client.query(
             `
-            SELECT financed_amount, vehicle_price, down_payment, monthly_installment
+            SELECT financed_amount, vehicle_price, down_payment
             FROM sales_transactions
             WHERE id = $1
             FOR UPDATE
@@ -926,7 +871,6 @@ exports.receiveInstallment = async (req, res) => {
         const expectedInstallmentBalance = Number(saleBalanceRow.financed_amount || 0) > 0
             ? Number(saleBalanceRow.financed_amount || 0)
             : Math.max(Number(saleBalanceRow.vehicle_price || 0) - Number(saleBalanceRow.down_payment || 0), 0);
-        const standardMonthlyAmount = Math.max(Number(saleBalanceRow.monthly_installment || 0), 0);
 
         const normalizeRowsResult = await client.query(
             `
@@ -941,24 +885,24 @@ exports.receiveInstallment = async (req, res) => {
 
         const normalizeRows = normalizeRowsResult.rows;
         const totalReceivedAmount = normalizeRows.reduce((sum, row) => sum + Number(row.received_amount || 0), 0);
-        let remainingInstallmentBalance = Math.max(expectedInstallmentBalance - totalReceivedAmount, 0);
-        let adjustedNextPending = false;
-
-        for (const row of normalizeRows) {
+        const remainingInstallmentBalance = roundMoney(Math.max(expectedInstallmentBalance - totalReceivedAmount, 0));
+        const pendingRows = normalizeRows.filter((row) => {
             const hasReceivedCash = Number(row.received_amount || 0) > 0;
             const normalizedStatus = String(row.status || '').toUpperCase();
+            return !hasReceivedCash && normalizedStatus !== 'RECEIVED' && normalizedStatus !== 'PARTIAL';
+        });
 
-            if (hasReceivedCash || normalizedStatus === 'RECEIVED' || normalizedStatus === 'PARTIAL') {
-                continue;
-            }
+        if (pendingRows.length > 0 && remainingInstallmentBalance > 0) {
+            const remainingCents = Math.round(remainingInstallmentBalance * 100);
+            const baseCents = Math.floor(remainingCents / pendingRows.length);
+            let extraCents = remainingCents % pendingRows.length;
 
-            const currentAmount = Math.max(Number(row.amount || 0), 0);
-            const baseAmount = adjustedNextPending
-                ? (standardMonthlyAmount > 0 ? standardMonthlyAmount : currentAmount)
-                : currentAmount;
-            const nextAmount = Math.max(Math.min(baseAmount, remainingInstallmentBalance), 0);
+            for (const row of pendingRows) {
+                const nextAmount = (baseCents + (extraCents > 0 ? 1 : 0)) / 100;
+                if (extraCents > 0) {
+                    extraCents -= 1;
+                }
 
-            if (nextAmount > 0) {
                 await client.query(
                     `
                     UPDATE sale_installments
@@ -971,9 +915,9 @@ exports.receiveInstallment = async (req, res) => {
                     `,
                     [row.id, nextAmount]
                 );
-                remainingInstallmentBalance -= nextAmount;
-                adjustedNextPending = true;
-            } else {
+            }
+        } else {
+            for (const row of pendingRows) {
                 await client.query(
                     `
                     DELETE FROM sale_installments
