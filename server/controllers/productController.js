@@ -8,6 +8,20 @@ const isSuperAdminSession = (user = {}) =>
 const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
 const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
 const resolveWriteDealerId = (req) => getEffectiveDealerId(req.user) || req.body?.dealer_id || null;
+const resolvedDealerScopeSql = (dealerParamIndex = 1, userParamIndex = 2) => `
+    COALESCE(
+        $${dealerParamIndex}::uuid,
+        (
+            SELECT COALESCE(current_user_scope.dealer_id, current_employee_scope.dealer_id, current_admin_dealer.id, current_email_dealer.id)
+            FROM users current_user_scope
+            LEFT JOIN employees current_employee_scope ON current_employee_scope.user_id = current_user_scope.id
+            LEFT JOIN dealers current_admin_dealer ON current_admin_dealer.admin_user_id = current_user_scope.id
+            LEFT JOIN dealers current_email_dealer ON LOWER(current_email_dealer.contact_email) = LOWER(current_user_scope.email)
+            WHERE current_user_scope.id = $${userParamIndex}::uuid
+            LIMIT 1
+        )
+    )
+`;
 
 const ensureProductDealerColumns = async () => {
     await pool.query(`
@@ -119,13 +133,14 @@ exports.listProducts = async (req, res) => {
             ) stock_owner ON true
             WHERE pc.is_active = TRUE
               ${globalScope ? '' : `AND (
-                  pc.dealer_id = $1
-                  OR creator.dealer_id = $1
-                  OR stock_owner.dealer_id = $1
+                  pc.dealer_id = ${resolvedDealerScopeSql(1, 2)}
+                  OR creator.dealer_id = ${resolvedDealerScopeSql(1, 2)}
+                  OR stock_owner.dealer_id = ${resolvedDealerScopeSql(1, 2)}
+                  OR pc.created_by = $2::uuid
               )`}
             ORDER BY pc.created_at DESC, pc.brand ASC, pc.model ASC
             `,
-            globalScope ? [] : [dealerId]
+            globalScope ? [] : [dealerId, req.user.id]
         );
 
         res.status(200).json(result.rows);

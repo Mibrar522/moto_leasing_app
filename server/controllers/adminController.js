@@ -77,28 +77,57 @@ const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies, 
     }
 };
 
-const productDealerScopeClause = (paramIndex = 1) => `
-    AND (
-        pc.dealer_id = $${paramIndex}
-        OR creator.dealer_id = $${paramIndex}
-        OR stock_owner.dealer_id = $${paramIndex}
+const resolvedDealerScopeSql = (dealerParamIndex = 1, userParamIndex = 2) => `
+    COALESCE(
+        $${dealerParamIndex}::uuid,
+        (
+            SELECT COALESCE(current_user_scope.dealer_id, current_employee_scope.dealer_id, current_admin_dealer.id, current_email_dealer.id)
+            FROM users current_user_scope
+            LEFT JOIN employees current_employee_scope ON current_employee_scope.user_id = current_user_scope.id
+            LEFT JOIN dealers current_admin_dealer ON current_admin_dealer.admin_user_id = current_user_scope.id
+            LEFT JOIN dealers current_email_dealer ON LOWER(current_email_dealer.contact_email) = LOWER(current_user_scope.email)
+            WHERE current_user_scope.id = $${userParamIndex}::uuid
+            LIMIT 1
+        )
     )
 `;
 
-const companyDealerScopeClause = (paramIndex = 1) => `
+const productDealerScopeClause = (dealerParamIndex = 1, userParamIndex = 2) => `
     AND (
-        cp.dealer_id = $${paramIndex}
-        OR creator.dealer_id = $${paramIndex}
-        OR stock_owner.dealer_id = $${paramIndex}
+        pc.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR creator.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR stock_owner.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR pc.created_by = $${userParamIndex}::uuid
     )
 `;
 
-const stockOrderDealerScopeClause = (paramIndex = 1) => `
+const companyDealerScopeClause = (dealerParamIndex = 1, userParamIndex = 2) => `
+    AND (
+        cp.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR creator.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR stock_owner.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR cp.created_by = $${userParamIndex}::uuid
+    )
+`;
+
+const stockOrderDealerScopeClause = (dealerParamIndex = 1, userParamIndex = 2) => `
     WHERE (
-        so.dealer_id = $${paramIndex}
-        OR u.dealer_id = $${paramIndex}
-        OR pc.dealer_id = $${paramIndex}
-        OR cp.dealer_id = $${paramIndex}
+        so.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR u.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR pc.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR cp.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        OR so.ordered_by = $${userParamIndex}::uuid
+        OR so.ordered_by IN (
+            SELECT dealer_user.id
+            FROM users dealer_user
+            WHERE dealer_user.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+        )
+        OR so.ordered_by IN (
+            SELECT dealer_employee.user_id
+            FROM employees dealer_employee
+            WHERE dealer_employee.dealer_id = ${resolvedDealerScopeSql(dealerParamIndex, userParamIndex)}
+              AND dealer_employee.user_id IS NOT NULL
+        )
     )
 `;
 
@@ -521,11 +550,14 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN users ou ON ou.id = so.ordered_by
             LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id)
-            ${hasDealerDataScope ? 'WHERE COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id) = $1' : ''}
+            ${hasDealerDataScope ? `WHERE (
+                COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id) = ${resolvedDealerScopeSql(1, 2)}
+                OR so.ordered_by = $2::uuid
+            )` : ''}
             ORDER BY v.created_at DESC NULLS LAST, v.brand ASC, v.model ASC
             LIMIT 500
             `,
-            hasDealerDataScope ? [effectiveDealerId] : []
+            hasDealerDataScope ? [effectiveDealerId, req.user.id] : []
             ),
             'inventory query',
             []
@@ -568,11 +600,11 @@ exports.getDashboardData = async (req, res) => {
                 LIMIT 1
             ) stock_owner ON true
             WHERE pc.is_active = TRUE
-              ${hasDealerDataScope ? productDealerScopeClause(1) : ''}
+              ${hasDealerDataScope ? productDealerScopeClause(1, 2) : ''}
             ORDER BY pc.created_at DESC, pc.brand ASC, pc.model ASC
             LIMIT 500
             `,
-            hasDealerDataScope ? [effectiveDealerId] : []
+            hasDealerDataScope ? [effectiveDealerId, req.user.id] : []
             ),
             'products query',
             []
@@ -604,11 +636,11 @@ exports.getDashboardData = async (req, res) => {
                 LIMIT 1
             ) stock_owner ON true
             WHERE cp.is_active = TRUE
-              ${hasDealerDataScope ? companyDealerScopeClause(1) : ''}
+              ${hasDealerDataScope ? companyDealerScopeClause(1, 2) : ''}
             ORDER BY cp.company_name ASC
             LIMIT 300
             `,
-            hasDealerDataScope ? [effectiveDealerId] : []
+            hasDealerDataScope ? [effectiveDealerId, req.user.id] : []
             ),
             'companies query',
             []
@@ -1041,11 +1073,11 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             LEFT JOIN users u ON u.id = so.ordered_by
             LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, u.dealer_id, pc.dealer_id, cp.dealer_id)
-            ${hasDealerDataScope ? stockOrderDealerScopeClause(1) : ''}
+            ${hasDealerDataScope ? stockOrderDealerScopeClause(1, 2) : ''}
             ORDER BY so.created_at DESC
             LIMIT 300
             `,
-            hasDealerDataScope ? [effectiveDealerId] : []
+            hasDealerDataScope ? [effectiveDealerId, req.user.id] : []
             ),
             'stock orders query',
             []
