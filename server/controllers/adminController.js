@@ -117,7 +117,7 @@ exports.getDashboardData = async (req, res) => {
                 u.email,
                 u.role_id,
                 r.role_name,
-                COALESCE(u.dealer_id, e.dealer_id) AS dealer_id,
+                        COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id) AS dealer_id,
                 u.brand_name,
                 u.brand_logo_url,
                 u.brand_address,
@@ -134,9 +134,11 @@ exports.getDashboardData = async (req, res) => {
             FROM users u
             LEFT JOIN roles r ON r.id = u.role_id
             LEFT JOIN employees e ON e.user_id = u.id
-            LEFT JOIN dealers d ON d.id = COALESCE(u.dealer_id, e.dealer_id)
+                    LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u.id
+                    LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u.email)
+                    LEFT JOIN dealers d ON d.id = COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id)
             WHERE u.id = $1
-            GROUP BY u.id, r.role_name, u.dealer_id, e.dealer_id, u.brand_name, u.brand_logo_url, u.brand_address, d.dealer_name, d.theme_key, d.dealer_logo_url, d.dealer_signature_url, d.dealer_address, d.mobile_country_code, d.mobile_number, d.contact_email, d.currency_code, d.application_slug
+                    GROUP BY u.id, r.role_name, u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id, u.brand_name, u.brand_logo_url, u.brand_address, d.dealer_name, d.theme_key, d.dealer_logo_url, d.dealer_signature_url, d.dealer_address, d.mobile_country_code, d.mobile_number, d.contact_email, d.currency_code, d.application_slug
             `,
             [req.user.id]
         );

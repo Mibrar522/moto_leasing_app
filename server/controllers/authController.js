@@ -151,7 +151,7 @@ const getUserAccessProfile = async (identifierField, identifierValue) => {
             u.full_name,
             u.email,
             u.role_id,
-            COALESCE(u.dealer_id, e.dealer_id) AS dealer_id,
+            COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id) AS dealer_id,
             u.is_active,
             u.password_hash,
             u.brand_name,
@@ -209,7 +209,9 @@ const getUserAccessProfile = async (identifierField, identifierValue) => {
         FROM users u
         LEFT JOIN roles r ON r.id = u.role_id
         LEFT JOIN employees e ON e.user_id = u.id
-        LEFT JOIN dealers d ON d.id = COALESCE(u.dealer_id, e.dealer_id)
+        LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u.id
+        LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u.email)
+        LEFT JOIN dealers d ON d.id = COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id)
         LEFT JOIN role_permissions rp ON rp.role_id = u.role_id
         LEFT JOIN features rf ON rf.id = rp.feature_id
         LEFT JOIN employee_features efm ON efm.employee_id = e.id
@@ -218,7 +220,7 @@ const getUserAccessProfile = async (identifierField, identifierValue) => {
         LEFT JOIN features df ON df.id = efo.feature_id
         WHERE u.${identifierField} = $1
         GROUP BY
-            u.id, u.full_name, u.email, u.role_id, u.dealer_id, e.dealer_id, u.is_active, u.password_hash,
+            u.id, u.full_name, u.email, u.role_id, u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id, u.is_active, u.password_hash,
             u.brand_name, u.brand_logo_url, u.brand_address,
             r.role_name, d.dealer_name, d.dealer_code, d.theme_key, d.dealer_logo_url, d.dealer_address, d.mobile_country_code, d.mobile_number, d.contact_email, d.currency_code, d.application_slug,
             e.id, e.employee_code, e.department, e.job_title
@@ -255,7 +257,7 @@ const getUserAccessProfileForMobileLogin = async (identifierValue, dealerIdentif
             u.full_name,
             u.email,
             u.role_id,
-            COALESCE(u.dealer_id, e.dealer_id) AS dealer_id,
+            COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id) AS dealer_id,
             u.is_active,
             u.password_hash,
             u.brand_name,
@@ -312,7 +314,9 @@ const getUserAccessProfileForMobileLogin = async (identifierValue, dealerIdentif
         FROM users u
         LEFT JOIN roles r ON r.id = u.role_id
         LEFT JOIN employees e ON e.user_id = u.id
-        LEFT JOIN dealers d ON d.id = COALESCE(u.dealer_id, e.dealer_id)
+        LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u.id
+        LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u.email)
+        LEFT JOIN dealers d ON d.id = COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id)
         LEFT JOIN role_permissions rp ON rp.role_id = u.role_id
         LEFT JOIN features rf ON rf.id = rp.feature_id
         LEFT JOIN employee_features efm ON efm.employee_id = e.id
@@ -325,7 +329,7 @@ const getUserAccessProfileForMobileLogin = async (identifierValue, dealerIdentif
         )
         ${dealerClause}
         GROUP BY
-            u.id, u.full_name, u.email, u.role_id, u.dealer_id, e.dealer_id, u.is_active, u.password_hash,
+            u.id, u.full_name, u.email, u.role_id, u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id, u.is_active, u.password_hash,
             u.brand_name, u.brand_logo_url, u.brand_address,
             r.role_name, d.dealer_name, d.dealer_code, d.theme_key, d.dealer_logo_url, d.dealer_address, d.mobile_country_code, d.mobile_number, d.contact_email, d.currency_code, d.application_slug,
             e.id, e.employee_code, e.department, e.job_title

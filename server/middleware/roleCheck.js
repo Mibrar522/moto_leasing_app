@@ -7,6 +7,15 @@ const isSuperAdminSession = (user = {}) =>
     Number(user?.real_role_id || user?.role_id) === 1 ||
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
 
+const getResolvedDealerSql = () => `
+    COALESCE(
+        u.dealer_id,
+        e.dealer_id,
+        admin_dealer.id,
+        email_dealer.id
+    )
+`;
+
 exports.protect = async (req, res, next) => {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ message: "Not authorized" });
@@ -28,11 +37,13 @@ exports.protect = async (req, res, next) => {
                         u.id,
                         u.role_id,
                         r.role_name,
-                        COALESCE(u.dealer_id, e.dealer_id) AS dealer_id,
+                        ${getResolvedDealerSql()} AS dealer_id,
                         e.id AS employee_id
                     FROM users u
                     LEFT JOIN roles r ON r.id = u.role_id
                     LEFT JOIN employees e ON e.user_id = u.id
+                    LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u.id
+                    LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u.email)
                     WHERE u.id = $1
                     LIMIT 1
                 ),
