@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const { reconcileReceivedStockOrders } = require('./stockController');
 const { syncAccessCatalogDefaults } = require('../utils/accessBootstrap');
+const { syncDealerOwnership } = require('../utils/dealerOwnershipBootstrap');
 
 const PENDING_APPLICATION_STATUSES = ['PENDING', 'SUBMITTED', 'UNDER_REVIEW'];
 const hasAnyFeature = (featureKeys = [], requiredKeys = []) => requiredKeys.some((featureKey) => featureKeys.includes(featureKey));
@@ -19,6 +20,7 @@ const runDashboardMaintenance = () => {
 
     Promise.all([
         syncAccessCatalogDefaults(),
+        syncDealerOwnership(),
         reconcileReceivedStockOrders(),
     ])
         .catch((error) => console.warn('Dashboard maintenance skipped:', error.message))
@@ -312,6 +314,9 @@ exports.getDashboardData = async (req, res) => {
             wantsGroup('companies'),
             wantsGroup('stockOrders') || wantsGroup('inventory')
         );
+        if (wantsGroup('products') || wantsGroup('companies') || wantsGroup('stockOrders') || wantsGroup('inventory')) {
+            await syncDealerOwnership();
+        }
 
         const metricsResult = wantsGroup('metrics') ? await pool.query(
             `

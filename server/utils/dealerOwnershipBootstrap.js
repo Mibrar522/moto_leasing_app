@@ -14,6 +14,10 @@ const OWNED_TABLES = [
     'workflow_tasks',
 ];
 
+const SYNC_CACHE_MS = 60 * 1000;
+let syncInFlight = null;
+let lastSyncCompletedAt = 0;
+
 const run = (sql, params = []) => pool.query(sql, params);
 
 const ensureColumn = async (table, column, definition) => {
@@ -57,7 +61,37 @@ const warnUnownedRows = async (table) => {
     }
 };
 
-const syncDealerOwnership = async () => {
+const syncUsersToDealerProfiles = async () => {
+    await run(`
+        UPDATE users u
+        SET dealer_id = dealer_scope.dealer_id
+        FROM (
+            SELECT DISTINCT ON (u2.id)
+                u2.id AS user_id,
+                COALESCE(admin_dealer.id, email_dealer.id) AS dealer_id
+            FROM users u2
+            LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u2.id
+            LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u2.email)
+            WHERE COALESCE(admin_dealer.id, email_dealer.id) IS NOT NULL
+            ORDER BY
+                u2.id,
+                CASE WHEN admin_dealer.id IS NOT NULL THEN 0 ELSE 1 END
+        ) dealer_scope
+        WHERE u.id = dealer_scope.user_id
+          AND (u.dealer_id IS NULL OR u.dealer_id <> dealer_scope.dealer_id)
+    `);
+
+    await run(`
+        UPDATE employees e
+        SET dealer_id = u.dealer_id
+        FROM users u
+        WHERE e.user_id = u.id
+          AND u.dealer_id IS NOT NULL
+          AND e.dealer_id <> u.dealer_id
+    `);
+};
+
+const performDealerOwnershipSync = async () => {
     await ensureColumn('product_catalog', 'dealer_id', 'UUID');
     await ensureColumn('product_catalog', 'created_by', 'UUID');
     await ensureColumn('company_profiles', 'dealer_id', 'UUID');
@@ -73,6 +107,8 @@ const syncDealerOwnership = async () => {
     await ensureColumn('app_ads', 'dealer_id', 'UUID');
     await ensureColumn('customer_orders', 'dealer_id', 'UUID');
     await ensureColumn('lease_applications', 'dealer_id', 'UUID');
+
+    await syncUsersToDealerProfiles();
 
     await run(`
         UPDATE product_catalog pc
@@ -94,13 +130,19 @@ const syncDealerOwnership = async () => {
 
     await run(`
         UPDATE stock_orders so
-        SET dealer_id = COALESCE(order_user.dealer_id, pc.dealer_id, cp.dealer_id)
-        FROM users order_user
-        LEFT JOIN product_catalog pc ON pc.id = so.product_id
-        LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
-        WHERE order_user.id = so.ordered_by
-          AND so.dealer_id IS NULL
-          AND COALESCE(order_user.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
+        SET dealer_id = stock_scope.dealer_id
+        FROM (
+            SELECT
+                so2.id,
+                COALESCE(order_user.dealer_id, pc.dealer_id, cp.dealer_id) AS dealer_id
+            FROM stock_orders so2
+            LEFT JOIN users order_user ON order_user.id = so2.ordered_by
+            LEFT JOIN product_catalog pc ON pc.id = so2.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so2.company_profile_id
+            WHERE COALESCE(order_user.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
+        ) stock_scope
+        WHERE stock_scope.id = so.id
+          AND (so.dealer_id IS NULL OR so.dealer_id <> stock_scope.dealer_id)
     `);
 
     await run(`
@@ -201,6 +243,26 @@ const syncDealerOwnership = async () => {
         await validateRequiredDealerConstraint(table);
         await warnUnownedRows(table);
     }
+};
+
+const syncDealerOwnership = async ({ force = false } = {}) => {
+    const now = Date.now();
+    if (!force && syncInFlight) {
+        return syncInFlight;
+    }
+    if (!force && lastSyncCompletedAt && now - lastSyncCompletedAt < SYNC_CACHE_MS) {
+        return;
+    }
+
+    syncInFlight = performDealerOwnershipSync()
+        .then(() => {
+            lastSyncCompletedAt = Date.now();
+        })
+        .finally(() => {
+            syncInFlight = null;
+        });
+
+    return syncInFlight;
 };
 
 module.exports = { syncDealerOwnership };

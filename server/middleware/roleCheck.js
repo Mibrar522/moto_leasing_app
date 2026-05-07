@@ -83,11 +83,12 @@ exports.protect = async (req, res, next) => {
             );
 
             const row = access.rows[0] || {};
-            // Backfill dealer scope if the JWT is missing it.
-            if (!req.user.dealer_id && !req.user.effective_dealer_id) {
-                req.user.dealer_id = row.dealer_id || null;
-                req.user.effective_dealer_id = row.dealer_id || null;
-            }
+            // JWTs can be stale after dealer fixes in the DB. For dealer-scoped
+            // users, trust PostgreSQL on every request so stock/product filters
+            // use the current dealer instead of an old token value.
+            req.user.dealer_id = row.dealer_id || null;
+            req.user.effective_dealer_id = row.dealer_id || null;
+            req.user.base_dealer_id = row.dealer_id || null;
             // Refresh role/feature gates for this request.
             req.user.role_id = row.role_id != null ? Number(row.role_id) : req.user.role_id;
             req.user.role_name = row.role_name || req.user.role_name;
