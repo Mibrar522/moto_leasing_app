@@ -7,8 +7,11 @@ const OWNED_TABLES = [
     'product_catalog',
     'company_profiles',
     'stock_orders',
+    'vehicles',
     'sales_transactions',
+    'sale_installments',
     'customer_orders',
+    'customer_order_installments',
     'lease_applications',
     'workflow_definitions',
     'workflow_tasks',
@@ -70,9 +73,14 @@ const syncUsersToDealerProfiles = async () => {
                 u2.id AS user_id,
                 COALESCE(admin_dealer.id, email_dealer.id) AS dealer_id
             FROM users u2
+            LEFT JOIN roles r ON r.id = u2.role_id
             LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u2.id
             LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u2.email)
             WHERE COALESCE(admin_dealer.id, email_dealer.id) IS NOT NULL
+              AND NOT (
+                u2.role_id = 1
+                OR UPPER(COALESCE(r.role_name, '')) = 'SUPER_ADMIN'
+              )
             ORDER BY
                 u2.id,
                 CASE WHEN admin_dealer.id IS NOT NULL THEN 0 ELSE 1 END
@@ -184,7 +192,9 @@ const performDealerOwnershipSync = async () => {
     await ensureColumn('company_profiles', 'dealer_id', 'UUID');
     await ensureColumn('company_profiles', 'created_by', 'UUID');
     await ensureColumn('stock_orders', 'dealer_id', 'UUID');
+    await ensureColumn('vehicles', 'dealer_id', 'UUID');
     await ensureColumn('sales_transactions', 'dealer_id', 'UUID');
+    await ensureColumn('sale_installments', 'dealer_id', 'UUID');
     await ensureColumn('customers', 'dealer_id', 'UUID');
     await ensureColumn('customers', 'created_by_agent', 'UUID');
     await ensureColumn('employees', 'dealer_id', 'UUID');
@@ -193,6 +203,7 @@ const performDealerOwnershipSync = async () => {
     await ensureColumn('workflow_tasks', 'dealer_id', 'UUID');
     await ensureColumn('app_ads', 'dealer_id', 'UUID');
     await ensureColumn('customer_orders', 'dealer_id', 'UUID');
+    await ensureColumn('customer_order_installments', 'dealer_id', 'UUID');
     await ensureColumn('lease_applications', 'dealer_id', 'UUID');
 
     await syncUsersToDealerProfiles();
@@ -265,21 +276,48 @@ const performDealerOwnershipSync = async () => {
     `);
 
     await run(`
+        UPDATE vehicles v
+        SET dealer_id = vehicle_scope.dealer_id
+        FROM (
+            SELECT
+                v2.id,
+                COALESCE(v2.dealer_id, so.dealer_id, order_user.dealer_id, pc.dealer_id, cp.dealer_id) AS dealer_id
+            FROM vehicles v2
+            LEFT JOIN stock_orders so ON so.id = v2.source_stock_order_id
+            LEFT JOIN users order_user ON order_user.id = so.ordered_by
+            LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
+            WHERE COALESCE(v2.dealer_id, so.dealer_id, order_user.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
+        ) vehicle_scope
+        WHERE vehicle_scope.id = v.id
+          AND v.dealer_id IS NULL
+    `);
+
+    await run(`
         UPDATE sales_transactions st
         SET dealer_id = sale_scope.dealer_id
         FROM (
             SELECT
                 st2.id,
-                COALESCE(c.dealer_id, agent.dealer_id, so.dealer_id) AS dealer_id
+                COALESCE(c.dealer_id, agent.dealer_id, v.dealer_id, so.dealer_id) AS dealer_id
             FROM sales_transactions st2
             JOIN customers c ON c.id = st2.customer_id
             JOIN users agent ON agent.id = st2.agent_id
             LEFT JOIN vehicles v ON v.id = st2.vehicle_id
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
-            WHERE COALESCE(c.dealer_id, agent.dealer_id, so.dealer_id) IS NOT NULL
+            WHERE COALESCE(c.dealer_id, agent.dealer_id, v.dealer_id, so.dealer_id) IS NOT NULL
         ) sale_scope
         WHERE sale_scope.id = st.id
           AND st.dealer_id IS NULL
+    `);
+
+    await run(`
+        UPDATE sale_installments si
+        SET dealer_id = st.dealer_id
+        FROM sales_transactions st
+        WHERE st.id = si.sale_id
+          AND si.dealer_id IS NULL
+          AND st.dealer_id IS NOT NULL
     `);
 
     await run(`
@@ -299,6 +337,15 @@ const performDealerOwnershipSync = async () => {
         ) order_scope
         WHERE order_scope.id = co.id
           AND co.dealer_id IS NULL
+    `);
+
+    await run(`
+        UPDATE customer_order_installments coi
+        SET dealer_id = co.dealer_id
+        FROM customer_orders co
+        WHERE co.id = coi.order_id
+          AND coi.dealer_id IS NULL
+          AND co.dealer_id IS NOT NULL
     `);
 
     await run(`
@@ -333,7 +380,9 @@ const performDealerOwnershipSync = async () => {
     await run('CREATE INDEX IF NOT EXISTS idx_product_catalog_dealer_id ON product_catalog(dealer_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_company_profiles_dealer_id ON company_profiles(dealer_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_stock_orders_dealer_id ON stock_orders(dealer_id)');
+    await run('CREATE INDEX IF NOT EXISTS idx_vehicles_dealer_id ON vehicles(dealer_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_sales_transactions_dealer_id ON sales_transactions(dealer_id)');
+    await run('CREATE INDEX IF NOT EXISTS idx_sale_installments_dealer_id ON sale_installments(dealer_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_customers_dealer_id ON customers(dealer_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_employees_dealer_id ON employees(dealer_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_workflow_definitions_dealer_id ON workflow_definitions(dealer_id)');
@@ -341,6 +390,7 @@ const performDealerOwnershipSync = async () => {
     await run('CREATE INDEX IF NOT EXISTS idx_vehicles_source_stock_order_id ON vehicles(source_stock_order_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_app_ads_dealer_id ON app_ads(dealer_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_customer_orders_dealer_id ON customer_orders(dealer_id)');
+    await run('CREATE INDEX IF NOT EXISTS idx_customer_order_installments_dealer_id ON customer_order_installments(dealer_id)');
     await run('CREATE INDEX IF NOT EXISTS idx_lease_applications_dealer_id ON lease_applications(dealer_id)');
 
     for (const table of OWNED_TABLES) {

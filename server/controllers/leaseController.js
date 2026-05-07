@@ -16,11 +16,13 @@ exports.submitLease = async (req, res) => {
         const dealerId = getEffectiveDealerId(req.user);
 
         await client.query('BEGIN'); // Enterprise Transaction
+        await client.query('ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS dealer_id UUID');
+        await client.query('ALTER TABLE lease_applications ADD COLUMN IF NOT EXISTS dealer_id UUID');
 
         // 1. Check vehicle availability in the 'vehicles' table
         const vCheck = await client.query(
             `
-            SELECT v.status, COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id) AS dealer_id
+            SELECT v.status, COALESCE(v.dealer_id, so.dealer_id, ou.dealer_id, pc.dealer_id) AS dealer_id
             FROM vehicles v
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
             LEFT JOIN users ou ON ou.id = so.ordered_by
@@ -61,7 +63,10 @@ exports.submitLease = async (req, res) => {
         );
 
         // 3. Update 'vehicles' status
-        await client.query('UPDATE vehicles SET status = $1 WHERE id = $2', ['LEASED', vehicle_id]);
+        await client.query(
+            'UPDATE vehicles SET status = $1 WHERE id = $2 AND dealer_id = $3',
+            ['LEASED', vehicle_id, resolvedDealerId]
+        );
 
         await client.query('COMMIT'); 
         res.status(201).json(newLease.rows[0]);

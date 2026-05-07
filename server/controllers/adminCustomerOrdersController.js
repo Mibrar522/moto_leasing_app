@@ -24,7 +24,7 @@ exports.receiveCustomerOrderInstallment = async (req, res) => {
 
         const existing = await pool.query(
             `
-            SELECT coi.id, coi.status, coi.amount, coi.paid_amount
+            SELECT coi.id, coi.status, coi.amount, coi.paid_amount, COALESCE(coi.dealer_id, co.dealer_id) AS dealer_id
             FROM customer_order_installments coi
             JOIN customer_orders co ON co.id = coi.order_id
             JOIN customer_accounts ca ON ca.id = co.customer_account_id
@@ -34,7 +34,7 @@ exports.receiveCustomerOrderInstallment = async (req, res) => {
             LEFT JOIN users ou ON ou.id = so.ordered_by
             WHERE coi.order_id = $1
               AND coi.installment_number = $2
-              ${globalScope ? '' : 'AND COALESCE(ca.preferred_dealer_id, so.dealer_id, ou.dealer_id, pc.dealer_id) = $3'}
+              ${globalScope ? '' : 'AND COALESCE(coi.dealer_id, co.dealer_id, ca.preferred_dealer_id, so.dealer_id, ou.dealer_id, pc.dealer_id) = $3'}
             LIMIT 1
             `,
             globalScope ? [orderId, installmentNumber] : [orderId, installmentNumber, dealerId]
@@ -58,9 +58,10 @@ exports.receiveCustomerOrderInstallment = async (req, res) => {
                 paid_amount = COALESCE($3, paid_amount, amount)
             WHERE order_id = $1
               AND installment_number = $2
+              ${globalScope ? '' : 'AND dealer_id = $4'}
             RETURNING *
             `,
-            [orderId, installmentNumber, paidAmount]
+            globalScope ? [orderId, installmentNumber, paidAmount] : [orderId, installmentNumber, paidAmount, dealerId]
         );
 
         return res.status(200).json({ message: 'Installment received', installment: update.rows[0] });

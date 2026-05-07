@@ -173,7 +173,7 @@ exports.listAvailableVehicles = async (req, res) => {
 
         if (dealerId) {
             params.push(dealerId);
-            where.push(`COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id) = $${params.length}`);
+            where.push(`COALESCE(v.dealer_id, so.dealer_id, ou.dealer_id, pc.dealer_id) = $${params.length}`);
         } else {
             return res.status(200).json({ vehicles: [] });
         }
@@ -207,7 +207,7 @@ exports.listAvailableVehicles = async (req, res) => {
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
             LEFT JOIN users ou ON ou.id = so.ordered_by
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
-            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id)
+            LEFT JOIN dealers d ON d.id = COALESCE(v.dealer_id, so.dealer_id, ou.dealer_id, pc.dealer_id)
             ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
             ORDER BY v.created_at DESC NULLS LAST, v.brand ASC, v.model ASC
             `,

@@ -140,6 +140,7 @@ const ensureCustomerOrdersColumns = async (client) => {
     await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS product_id uuid;`);
     await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS vehicle_id uuid;`);
     await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS dealer_id uuid;`);
+    await client.query(`ALTER TABLE customer_order_installments ADD COLUMN IF NOT EXISTS dealer_id uuid;`);
     await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS down_payment numeric(12,2) DEFAULT 0 NOT NULL;`);
     await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS financed_amount numeric(12,2) DEFAULT 0 NOT NULL;`);
     await client.query(`ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS first_due_date date NULL;`);
@@ -160,6 +161,9 @@ exports.createOrder = async (req, res) => {
             return res.status(400).json({ message: 'purchase_mode must be CASH or INSTALLMENT' });
         }
 
+        await client.query('ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS dealer_id uuid');
+        await ensureCustomerOrdersColumns(client);
+
         const vehicleResult = await client.query(
             `
             SELECT
@@ -173,13 +177,14 @@ exports.createOrder = async (req, res) => {
                 v.image_url,
                 v.monthly_rate,
                 v.purchase_price,
+                v.dealer_id AS vehicle_dealer_id,
                 so.product_id,
                 pc.cash_markup_percent,
                 pc.cash_markup_value,
                 pc.installment_markup_percent,
                 pc.installment_months,
                 pc.is_active AS product_is_active,
-                d.id AS dealer_id
+                COALESCE(v.dealer_id, d.id) AS dealer_id
             FROM vehicles v
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
@@ -309,25 +314,30 @@ exports.createOrder = async (req, res) => {
                     `
                     INSERT INTO customer_order_installments (
                         order_id,
+                        dealer_id,
                         installment_number,
                         due_date,
                         amount,
                         status
                     )
-                    VALUES ($1,$2,$3,$4,'PENDING')
+                    VALUES ($1,$2,$3,$4,$5,'PENDING')
                     RETURNING *
                     `,
-                    [order.id, i, dueDate.toISOString().slice(0, 10), amount]
+                    [order.id, order.dealer_id, i, dueDate.toISOString().slice(0, 10), amount]
                 );
                 installments.push(inst.rows[0]);
             }
         }
 
         const nextVehicleStatus = purchaseMode === 'CASH' ? 'SOLD' : 'INSTALLMENT';
-        await client.query(
-            'UPDATE vehicles SET status = $1 WHERE id = $2',
-            [nextVehicleStatus, vehicle.id]
+        const vehicleStatusUpdate = await client.query(
+            'UPDATE vehicles SET status = $1 WHERE id = $2 AND dealer_id = $3',
+            [nextVehicleStatus, vehicle.id, vehicle.dealer_id]
         );
+        if (vehicleStatusUpdate.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ message: 'Vehicle ownership changed before the order could be completed.' });
+        }
 
         await client.query('COMMIT');
 
@@ -393,7 +403,7 @@ exports.listOrders = async (req, res) => {
                 GROUP BY order_id
             ) inst ON inst.order_id = o.id
             WHERE o.customer_account_id = $1
-              AND (o.dealer_id IS NULL OR o.dealer_id = $2)
+              AND o.dealer_id = $2
             ORDER BY o.created_at DESC
             `,
             [customerAccountId, req.customer.preferred_dealer_id || null]
@@ -427,7 +437,7 @@ exports.getOrder = async (req, res) => {
             LEFT JOIN vehicles v ON v.id = o.vehicle_id
             WHERE o.id = $1
               AND o.customer_account_id = $2
-              AND (o.dealer_id IS NULL OR o.dealer_id = $3)
+              AND o.dealer_id = $3
             LIMIT 1
             `,
             [orderId, customerAccountId, req.customer.preferred_dealer_id || null]
@@ -442,9 +452,10 @@ exports.getOrder = async (req, res) => {
             SELECT *
             FROM customer_order_installments
             WHERE order_id = $1
+              AND dealer_id = $2
             ORDER BY installment_number ASC
             `,
-            [orderId]
+            [orderId, orderResult.rows[0].dealer_id]
         );
 
         return res.status(200).json({
@@ -472,7 +483,7 @@ exports.receiveInstallment = async (req, res) => {
             FROM customer_orders
             WHERE id = $1
               AND customer_account_id = $2
-              AND (dealer_id IS NULL OR dealer_id = $3)
+              AND dealer_id = $3
             LIMIT 1
             `,
             [orderId, customerAccountId, req.customer.preferred_dealer_id || null]
@@ -494,10 +505,11 @@ exports.receiveInstallment = async (req, res) => {
                 paid_amount = COALESCE($3, paid_amount, amount)
             WHERE order_id = $1
               AND installment_number = $2
+              AND dealer_id = $4
               AND status <> 'RECEIVED'
             RETURNING *
             `,
-            [orderId, installmentNumber, paidAmount]
+            [orderId, installmentNumber, paidAmount, req.customer.preferred_dealer_id || null]
         );
 
         if (update.rows.length === 0) {
@@ -507,9 +519,10 @@ exports.receiveInstallment = async (req, res) => {
                 FROM customer_order_installments
                 WHERE order_id = $1
                   AND installment_number = $2
+                  AND dealer_id = $3
                 LIMIT 1
                 `,
-                [orderId, installmentNumber]
+                [orderId, installmentNumber, req.customer.preferred_dealer_id || null]
             );
             if (existing.rows.length === 0) {
                 return res.status(404).json({ message: 'Installment not found' });

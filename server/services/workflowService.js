@@ -130,11 +130,18 @@ const findApplicableSalesWorkflowDefinition = async (client, { roleName, dealerI
     return result.rows[0] || null;
 };
 
+const ensureWorkflowDealerColumns = async (client) => {
+    await client.query('ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS dealer_id UUID');
+    await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS dealer_id UUID');
+};
+
 const queueSaleForWorkflow = async (client, { sale, vehicleId, creator, workflowDefinition }) => {
     const stepRoles = getWorkflowStepRoles(workflowDefinition);
     if (stepRoles.length === 0) {
         return null;
     }
+    await ensureWorkflowDealerColumns(client);
+    const saleDealerId = sale.dealer_id || creator.effective_dealer_id || creator.dealer_id || null;
 
     await client.query(
         `
@@ -151,16 +158,19 @@ const queueSaleForWorkflow = async (client, { sale, vehicleId, creator, workflow
         [sale.id, workflowDefinition.id, creator.id]
     );
 
-    await client.query(
-        'UPDATE vehicles SET status = $1 WHERE id = $2',
-        ['RESERVED', vehicleId]
+    const reservedVehicle = await client.query(
+        'UPDATE vehicles SET status = $1 WHERE id = $2 AND dealer_id = $3',
+        ['RESERVED', vehicleId, saleDealerId]
     );
+    if (reservedVehicle.rowCount === 0) {
+        throw new Error('Workflow could not reserve vehicle because dealer ownership did not match.');
+    }
 
     return createWorkflowTask(client, {
         workflowDefinitionId: workflowDefinition.id,
         entityType: 'SALE',
         entityId: sale.id,
-        dealerId: sale.dealer_id || creator.effective_dealer_id || creator.dealer_id || null,
+        dealerId: saleDealerId,
         createdBy: creator.id,
         assignedRoleName: stepRoles[0],
         stepNumber: 1,
@@ -170,6 +180,8 @@ const queueSaleForWorkflow = async (client, { sale, vehicleId, creator, workflow
 };
 
 const finalizeApprovedSale = async (client, saleId, actingUserId = null) => {
+    await ensureWorkflowDealerColumns(client);
+
     const saleResult = await client.query(
         `
         SELECT *
@@ -188,12 +200,13 @@ const finalizeApprovedSale = async (client, saleId, actingUserId = null) => {
 
     const vehicleResult = await client.query(
         `
-        SELECT id
+        SELECT id, dealer_id
         FROM vehicles
         WHERE id = $1
+          AND dealer_id = $2
         FOR UPDATE
         `,
-        [sale.vehicle_id]
+        [sale.vehicle_id, sale.dealer_id]
     );
 
     if (vehicleResult.rows.length === 0) {
@@ -215,12 +228,13 @@ const finalizeApprovedSale = async (client, saleId, actingUserId = null) => {
             await client.query(
                 `
                 INSERT INTO sale_installments (
-                    sale_id, installment_number, due_date, amount, status
+                    sale_id, dealer_id, installment_number, due_date, amount, status
                 )
-                VALUES ($1,$2,$3,$4,$5)
+                VALUES ($1,$2,$3,$4,$5,$6)
                 `,
                 [
                     saleId,
+                    sale.dealer_id,
                     index + 1,
                     addMonths(sale.first_due_date, index),
                     sale.monthly_installment || 0,
@@ -263,8 +277,8 @@ const finalizeApprovedSale = async (client, saleId, actingUserId = null) => {
     );
 
     await client.query(
-        'UPDATE vehicles SET status = $1 WHERE id = $2',
-        [String(sale.sale_mode || '').toUpperCase() === 'CASH' ? 'SOLD' : 'INSTALLMENT', sale.vehicle_id]
+        'UPDATE vehicles SET status = $1 WHERE id = $2 AND dealer_id = $3',
+        [String(sale.sale_mode || '').toUpperCase() === 'CASH' ? 'SOLD' : 'INSTALLMENT', sale.vehicle_id, sale.dealer_id]
     );
 
     return sale;
@@ -334,9 +348,11 @@ const approveWorkflowTask = async (client, taskId, actingUser, decisionNotes = '
 };
 
 const rejectWorkflowTask = async (client, taskId, actingUser, decisionNotes = '') => {
+    await ensureWorkflowDealerColumns(client);
+
     const taskResult = await client.query(
         `
-        SELECT wt.*, st.vehicle_id
+        SELECT wt.*, st.vehicle_id, st.dealer_id AS sale_dealer_id
         FROM workflow_tasks wt
         LEFT JOIN sales_transactions st ON st.id = wt.entity_id
         WHERE wt.id = $1
@@ -391,7 +407,10 @@ const rejectWorkflowTask = async (client, taskId, actingUser, decisionNotes = ''
     );
 
     if (task.vehicle_id) {
-        await client.query('UPDATE vehicles SET status = $1 WHERE id = $2', ['AVAILABLE', task.vehicle_id]);
+        await client.query(
+            'UPDATE vehicles SET status = $1 WHERE id = $2 AND dealer_id = $3',
+            ['AVAILABLE', task.vehicle_id, task.sale_dealer_id || task.dealer_id]
+        );
     }
 
     return { taskStatus: 'REJECTED' };

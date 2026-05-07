@@ -72,6 +72,10 @@ const ensureStockScopedColumns = async () => {
             ADD COLUMN IF NOT EXISTS dealer_id UUID
     `);
     await pool.query(`
+        ALTER TABLE vehicles
+            ADD COLUMN IF NOT EXISTS dealer_id UUID
+    `);
+    await pool.query(`
         WITH stock_owner AS (
             SELECT
                 so2.id,
@@ -355,9 +359,10 @@ const createReceivedInventoryVehicle = async (client, order, item, pieceNumber) 
             image_url,
             monthly_rate,
             purchase_price,
+            dealer_id,
             status
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
         `,
         [
             order.brand,
@@ -373,6 +378,7 @@ const createReceivedInventoryVehicle = async (client, order, item, pieceNumber) 
             order.image_url || null,
             Number(order.monthly_rate || 0),
             Number(order.unit_price || 0),
+            order.dealer_id || null,
             'AVAILABLE',
         ]
     );

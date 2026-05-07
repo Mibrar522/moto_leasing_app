@@ -158,6 +158,7 @@ exports.verifyOtp = async (req, res) => {
         }
 
         await client.query('BEGIN');
+        await client.query('ALTER TABLE customers ADD COLUMN IF NOT EXISTS dealer_id uuid');
 
         await client.query(
             `
@@ -188,6 +189,20 @@ exports.verifyOtp = async (req, res) => {
 
             const cnic = formatCnic(rawCnic);
 
+            if (!preferredDealerId) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Preferred dealer is required for customer signup' });
+            }
+
+            const dealerCheck = await client.query(
+                'SELECT id FROM dealers WHERE id = $1 AND is_active = TRUE',
+                [preferredDealerId]
+            );
+            if (dealerCheck.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Selected dealer is invalid or inactive' });
+            }
+
             const existingAccountCheck = await client.query(
                 `
                 SELECT id
@@ -208,9 +223,9 @@ exports.verifyOtp = async (req, res) => {
             try {
                 customerInsert = await client.query(
                     `
-                    INSERT INTO customers (full_name, cnic_passport_number, ocr_details, created_by_agent, identity_doc_url, biometric_hash)
-                    VALUES ($1, $2, $3, NULL, NULL, NULL)
-                    RETURNING id, full_name, cnic_passport_number, ocr_details
+                    INSERT INTO customers (full_name, cnic_passport_number, ocr_details, created_by_agent, dealer_id, identity_doc_url, biometric_hash)
+                    VALUES ($1, $2, $3, NULL, $4, NULL, NULL)
+                    RETURNING id, full_name, cnic_passport_number, ocr_details, dealer_id
                     `,
                     [
                         fullName,
@@ -220,6 +235,7 @@ exports.verifyOtp = async (req, res) => {
                             contact_phone: phone.phone_e164,
                             address,
                         },
+                        preferredDealerId,
                     ]
                 );
             } catch (error) {

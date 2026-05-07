@@ -368,7 +368,7 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
             LEFT JOIN users vou ON vou.id = so.ordered_by
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
-            WHERE COALESCE(so.dealer_id, vou.dealer_id, pc.dealer_id) = $1
+            WHERE COALESCE(v.dealer_id, so.dealer_id, vou.dealer_id, pc.dealer_id) = $1
             ` : ''}
             `,
             isDealerScopedView ? [effectiveDealerId] : []
@@ -477,7 +477,7 @@ exports.getDashboardData = async (req, res) => {
                     WHERE COALESCE(ocr_details->>'document_type', '') IN ('CNIC', 'PASSPORT')
                 )::int AS scanned_documents
             FROM customers
-            ${isDealerScopedView ? 'WHERE created_by_agent IN (SELECT id FROM users WHERE dealer_id = $1)' : ''}
+            ${isDealerScopedView ? 'WHERE dealer_id = $1' : ''}
             `,
             isDealerScopedView ? [effectiveDealerId] : []
         ) : { rows: [{ total_customers: 0, enrolled_biometrics: 0, scanned_documents: 0 }] };
@@ -560,9 +560,9 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
             LEFT JOIN users ou ON ou.id = so.ordered_by
-            LEFT JOIN dealers d ON d.id = COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id)
+            LEFT JOIN dealers d ON d.id = COALESCE(v.dealer_id, so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id)
             ${hasDealerDataScope ? `WHERE (
-                COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id) = ${resolvedDealerScopeSql(1, 2)}
+                COALESCE(v.dealer_id, so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id) = ${resolvedDealerScopeSql(1, 2)}
                 OR so.ordered_by = $2::uuid
             )` : ''}
             ORDER BY v.created_at DESC NULLS LAST, v.brand ASC, v.model ASC

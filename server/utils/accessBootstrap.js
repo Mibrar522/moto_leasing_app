@@ -654,7 +654,8 @@ exports.syncAccessControlDefaults = async () => {
             ALTER TABLE vehicles
                 ADD COLUMN IF NOT EXISTS product_description TEXT,
                 ADD COLUMN IF NOT EXISTS serial_number VARCHAR(260),
-                ADD COLUMN IF NOT EXISTS source_stock_order_id UUID REFERENCES stock_orders(id) ON DELETE SET NULL
+                ADD COLUMN IF NOT EXISTS source_stock_order_id UUID REFERENCES stock_orders(id) ON DELETE SET NULL,
+                ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id) ON DELETE SET NULL
         `);
 
         await client.query(`
@@ -1136,6 +1137,28 @@ exports.syncAccessCatalogDefaults = async () => {
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
+        `);
+
+        await client.query(`
+            DO $$
+            BEGIN
+                IF to_regclass('public.sale_installments') IS NOT NULL THEN
+                    ALTER TABLE sale_installments
+                        ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id) ON DELETE SET NULL;
+                END IF;
+                IF to_regclass('public.customer_orders') IS NOT NULL THEN
+                    ALTER TABLE customer_orders
+                        ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id) ON DELETE SET NULL;
+                END IF;
+                IF to_regclass('public.customer_order_installments') IS NOT NULL THEN
+                    ALTER TABLE customer_order_installments
+                        ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id) ON DELETE SET NULL;
+                END IF;
+                IF to_regclass('public.lease_applications') IS NOT NULL THEN
+                    ALTER TABLE lease_applications
+                        ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id) ON DELETE SET NULL;
+                END IF;
+            END $$;
         `);
 
         await client.query(`

@@ -27,7 +27,12 @@ const getSalesScopeContext = (user = {}) => {
 };
 
 const getSaleDealerExpression = () => 'COALESCE(st.dealer_id, c.dealer_id, u.dealer_id)';
-const getVehicleDealerExpression = () => 'COALESCE(so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id)';
+const getVehicleDealerExpression = () => 'COALESCE(v.dealer_id, so.dealer_id, ou.dealer_id, pc.dealer_id, cp.dealer_id)';
+const ensureSalesDealerColumns = async (client) => {
+    await client.query('ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS dealer_id UUID');
+    await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS dealer_id UUID');
+    await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS dealer_id UUID');
+};
 
 const buildScopedSalesWhereClause = ({ isEmployeeLogin, isDealerScopedView }) => {
     if (isEmployeeLogin) {
@@ -314,6 +319,7 @@ exports.createSale = async (req, res) => {
         }
 
         await client.query('BEGIN');
+        await ensureSalesDealerColumns(client);
 
         const customerRecord = await getCustomerDealerId(client, customer_id);
         if (!customerRecord) {
@@ -420,12 +426,13 @@ exports.createSale = async (req, res) => {
                 await client.query(
                     `
                     INSERT INTO sale_installments (
-                        sale_id, installment_number, due_date, amount, status
+                        sale_id, dealer_id, installment_number, due_date, amount, status
                     )
-                    VALUES ($1,$2,$3,$4,$5)
+                    VALUES ($1,$2,$3,$4,$5,$6)
                     `,
                     [
                         saleResult.rows[0].id,
+                        resolvedSaleDealerId,
                         index + 1,
                         addMonths(normalizedFirstDueDate, index),
                         monthly_installment || 0,
@@ -471,8 +478,8 @@ exports.createSale = async (req, res) => {
             );
 
             await client.query(
-                'UPDATE vehicles SET status = $1 WHERE id = $2',
-                [normalizedSaleMode === 'CASH' ? 'SOLD' : 'INSTALLMENT', vehicle_id]
+                'UPDATE vehicles SET status = $1 WHERE id = $2 AND dealer_id = $3',
+                [normalizedSaleMode === 'CASH' ? 'SOLD' : 'INSTALLMENT', vehicle_id, resolvedSaleDealerId]
             );
         }
 
@@ -525,6 +532,7 @@ exports.updateSale = async (req, res) => {
         } = req.body;
 
         await client.query('BEGIN');
+        await ensureSalesDealerColumns(client);
 
         const currentSaleResult = await client.query(
             `
@@ -688,12 +696,13 @@ exports.updateSale = async (req, res) => {
                 await client.query(
                     `
                     INSERT INTO sale_installments (
-                        sale_id, installment_number, due_date, amount, status
+                        sale_id, dealer_id, installment_number, due_date, amount, status
                     )
-                    VALUES ($1,$2,$3,$4,$5)
+                    VALUES ($1,$2,$3,$4,$5,$6)
                     `,
                     [
                         req.params.id,
+                        resolvedSaleDealerId,
                         index + 1,
                         addMonths(first_due_date, index),
                         monthly_installment || 0,
@@ -705,14 +714,14 @@ exports.updateSale = async (req, res) => {
 
         if (vehicle_id !== currentSale.vehicle_id) {
             await client.query(
-                'UPDATE vehicles SET status = $1 WHERE id = $2',
-                [pendingWorkflowApproval ? 'AVAILABLE' : 'AVAILABLE', currentSale.vehicle_id]
+                'UPDATE vehicles SET status = $1 WHERE id = $2 AND dealer_id = $3',
+                ['AVAILABLE', currentSale.vehicle_id, currentSale.dealer_id]
             );
         }
 
         await client.query(
-            'UPDATE vehicles SET status = $1 WHERE id = $2',
-            [pendingWorkflowApproval ? 'RESERVED' : sale_mode === 'CASH' ? 'SOLD' : 'INSTALLMENT', vehicle_id]
+            'UPDATE vehicles SET status = $1 WHERE id = $2 AND dealer_id = $3',
+            [pendingWorkflowApproval ? 'RESERVED' : sale_mode === 'CASH' ? 'SOLD' : 'INSTALLMENT', vehicle_id, resolvedSaleDealerId]
         );
 
         const updatedSaleResult = await client.query(
