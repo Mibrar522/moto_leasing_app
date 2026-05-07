@@ -853,7 +853,7 @@ exports.receiveInstallment = async (req, res) => {
                 req.params.id,
                 receivedAmount,
                 carryForwardAmount > 0 ? carryForwardAmount : extraAdvanceAmount > 0 ? -extraAdvanceAmount : 0,
-                carryForwardAmount > 0 ? 'PARTIAL' : 'RECEIVED',
+                carryForwardAmount > 0 ? 'PENDING' : 'RECEIVED',
             ]
         );
 
@@ -1022,7 +1022,19 @@ exports.receiveInstallment = async (req, res) => {
         res.status(200).json(installmentResult.rows[0]);
     } catch (error) {
         await client.query('ROLLBACK');
-        res.status(500).json({ message: 'Failed to receive installment', error: error.message });
+        console.error('Installment receive error:', {
+            message: error.message,
+            code: error.code,
+            constraint: error.constraint,
+            detail: error.detail,
+        });
+        res.status(500).json({
+            message: 'Failed to receive installment',
+            error: error.message,
+            code: error.code || null,
+            constraint: error.constraint || null,
+            detail: error.detail || null,
+        });
     } finally {
         client.release();
     }
