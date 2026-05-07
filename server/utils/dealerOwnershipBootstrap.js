@@ -132,7 +132,7 @@ const syncDealerOwnershipLight = async () => {
             WHERE COALESCE(order_user.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
         ) stock_scope
         WHERE stock_scope.id = so.id
-          AND (so.dealer_id IS NULL OR so.dealer_id <> stock_scope.dealer_id)
+          AND so.dealer_id IS NULL
     `);
 
     await run(`
@@ -229,7 +229,7 @@ const performDealerOwnershipSync = async () => {
             WHERE COALESCE(order_user.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
         ) stock_scope
         WHERE stock_scope.id = so.id
-          AND (so.dealer_id IS NULL OR so.dealer_id <> stock_scope.dealer_id)
+          AND so.dealer_id IS NULL
     `);
 
     await run(`

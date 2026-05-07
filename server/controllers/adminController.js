@@ -60,14 +60,21 @@ const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies, 
                     ADD COLUMN IF NOT EXISTS dealer_id UUID
             `);
             await pool.query(`
+                WITH stock_owner AS (
+                    SELECT
+                        so2.id,
+                        COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id) AS dealer_id
+                    FROM stock_orders so2
+                    LEFT JOIN users u ON u.id = so2.ordered_by
+                    LEFT JOIN product_catalog pc ON pc.id = so2.product_id
+                    LEFT JOIN company_profiles cp ON cp.id = so2.company_profile_id
+                    WHERE COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
+                )
                 UPDATE stock_orders so
-                SET dealer_id = COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id)
-                FROM users u
-                LEFT JOIN product_catalog pc ON pc.id = so.product_id
-                LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
-                WHERE u.id = so.ordered_by
+                SET dealer_id = stock_owner.dealer_id
+                FROM stock_owner
+                WHERE stock_owner.id = so.id
                   AND so.dealer_id IS NULL
-                  AND COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
             `);
         }
         return true;

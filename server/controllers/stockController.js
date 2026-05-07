@@ -72,14 +72,21 @@ const ensureStockScopedColumns = async () => {
             ADD COLUMN IF NOT EXISTS dealer_id UUID
     `);
     await pool.query(`
+        WITH stock_owner AS (
+            SELECT
+                so2.id,
+                COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id) AS dealer_id
+            FROM stock_orders so2
+            LEFT JOIN users u ON u.id = so2.ordered_by
+            LEFT JOIN product_catalog pc ON pc.id = so2.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so2.company_profile_id
+            WHERE COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
+        )
         UPDATE stock_orders so
-        SET dealer_id = COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id)
-        FROM users u
-        LEFT JOIN product_catalog pc ON pc.id = so.product_id
-        LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
-        WHERE u.id = so.ordered_by
+        SET dealer_id = stock_owner.dealer_id
+        FROM stock_owner
+        WHERE stock_owner.id = so.id
           AND so.dealer_id IS NULL
-          AND COALESCE(u.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
     `);
     await pool.query(`
         ALTER TABLE product_catalog
@@ -464,31 +471,21 @@ exports.listStockOrders = async (req, res) => {
 
         const result = await pool.query(
             `
-            SELECT
-                so.*,
-                cp.company_name AS profile_company_name,
-                cp.company_email AS profile_company_email,
-                pc.brand AS product_brand,
-                pc.model AS product_model,
-                pc.vehicle_type AS product_vehicle_type,
-                pc.color AS product_color,
-                pc.description AS product_description,
-                pc.serial_number AS product_serial_number,
-                pc.image_url AS product_image_url,
-                pc.monthly_rate AS product_monthly_rate,
-                pc.purchase_price AS product_purchase_price,
-                u.full_name AS ordered_by_name,
-                stock_scope.resolved_dealer_id,
-                stock_scope.ownership_source
-            FROM stock_orders so
-            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
-            LEFT JOIN product_catalog pc ON pc.id = so.product_id
-            LEFT JOIN users u ON u.id = so.ordered_by
-            LEFT JOIN employees ordered_employee ON ordered_employee.user_id = u.id
-            LEFT JOIN dealers ordered_admin_dealer ON ordered_admin_dealer.admin_user_id = u.id
-            LEFT JOIN dealers ordered_email_dealer ON LOWER(ordered_email_dealer.contact_email) = LOWER(u.email)
-            LEFT JOIN LATERAL (
+            WITH stock_rows AS (
                 SELECT
+                    so.*,
+                    cp.company_name AS profile_company_name,
+                    cp.company_email AS profile_company_email,
+                    pc.brand AS product_brand,
+                    pc.model AS product_model,
+                    pc.vehicle_type AS product_vehicle_type,
+                    pc.color AS product_color,
+                    pc.description AS product_description,
+                    pc.serial_number AS product_serial_number,
+                    pc.image_url AS product_image_url,
+                    pc.monthly_rate AS product_monthly_rate,
+                    pc.purchase_price AS product_purchase_price,
+                    u.full_name AS ordered_by_name,
                     COALESCE(
                         so.dealer_id,
                         pc.dealer_id,
@@ -508,13 +505,21 @@ exports.listStockOrders = async (req, res) => {
                         WHEN ordered_email_dealer.id IS NOT NULL THEN 'ordered_by_email_dealer'
                         ELSE 'unmapped'
                     END AS ownership_source
-            ) stock_scope ON true
-            LEFT JOIN dealers d ON d.id = stock_scope.resolved_dealer_id
+                FROM stock_orders so
+                LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
+                LEFT JOIN product_catalog pc ON pc.id = so.product_id
+                LEFT JOIN users u ON u.id = so.ordered_by
+                LEFT JOIN employees ordered_employee ON ordered_employee.user_id = u.id
+                LEFT JOIN dealers ordered_admin_dealer ON ordered_admin_dealer.admin_user_id = u.id
+                LEFT JOIN dealers ordered_email_dealer ON LOWER(ordered_email_dealer.contact_email) = LOWER(u.email)
+            )
+            SELECT *
+            FROM stock_rows
             ${globalScope ? '' : `WHERE (
-                stock_scope.resolved_dealer_id = $1::uuid
-                OR so.ordered_by = $2::uuid
+                resolved_dealer_id = $1::uuid
+                OR ordered_by = $2::uuid
             )`}
-            ORDER BY so.created_at DESC
+            ORDER BY created_at DESC
             `,
             globalScope ? [] : [dealerId, req.user.id]
         );
