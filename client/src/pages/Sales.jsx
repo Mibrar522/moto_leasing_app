@@ -9,6 +9,7 @@ export default function Sales({ ctx }) {
     canViewSalesAgreementSummary,
     canViewSalesInstallmentPreview,
     canViewSalesRegister,
+    canUpdateSalesRegister,
     currentSalesDealerSignatureUrl,
     dashboardData,
     editingSaleRecord,
@@ -380,9 +381,8 @@ if (!canCreateSales) {
                                                 const isViewing = transactionActionState.saleId === sale.id && transactionActionState.action === 'view';
                                                 const isPrinting = transactionActionState.saleId === sale.id && transactionActionState.action === 'print';
                                                 const isRoutingInstallment = transactionActionState.saleId === sale.id && transactionActionState.action === 'installments';
-                                                const canEditSaleRecord = canManageSales
+                                                const canUpdateSaleRecord = canUpdateSalesRegister
                                                     && canViewSalesAgreementForm
-                                                    && String(sale.status || '').toUpperCase() !== 'RECEIVED'
                                                     && !hasReceivedInstallment;
 
                                                 return (
@@ -446,16 +446,16 @@ if (!canCreateSales) {
                                                                     {isViewing ? <span className="btn-spinner" aria-hidden="true" /> : tableActionIcons.view}
                                                                     <span>{isViewing ? 'Loading' : 'View'}</span>
                                                                 </button>
-                                                                {canEditSaleRecord ? (
+                                                                {canUpdateSaleRecord ? (
                                                                     <button
                                                                         type="button"
                                                                         className="icon-action-btn"
                                                                         onClick={() => handleEditSale(sale)}
-                                                                        title="Edit sale"
-                                                                        aria-label="Edit sale"
+                                                                        title="Update sale"
+                                                                        aria-label="Update sale"
                                                                     >
                                                                         {tableActionIcons.edit}
-                                                                        <span>Edit</span>
+                                                                        <span>Update</span>
                                                                     </button>
                                                                 ) : null}
                                                             </div>

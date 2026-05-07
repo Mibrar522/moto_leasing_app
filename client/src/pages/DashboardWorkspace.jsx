@@ -331,7 +331,7 @@ const ACCESS_PAGE_GROUPS = [
         key: 'sales',
         label: 'Sales',
         description: 'Sale creation, sales register, and transaction register access.',
-        featureKeys: ['FEAT_SALES_CREATE', 'FEAT_SALES_MGMT', 'FEAT_SALES_AGREEMENT_FORM', 'FEAT_SALES_AGREEMENT_SUMMARY', 'FEAT_SALES_INSTALLMENT_PREVIEW', 'FEAT_SALES_REGISTER', 'FEAT_TRANSACTION_REGISTER'],
+        featureKeys: ['FEAT_SALES_CREATE', 'FEAT_SALES_MGMT', 'FEAT_SALES_AGREEMENT_FORM', 'FEAT_SALES_AGREEMENT_SUMMARY', 'FEAT_SALES_INSTALLMENT_PREVIEW', 'FEAT_SALES_REGISTER', 'FEAT_SALES_UPDATE', 'FEAT_TRANSACTION_REGISTER'],
     },
     {
         key: 'installments',
@@ -911,6 +911,7 @@ const FEATURE_ACCESS_LABELS = {
     FEAT_SALES_AGREEMENT_SUMMARY: 'Agreement Summary',
     FEAT_SALES_INSTALLMENT_PREVIEW: 'Installment Page',
     FEAT_SALES_REGISTER: 'Sales Transaction Register',
+    FEAT_SALES_UPDATE: 'Sales Register Update Button',
     FEAT_TRANSACTION_REGISTER: 'Transaction Register',
     FEAT_STOCK_ORDER_FORM: 'Order Stock',
     FEAT_STOCK_RECEIVED_VIEW: 'Stock Received From Company',
@@ -1972,6 +1973,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canViewSalesAgreementSummary = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_AGREEMENT_SUMMARY']);
     const canViewSalesInstallmentPreview = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_INSTALLMENT_PREVIEW']);
     const canViewSalesRegister = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_REGISTER']);
+    const canUpdateSalesRegister = hasAnyFeature(user, ['FEAT_SALES_UPDATE', 'FEAT_SALES_MGMT']);
     const canViewTransactionRegister = canManageSales && hasAnyFeature(user, ['FEAT_TRANSACTION_REGISTER']);
     const canViewStockOrderForm = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_ORDER_FORM']);
     const canViewStockReceived = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_RECEIVED_VIEW']);
@@ -5165,8 +5167,8 @@ const selectedCustomer = useMemo(
     };
 
     const handleEditSale = (sale) => {
-        if (!canManageSales || !canViewSalesAgreementForm) {
-            setSaleMessage('Your account does not have permission to edit sales transactions.');
+        if (!canUpdateSalesRegister || !canViewSalesAgreementForm) {
+            setSaleMessage('Your account does not have permission to update sales transactions.');
             return;
         }
 
@@ -5214,7 +5216,7 @@ const selectedCustomer = useMemo(
         });
         setSaleFormReadOnly(false);
         goToPage('sales');
-        setSaleMessage(`Editing sale for ${sale.customer_name}`);
+        setSaleMessage(`Updating sale for ${sale.customer_name}`);
     };
 
     const handleViewSale = (sale) => {
@@ -7975,6 +7977,7 @@ const selectedCustomer = useMemo(
         canViewSalesAgreementSummary,
         canViewSalesInstallmentPreview,
         canViewSalesRegister,
+        canUpdateSalesRegister,
         canViewTransactionRegister,
         canViewWorkflowConfig,
         canViewWorkflowTasks,
