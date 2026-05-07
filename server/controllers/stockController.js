@@ -135,6 +135,19 @@ const buildInventorySerialBase = (order, pieceNumber) => {
         sanitizeSerialSegment(order.engine_number || `${order.id}${pieceNumber}`),
     ].join('');
 };
+const normalizeInventoryVehicleType = (value) => {
+    const type = String(value || '').trim().toUpperCase();
+    if (type === 'MOTOR_CAR') {
+        return 'CAR';
+    }
+    if (type === 'MOTORCYCLE' || type === 'MOTOR_BIKE') {
+        return 'BIKE';
+    }
+    if (['BIKE', 'MOTOR', 'CAR', 'SUV', 'VAN', 'TRUCK', 'BUS'].includes(type)) {
+        return type;
+    }
+    return 'MOTOR';
+};
 
 const getDealerMailContext = async (userId, fallbackUser = {}) => {
     const result = await pool.query(
@@ -350,7 +363,7 @@ const createReceivedInventoryVehicle = async (client, order, item, pieceNumber) 
             order.brand,
             order.model,
             registrationNumber,
-            String(order.vehicle_type || '').toUpperCase(),
+            normalizeInventoryVehicleType(order.vehicle_type),
             chassisNumber,
             engineNumber,
             serialNumber,
