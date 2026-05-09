@@ -32,6 +32,9 @@ const ensureSalesDealerColumns = async (client) => {
     await client.query('ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS dealer_id UUID');
     await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS dealer_id UUID');
     await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS dealer_id UUID');
+    await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS received_amount NUMERIC(12, 2) NOT NULL DEFAULT 0');
+    await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS carry_forward_amount NUMERIC(12, 2) NOT NULL DEFAULT 0');
+    await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS paid_date DATE');
 };
 
 const buildScopedSalesWhereClause = ({ isEmployeeLogin, isDealerScopedView }) => {
@@ -126,6 +129,9 @@ const recordEmployeeCommission = async (client, { userId, saleId, installmentId 
     if (numericBaseAmount <= 0) {
         return;
     }
+
+    await client.query('ALTER TABLE employee_commissions ADD COLUMN IF NOT EXISTS notes TEXT');
+    await client.query('ALTER TABLE employee_commissions ADD COLUMN IF NOT EXISTS commission_amount NUMERIC(12, 2) NOT NULL DEFAULT 0');
 
     if (installmentId) {
         const exists = await client.query(
@@ -751,6 +757,7 @@ exports.receiveInstallment = async (req, res) => {
         const scope = getSalesScopeContext(req.user);
         const manualAmount = Number(req.body?.received_amount || 0);
         await client.query('BEGIN');
+        await ensureSalesDealerColumns(client);
 
         const currentInstallmentResult = await client.query(
             `
@@ -798,14 +805,14 @@ exports.receiveInstallment = async (req, res) => {
         const beforeReceiptInstallmentBalance = Number(remainingBalanceRow.financed_amount || 0) > 0
             ? Number(remainingBalanceRow.financed_amount || 0)
             : Math.max(Number(remainingBalanceRow.vehicle_price || 0) - Number(remainingBalanceRow.down_payment || 0), 0);
-        const totalRemainingAmount = Math.max(beforeReceiptInstallmentBalance - Number(remainingBalanceRow.total_received_amount || 0), 0);
+        const totalRemainingAmount = roundMoney(Math.max(beforeReceiptInstallmentBalance - Number(remainingBalanceRow.total_received_amount || 0), 0));
 
         if (manualAmount < 0) {
             await client.query('ROLLBACK');
             return res.status(400).json({ message: 'Received amount cannot be negative.' });
         }
 
-        const receivedAmount = manualAmount > 0 ? manualAmount : expectedAmount;
+        const receivedAmount = roundMoney(manualAmount > 0 ? manualAmount : Math.min(expectedAmount, totalRemainingAmount));
         if (receivedAmount <= 0) {
             await client.query('ROLLBACK');
             return res.status(400).json({ message: 'Received amount must be greater than zero.' });
@@ -823,6 +830,7 @@ exports.receiveInstallment = async (req, res) => {
             WHERE sale_id = $1
               AND installment_number > $2
               AND UPPER(COALESCE(status, '')) <> 'RECEIVED'
+              AND COALESCE(received_amount, 0) <= 0
             ORDER BY installment_number ASC
             FOR UPDATE
             `,
@@ -853,7 +861,7 @@ exports.receiveInstallment = async (req, res) => {
                 req.params.id,
                 receivedAmount,
                 carryForwardAmount > 0 ? carryForwardAmount : extraAdvanceAmount > 0 ? -extraAdvanceAmount : 0,
-                carryForwardAmount > 0 ? 'PENDING' : 'RECEIVED',
+                'RECEIVED',
             ]
         );
 
@@ -889,7 +897,7 @@ exports.receiveInstallment = async (req, res) => {
         const pendingRows = normalizeRows.filter((row) => {
             const hasReceivedCash = Number(row.received_amount || 0) > 0;
             const normalizedStatus = String(row.status || '').toUpperCase();
-            return !hasReceivedCash && normalizedStatus !== 'RECEIVED' && normalizedStatus !== 'PARTIAL';
+            return !hasReceivedCash && normalizedStatus !== 'RECEIVED';
         });
 
         if (pendingRows.length > 0 && remainingInstallmentBalance > 0) {

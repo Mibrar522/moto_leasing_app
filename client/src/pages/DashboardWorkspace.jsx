@@ -2862,66 +2862,10 @@ const selectedCustomer = useMemo(
 
         return lines.join('\n');
     };
-    const getNormalizedInstallmentRows = (sale) => {
-        const rows = [...(sale?.installments || [])].sort((a, b) => Number(a.installment_number) - Number(b.installment_number));
-        const financedAmount = Number(sale?.financed_amount || 0);
-        const totalPrice = Number(sale?.vehicle_price || 0);
-        const downPayment = Number(sale?.down_payment || 0);
-        const standardMonthlyAmount = Math.max(Number(sale?.monthly_installment || 0), 0);
-        const expectedInstallmentBalance = financedAmount > 0
-            ? financedAmount
-            : Math.max(totalPrice - downPayment, 0);
-        let remainingBalanceForReceived = expectedInstallmentBalance;
-        let remainingBalanceForSchedule = expectedInstallmentBalance;
-        let previousCarryForward = 0;
-        let nextPendingAdjusted = false;
-
-        return rows.reduce((accumulator, row) => {
-            const normalizedStatus = String(row.status || '').toUpperCase();
-            const receivedAmount = roundCurrencyValue(Number(row.received_amount || 0));
-            const hasReceivedCash = receivedAmount > 0;
-            const isSettledRow = hasReceivedCash || normalizedStatus === 'RECEIVED' || normalizedStatus === 'PARTIAL';
-            const fallbackAmount = Math.max(Number(row.amount || 0), 0);
-            const effectiveBaseAmount = standardMonthlyAmount > 0 ? standardMonthlyAmount : fallbackAmount;
-            const effectiveAmount = roundCurrencyValue(Math.max(Math.min(effectiveBaseAmount + previousCarryForward, remainingBalanceForSchedule), 0));
-
-            if (isSettledRow) {
-                const effectiveCarryForward = roundCurrencyValue(effectiveAmount - receivedAmount);
-                accumulator.push({
-                    ...row,
-                    amount: effectiveAmount,
-                    carry_forward_amount: effectiveCarryForward,
-                });
-                remainingBalanceForReceived = Math.max(roundCurrencyValue(remainingBalanceForReceived - receivedAmount), 0);
-                remainingBalanceForSchedule = Math.max(roundCurrencyValue(remainingBalanceForSchedule - effectiveAmount), 0);
-                previousCarryForward = effectiveCarryForward;
-                return accumulator;
-            }
-
-            if (remainingBalanceForReceived <= 0) {
-                return accumulator;
-            }
-
-            const nextAmount = nextPendingAdjusted
-                ? roundCurrencyValue(Math.max(Math.min(effectiveBaseAmount, remainingBalanceForReceived), 0))
-                : roundCurrencyValue(Math.max(Math.min(effectiveAmount, remainingBalanceForReceived), 0));
-
-            if (nextAmount > 0) {
-                accumulator.push({
-                    ...row,
-                    amount: nextAmount,
-                    carry_forward_amount: 0,
-                    status: 'PENDING',
-                    paid_date: null,
-                });
-                remainingBalanceForReceived = Math.max(roundCurrencyValue(remainingBalanceForReceived - nextAmount), 0);
-                nextPendingAdjusted = true;
-                previousCarryForward = 0;
-            }
-
-            return accumulator;
-        }, []);
-    };
+    const getNormalizedInstallmentRows = (sale) =>
+        [...(sale?.installments || [])]
+            .filter((row) => Number(row.amount || 0) > 0 || Number(row.received_amount || 0) > 0)
+            .sort((a, b) => Number(a.installment_number) - Number(b.installment_number));
     const getSaleInstallmentRows = (sale) => getNormalizedInstallmentRows(sale);
     const summarizeSaleInstallments = (sale) => {
         const rows = getSaleInstallmentRows(sale);
