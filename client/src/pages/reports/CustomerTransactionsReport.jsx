@@ -50,7 +50,7 @@ return (
                                         <tbody>
                                             {getVisibleRows('report-customer-transactions', reportCustomerTransactionRows).map((row) => (
                                                 <tr key={row.id}>
-                                                    <td>{String(row.purchase_date || row.agreement_date || row.created_at || '').slice(0, 10) || 'Not set'}</td>
+                                                    <td>{row.report_activity_date || String(row.purchase_date || row.agreement_date || row.created_at || '').slice(0, 10) || 'Not set'}</td>
                                                     <td>{row.customer_name}<br />{row.cnic_passport_number}</td>
                                                     <td>{row.brand} {row.model}<br />{row.registration_number || 'No registration'}</td>
                                                     <td>{row.sale_mode}</td>

@@ -3525,6 +3525,17 @@ const selectedCustomer = useMemo(
         return (dashboardData.salesTransactions || [])
             .map((sale) => {
                 const summary = summarizeSaleInstallments(sale);
+                const saleDateKey = String(sale.purchase_date || sale.agreement_date || sale.created_at || '').slice(0, 10);
+                const installmentPaymentDateKeys = (sale.installments || [])
+                    .filter((row) => Number(row.received_amount || 0) > 0 || String(row.status || '').toUpperCase() === 'RECEIVED')
+                    .map((row) => toLocalDateKey(row.paid_date || row.updated_at || row.due_date))
+                    .filter(Boolean)
+                    .sort((a, b) => b.localeCompare(a));
+                const matchingInstallmentPaymentDateKeys = installmentPaymentDateKeys.filter((dateKey) => {
+                    if (activeReportDateFrom && dateKey < activeReportDateFrom) return false;
+                    if (activeReportDateTo && dateKey > activeReportDateTo) return false;
+                    return true;
+                });
                 const searchable = normalizeTextValue([
                     sale.customer_name,
                     sale.cnic_passport_number,
@@ -3547,6 +3558,8 @@ const selectedCustomer = useMemo(
                     advance_covered_installments: summary.coveredByAdvanceCount,
                     total_installment_months: summary.totalPlannedMonths,
                     total_remaining_after: summary.totalRemainingAmount,
+                    report_activity_date: matchingInstallmentPaymentDateKeys[0] || saleDateKey,
+                    has_report_date_activity: isWithinReportRange(saleDateKey) || matchingInstallmentPaymentDateKeys.length > 0,
                     installment_collection_label: summary.totalRemainingAmount <= 0
                         ? `${summary.actualReceivedCount}/${summary.totalPlannedMonths} received\nPaid in full\n${summary.receivedDateLines}`
                         : `${summary.actualReceivedCount}/${summary.totalPlannedMonths} received\n${summary.pendingCount} pending\nRemaining ${formatCurrency(summary.totalRemainingAmount)}\n${summary.receivedDateLines}`,
@@ -3557,7 +3570,7 @@ const selectedCustomer = useMemo(
                 const status = String(sale.status || '').toUpperCase();
                 const saleMode = String(sale.sale_mode || '').toUpperCase();
 
-                if (!isWithinReportRange(sale.purchase_date || sale.agreement_date || sale.created_at)) return false;
+                if (!sale.has_report_date_activity) return false;
                 if (!matchesReportBranch(sale.branch_name)) return false;
                 if (!matchesReportAgent(sale.agent_name)) return false;
                 if (activeReportSaleMode !== 'ALL' && saleMode !== activeReportSaleMode) return false;
@@ -3565,7 +3578,7 @@ const selectedCustomer = useMemo(
                 if (normalizedReportKeyword && !sale.searchable.includes(normalizedReportKeyword)) return false;
                 return true;
             })
-            .sort((a, b) => new Date(b.purchase_date || b.created_at || 0) - new Date(a.purchase_date || a.created_at || 0));
+            .sort((a, b) => String(b.report_activity_date || '').localeCompare(String(a.report_activity_date || '')));
     }, [activeReportAgentName, activeReportBranchName, activeReportDateFrom, activeReportDateTo, activeReportSaleMode, activeReportStatus, dashboardData.salesTransactions, normalizedReportKeyword, resolvedBranchName]);
     const reportBusinessTransactionRows = useMemo(() => {
         return (dashboardData.salesTransactions || [])
@@ -6954,7 +6967,7 @@ const selectedCustomer = useMemo(
                         <tbody>
                             ${reportCustomerTransactionRows.map((row) => `
                                 <tr>
-                                    <td>${escapeHtml(String(row.purchase_date || row.agreement_date || row.created_at || '').slice(0, 10) || 'Not set')}</td>
+                                    <td>${escapeHtml(row.report_activity_date || String(row.purchase_date || row.agreement_date || row.created_at || '').slice(0, 10) || 'Not set')}</td>
                                     <td>${escapeHtml(row.customer_name || 'Not set')}</td>
                                     <td>${escapeHtml(`${row.brand || ''} ${row.model || ''}`.trim() || 'Not set')}</td>
                                     <td>${escapeHtml(row.sale_mode || 'Not set')}</td>
