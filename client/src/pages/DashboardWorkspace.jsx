@@ -2997,15 +2997,17 @@ const selectedCustomer = useMemo(
     }, [installmentSummary.totalRemainingAmount, selectedInstallmentRows]);
 
     const getInstallmentReceiptContext = (row) => {
-        const rowIndex = visibleSelectedInstallmentRows.findIndex((item) => item.id === row.id);
-        const remainingRows = rowIndex >= 0 ? visibleSelectedInstallmentRows.slice(rowIndex + 1) : [];
+        const scheduleRows = selectedInstallmentRows;
+        const rowIndex = scheduleRows.findIndex((item) => item.id === row.id);
+        const remainingRows = rowIndex >= 0 ? scheduleRows.slice(rowIndex + 1) : [];
         const pendingRows = remainingRows.filter((item) => {
             const status = String(item.status || '').toUpperCase();
             if (status === 'RECEIVED') return false;
             // Treat partial/any received cash as "collected" so remaining months count stays accurate for customers.
             return Number(item.received_amount || 0) <= 0;
         });
-        const nextPendingRow = pendingRows[0] || null;
+        const nextScheduledRow = remainingRows[0] || null;
+        const nextPendingRow = pendingRows[0] || nextScheduledRow || null;
         const rowStatus = String(row.status || 'PENDING').toUpperCase();
         // For receipts, the "installment month" should follow the due date, not the payment date.
         const installmentMonthLabel = new Date(row.due_date || new Date()).toLocaleDateString('en-PK', {
@@ -3024,11 +3026,11 @@ const selectedCustomer = useMemo(
             : Math.max(totalPrice - downPayment, 0);
 
         const receivedBefore = rowIndex > 0
-            ? visibleSelectedInstallmentRows.slice(0, rowIndex).reduce((sum, item) => sum + Number(item.received_amount || 0), 0)
+            ? scheduleRows.slice(0, rowIndex).reduce((sum, item) => sum + Number(item.received_amount || 0), 0)
             : 0;
         const receivedThrough = rowIndex >= 0
-            ? visibleSelectedInstallmentRows.slice(0, rowIndex + 1).reduce((sum, item) => sum + Number(item.received_amount || 0), 0)
-            : visibleSelectedInstallmentRows.reduce((sum, item) => sum + Number(item.received_amount || 0), 0);
+            ? scheduleRows.slice(0, rowIndex + 1).reduce((sum, item) => sum + Number(item.received_amount || 0), 0)
+            : scheduleRows.reduce((sum, item) => sum + Number(item.received_amount || 0), 0);
         const overallRemainingBefore = Math.max(expectedInstallmentBalance - receivedBefore, 0);
         const overallRemainingAfter = Math.max(expectedInstallmentBalance - receivedThrough, 0);
         const installmentPlanned = Math.max(Number(row.amount || 0), 0);
@@ -3039,9 +3041,11 @@ const selectedCustomer = useMemo(
             : 0;
         const totalRemainingAmount = Math.max(
             expectedInstallmentBalance -
-            visibleSelectedInstallmentRows.reduce((sum, item) => sum + Number(item.received_amount || 0), 0),
+            scheduleRows.reduce((sum, item) => sum + Number(item.received_amount || 0), 0),
             0
         );
+        const isFinalScheduleRow = remainingRows.length === 0;
+        const accountPaidAfterThisReceipt = overallRemainingAfter <= 0;
 
         return {
             pendingMonths: pendingRows.length,
@@ -3053,8 +3057,8 @@ const selectedCustomer = useMemo(
             installmentPaid,
             installmentRemaining,
             revisedMonthlyForRemaining,
-            nextMonthValue: Number(nextPendingRow?.amount || 0),
-            nextMonthDate: nextPendingRow?.due_date || '',
+            nextMonthValue: accountPaidAfterThisReceipt || isFinalScheduleRow ? 0 : Number(nextPendingRow?.amount || 0),
+            nextMonthDate: accountPaidAfterThisReceipt || isFinalScheduleRow ? '' : nextPendingRow?.due_date || '',
             installmentMonthLabel,
             paymentMonthLabel,
             currentStatus: rowStatus,
