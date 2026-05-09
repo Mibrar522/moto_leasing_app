@@ -102,7 +102,7 @@ if (!canManageInstallments) {
 
                         {canViewInstallmentOverview ? (
                         <div className="metrics-grid">
-                            <div className="metric-card"><label>Received Installments</label><div className="value success">{installmentSummary.receivedCount}</div></div>
+                            <div className="metric-card"><label>Received Months</label><div className="value success">{installmentSummary.receivedMonthLabel || `${installmentSummary.receivedCount} / ${selectedInstallmentSale.installment_months || 0}`}</div></div>
                             <div className="metric-card"><label>Pending Installments</label><div className="value warning">{installmentSummary.pendingCount}</div></div>
                             <div className="metric-card"><label>Received Cash</label><div className="value success">{formatCurrency(installmentSummary.receivedAmount)}</div></div>
                             <div className="metric-card">
