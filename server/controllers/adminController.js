@@ -463,6 +463,30 @@ exports.getDashboardData = async (req, res) => {
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
         ) : { rows: [{ total_sales: 0, active_installment_sales: 0, pending_sales: 0, total_sales_revenue: 0 }] };
 
+        const dashboardSalesCardMetricsResult = wantsGroup('metrics') ? await pool.query(
+            `
+            SELECT
+                COUNT(DISTINCT st.id) FILTER (
+                    WHERE UPPER(COALESCE(st.sale_mode, '')) = 'CASH'
+                )::int AS cash_transactions,
+                COUNT(DISTINCT st.id) FILTER (
+                    WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
+                )::int AS installment_transactions,
+                COUNT(si.id) FILTER (
+                    WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
+                      AND (
+                          UPPER(COALESCE(si.status, '')) = 'RECEIVED'
+                          OR COALESCE(si.received_amount, 0) > 0
+                      )
+                )::int AS received_installments
+            FROM sales_transactions st
+            LEFT JOIN users su ON su.id = st.agent_id
+            LEFT JOIN sale_installments si ON si.sale_id = st.id
+            ${isEmployeeLogin ? 'WHERE st.agent_id = $1' : isDealerScopedView ? 'WHERE COALESCE(st.dealer_id, su.dealer_id) = $1' : ''}
+            `,
+            isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
+        ) : { rows: [{ cash_transactions: 0, installment_transactions: 0, received_installments: 0 }] };
+
         const installmentTaskMetricsResult = wantsGroup('metrics') ? await pool.query(
             `
             SELECT
@@ -1330,6 +1354,9 @@ exports.getDashboardData = async (req, res) => {
             activeEmployees: employeeMetricsResult.rows[0].active_employees,
             totalDealers: dealerMetricsResult.rows[0].total_dealers,
             activeDealers: dealerMetricsResult.rows[0].active_dealers,
+            cashTransactions: Number(dashboardSalesCardMetricsResult.rows[0].cash_transactions || 0),
+            installmentTransactions: Number(dashboardSalesCardMetricsResult.rows[0].installment_transactions || 0),
+            receivedInstallments: Number(dashboardSalesCardMetricsResult.rows[0].received_installments || 0),
         };
 
         const employeeSales = {

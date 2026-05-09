@@ -4150,15 +4150,21 @@ const selectedCustomer = useMemo(
     }, [dashboardData.inventory, dashboardData.salesTransactions, dashboardData.stockOrders, normalizedReportKeyword, reportBranchName, reportDateFrom, reportDateTo, reportSaleMode, reportStatus, resolvedBranchName]);
     const overviewMetrics = useMemo(() => {
         const salesRows = dashboardData.salesTransactions || [];
-        const cashTransactions = salesRows.filter((sale) => String(sale.sale_mode || '').toUpperCase() === 'CASH').length;
-        const installmentTransactions = salesRows.filter((sale) => String(sale.sale_mode || '').toUpperCase() === 'INSTALLMENT').length;
-        const receivedInstallments = salesRows.reduce((sum, sale) => {
+        const computedCashTransactions = salesRows.filter((sale) => String(sale.sale_mode || '').toUpperCase() === 'CASH').length;
+        const computedInstallmentTransactions = salesRows.filter((sale) => String(sale.sale_mode || '').toUpperCase() === 'INSTALLMENT').length;
+        const computedReceivedInstallments = salesRows.reduce((sum, sale) => {
             if (String(sale.sale_mode || '').toUpperCase() !== 'INSTALLMENT') {
                 return sum;
             }
 
-            return sum + (sale.installments || []).filter((row) => String(row.status || '').toUpperCase() === 'RECEIVED').length;
+            return sum + (sale.installments || []).filter((row) => (
+                String(row.status || '').toUpperCase() === 'RECEIVED'
+                || Number(row.received_amount || 0) > 0
+            )).length;
         }, 0);
+        const cashTransactions = Number(dashboardData.metrics.cashTransactions ?? computedCashTransactions);
+        const installmentTransactions = Number(dashboardData.metrics.installmentTransactions ?? computedInstallmentTransactions);
+        const receivedInstallments = Number(dashboardData.metrics.receivedInstallments ?? computedReceivedInstallments);
 
         return {
             settledLeases: Number(dashboardData.metrics.activeLeases || 0),
