@@ -1499,6 +1499,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         'dashboard'
     );
     const [activePage, setActivePage] = useState(() => getCurrentRoutePage());
+    const routeActivePage = getCurrentRoutePage();
+    const visibleActivePage = routeActivePage || activePage || 'dashboard';
     const [searchTerm, setSearchTerm] = useState('');
     const [dashboardData, setDashboardData] = useState({
         user: null,
@@ -1632,14 +1634,21 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [adMessage, setAdMessage] = useState('');
     const [savingAd, setSavingAd] = useState(false);
     const workflowTasksTableRef = useRef(null);
+    const dashboardLoadRequestRef = useRef(0);
 
     const loadDashboard = async () => {
+        const requestId = dashboardLoadRequestRef.current + 1;
+        dashboardLoadRequestRef.current = requestId;
+
         try {
             setLoading(true);
-            const requestedDashboardPage = getCurrentRoutePage() || activePage || 'dashboard';
+            const requestedDashboardPage = routeActivePage || activePage || 'dashboard';
             const { data } = await API.get('/admin/dashboard', {
                 params: { page: requestedDashboardPage },
             });
+            if (requestId !== dashboardLoadRequestRef.current) {
+                return;
+            }
             setDashboardData(data);
             localStorage.setItem('user', JSON.stringify(data.user));
             setReadNotificationKeys(data.notificationReadKeys || []);
@@ -1693,6 +1702,9 @@ const Dashboard = ({ pageKey, PageComponent }) => {
             }));
             setError('');
         } catch (err) {
+            if (requestId !== dashboardLoadRequestRef.current) {
+                return;
+            }
             const message = err.response?.status === 401
                 ? 'Your session has expired. Please sign in again.'
                 : err.response?.status === 403
@@ -1707,7 +1719,9 @@ const Dashboard = ({ pageKey, PageComponent }) => {
                 navigate('/login');
             }
         } finally {
-            setLoading(false);
+            if (requestId === dashboardLoadRequestRef.current) {
+                setLoading(false);
+            }
         }
     };
 
@@ -2090,7 +2104,7 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
         canViewReportStockInventory,
         canViewReportStockReceived,
     ]);
-    const isReportPage = activePage === 'reports' || reportLinks.some((report) => report.key === activePage);
+    const isReportPage = visibleActivePage === 'reports' || reportLinks.some((report) => report.key === visibleActivePage);
     const tabReferences = useMemo(() => ([
         { key: 'dashboard', label: 'Dashboard', visible: canViewDashboard, featureRef: 'FEAT_DASHBOARD_VIEW' },
         { key: 'customers', label: 'Customers', visible: canOpenCustomers, featureRef: 'FEAT_CUSTOMER_MGMT / FEAT_OCR_SCAN / FEAT_BIOMETRIC / FEAT_CUSTOMER_BIOMETRIC' },
@@ -2171,17 +2185,16 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
             transactions: canViewTransactionRegister,
         };
 
-        if (pageAccess[activePage] !== false) {
+        if (pageAccess[visibleActivePage] !== false) {
             return;
         }
 
         const fallbackPage = tabReferences.find((tab) => tab.visible)?.key;
 
-        if (fallbackPage && fallbackPage !== activePage) {
+        if (fallbackPage && fallbackPage !== visibleActivePage) {
             goToPage(fallbackPage, { replace: true });
         }
     }, [
-        activePage,
         canCreateSales,
         canManageAccess,
         canManageDealers,
@@ -2203,14 +2216,13 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
         dashboardData.salesTransactions,
         loading,
         tabReferences,
+        visibleActivePage,
     ]);
     useEffect(() => {
-        const pageFromLocation = getCurrentRoutePage();
-
-        if (pageFromLocation !== activePage) {
-            setActivePage(pageFromLocation);
+        if (routeActivePage !== activePage) {
+            setActivePage(routeActivePage);
         }
-    }, [location.pathname, location.search, pageKey]);
+    }, [activePage, routeActivePage]);
 
     const filteredApplications = useMemo(() => {
         const query = searchTerm.trim().toLowerCase();
@@ -2350,13 +2362,13 @@ const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(u
         [workflowTaskGroups]
     );
     useEffect(() => {
-        if (activePage !== 'user-tasks' || !selectedWorkflowTaskId || !workflowTasksTableRef.current) {
+        if (visibleActivePage !== 'user-tasks' || !selectedWorkflowTaskId || !workflowTasksTableRef.current) {
             return;
         }
         window.requestAnimationFrame(() => {
             workflowTasksTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
-    }, [activePage, selectedWorkflowTaskId]);
+    }, [selectedWorkflowTaskId, visibleActivePage]);
 
     const selectedStockProduct = useMemo(
         () => (dashboardData.products || []).find((product) => product.id === stockOrderForm.product_id) || null,
@@ -6752,7 +6764,7 @@ const selectedCustomer = useMemo(
         let reportTitle = 'Report';
         let bodyHtml = '';
 
-        if (activePage === 'report-stock-inventory') {
+        if (visibleActivePage === 'report-stock-inventory') {
             reportTitle = `Stock Inventory Report - ${reportRangeLabel}`;
             bodyHtml = `
                 <div class="page">
@@ -6804,7 +6816,7 @@ const selectedCustomer = useMemo(
                     </table>
                 </div>
             `;
-        } else if (activePage === 'report-daily-sales') {
+        } else if (visibleActivePage === 'report-daily-sales') {
             reportTitle = `Daily Sale Report - ${reportRangeLabel}`;
             bodyHtml = `
                 <div class="page">
@@ -6855,7 +6867,7 @@ const selectedCustomer = useMemo(
                     </table>
                 </div>
             `;
-        } else if (activePage === 'report-stock-received') {
+        } else if (visibleActivePage === 'report-stock-received') {
             reportTitle = `Daily Stock Received Report - ${reportRangeLabel}`;
             bodyHtml = `
                 <div class="page">
@@ -6897,7 +6909,7 @@ const selectedCustomer = useMemo(
                     </table>
                 </div>
             `;
-        } else if (activePage === 'report-customers') {
+        } else if (visibleActivePage === 'report-customers') {
             reportTitle = 'Customer Report';
             bodyHtml = `
                 <div class="page">
@@ -6937,7 +6949,7 @@ const selectedCustomer = useMemo(
                     </table>
                 </div>
             `;
-        } else if (activePage === 'report-customer-transactions') {
+        } else if (visibleActivePage === 'report-customer-transactions') {
             reportTitle = `Customer Transaction Report - ${reportRangeLabel}`;
             bodyHtml = `
                 <div class="page">
@@ -6979,7 +6991,7 @@ const selectedCustomer = useMemo(
                     </table>
                 </div>
             `;
-        } else if (activePage === 'report-business-transactions') {
+        } else if (visibleActivePage === 'report-business-transactions') {
             reportTitle = `Business Transaction Report - ${reportRangeLabel}`;
             bodyHtml = `
                 <div class="page">
@@ -7029,7 +7041,7 @@ const selectedCustomer = useMemo(
                     </table>
                 </div>
             `;
-        } else if (activePage === 'report-invoice-view') {
+        } else if (visibleActivePage === 'report-invoice-view') {
             reportTitle = `Invoice View Report - ${reportRangeLabel}`;
             bodyHtml = `
                 <div class="page">
@@ -7073,7 +7085,7 @@ const selectedCustomer = useMemo(
                     </table>
                 </div>
             `;
-        } else if (activePage === 'report-employees') {
+        } else if (visibleActivePage === 'report-employees') {
             reportTitle = 'Employees Report';
             bodyHtml = `
                 <div class="page">
@@ -7121,7 +7133,7 @@ const selectedCustomer = useMemo(
                     </table>
                 </div>
             `;
-        } else if (activePage === 'report-salary') {
+        } else if (visibleActivePage === 'report-salary') {
             reportTitle = 'Salary Report';
             bodyHtml = `
                 <div class="page">
@@ -7167,7 +7179,7 @@ const selectedCustomer = useMemo(
                     </table>
                 </div>
             `;
-        } else if (activePage === 'report-dealer-information') {
+        } else if (visibleActivePage === 'report-dealer-information') {
             reportTitle = 'Dealer Information Report';
             bodyHtml = `
                 <div class="page">
@@ -7223,7 +7235,7 @@ const selectedCustomer = useMemo(
                     `).join('')}
                 </div>
             `;
-        } else if (activePage === 'report-dealer-employees') {
+        } else if (visibleActivePage === 'report-dealer-employees') {
             reportTitle = 'Dealer Wise Employee Report';
             bodyHtml = `
                 <div class="page">
@@ -8188,7 +8200,7 @@ const selectedCustomer = useMemo(
     };
 
     const renderContent = () => {
-        switch (activePage) {
+        switch (visibleActivePage) {
             case 'applications':
                 return <Applications
                     canViewApplications={canViewApplications}
@@ -8666,7 +8678,7 @@ const selectedCustomer = useMemo(
                                                 <button
                                                     key={report.key}
                                                     type="button"
-                                                    className={`nav-sub-btn ${activePage === report.key ? 'active' : ''}`}
+                                                    className={`nav-sub-btn ${visibleActivePage === report.key ? 'active' : ''}`}
                                                     onClick={() => goToPage(report.key)}
                                                 >
                                                     {report.label}
@@ -8681,7 +8693,7 @@ const selectedCustomer = useMemo(
                         return (
                             <button
                                 key={tab.key}
-                                className={`nav-btn ${activePage === tab.key ? 'active' : ''}`}
+                                className={`nav-btn ${visibleActivePage === tab.key ? 'active' : ''}`}
                                 onClick={() => goToPage(tab.key)}
                                 title={tab.featureRef}
                             >
@@ -9099,7 +9111,7 @@ const selectedCustomer = useMemo(
                     </div>
                 </div>
             ) : null}
-            {activePage === 'user-tasks' && selectedWorkflowTask ? (
+            {visibleActivePage === 'user-tasks' && selectedWorkflowTask ? (
                 <div className="receive-modal-backdrop" onClick={() => setSelectedWorkflowTaskId('')}>
                     <div className="receive-modal access-permission-modal workflow-task-modal" onClick={(event) => event.stopPropagation()}>
                         <div className="section-header">
@@ -9174,3 +9186,4 @@ const selectedCustomer = useMemo(
 };
 
 export default Dashboard;
+
