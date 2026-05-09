@@ -38,6 +38,33 @@ const safeDashboardQuery = async (runner, label, fallbackRows = []) => {
     }
 };
 
+const ensureNotificationReadsSchema = async () => {
+    await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS notification_reads (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            notification_key TEXT NOT NULL,
+            read_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    `);
+    await pool.query(`
+        DELETE FROM notification_reads first_row
+        USING notification_reads duplicate_row
+        WHERE first_row.ctid < duplicate_row.ctid
+          AND first_row.user_id = duplicate_row.user_id
+          AND first_row.notification_key = duplicate_row.notification_key
+    `);
+    await pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS notification_reads_unique_idx
+        ON notification_reads (user_id, notification_key)
+    `);
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS notification_reads_user_idx
+        ON notification_reads (user_id, read_at DESC)
+    `);
+};
+
 const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies, wantsStockOrders) => {
     try {
         if (wantsProducts || wantsStockOrders) {
@@ -1349,6 +1376,8 @@ exports.getDashboardData = async (req, res) => {
 
 exports.markNotificationsRead = async (req, res) => {
     try {
+        await ensureNotificationReadsSchema();
+
         const notificationKeys = [...new Set((req.body.notification_keys || [])
             .map((value) => String(value || '').trim())
             .filter(Boolean))];
