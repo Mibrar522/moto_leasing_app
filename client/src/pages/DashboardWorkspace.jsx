@@ -6561,9 +6561,8 @@ const selectedCustomer = useMemo(
                 <div class="stats">
                     <div class="stat"><span class="label">Received Cash</span><strong>${escapeHtml(formatCurrency(installmentSummary.receivedAmount))}</strong></div>
                     <div class="stat"><span class="label">Received Months</span><strong>${escapeHtml(installmentSummary.receivedMonthLabel || `${installmentSummary.receivedCount} / ${selectedInstallmentSale.installment_months || 0}`)}</strong></div>
-                    <div class="stat"><span class="label">Next Payment</span><strong>${escapeHtml(formatCurrency(installmentSummary.nextPaymentAmount))}</strong></div>
-                    <div class="stat"><span class="label">Next Due Date</span><strong>${escapeHtml(installmentSummary.nextPaymentDate || 'No pending installment')}</strong></div>
                     <div class="stat"><span class="label">Pending Installments</span><strong>${escapeHtml(String(installmentSummary.pendingCount))}</strong></div>
+                    <div class="stat"><span class="label">Total Remaining</span><strong>${escapeHtml(formatCurrency(installmentSummary.totalRemainingAmount))}</strong></div>
                 </div>
                 <div class="approval-strip">
                     <div class="approval-card">

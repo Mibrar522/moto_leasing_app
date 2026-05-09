@@ -106,11 +106,6 @@ if (!canManageInstallments) {
                             <div className="metric-card"><label>Pending Installments</label><div className="value warning">{installmentSummary.pendingCount}</div></div>
                             <div className="metric-card"><label>Received Cash</label><div className="value success">{formatCurrency(installmentSummary.receivedAmount)}</div></div>
                             <div className="metric-card">
-                                <label>Next Payment</label>
-                                <div className="value warning">{formatCurrency(installmentSummary.nextPaymentAmount)}</div>
-                                <div className="meta-inline">{installmentSummary.nextPaymentDate || 'No pending installment'}</div>
-                            </div>
-                            <div className="metric-card">
                                 <label>Total Remaining</label>
                                 <div className="value warning">{formatCurrency(installmentSummary.totalRemainingAmount)}</div>
                                 <div className="meta-inline">From total price balance</div>
