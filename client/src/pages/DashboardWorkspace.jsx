@@ -3546,6 +3546,10 @@ const selectedCustomer = useMemo(
                     actual_received_installments: summary.actualReceivedCount,
                     advance_covered_installments: summary.coveredByAdvanceCount,
                     total_installment_months: summary.totalPlannedMonths,
+                    total_remaining_after: summary.totalRemainingAmount,
+                    installment_collection_label: summary.totalRemainingAmount <= 0
+                        ? `${summary.actualReceivedCount}/${summary.totalPlannedMonths} received\nPaid in full\n${summary.receivedDateLines}`
+                        : `${summary.actualReceivedCount}/${summary.totalPlannedMonths} received\n${summary.pendingCount} pending\nRemaining ${formatCurrency(summary.totalRemainingAmount)}\n${summary.receivedDateLines}`,
                     searchable,
                 };
             })
@@ -6929,7 +6933,7 @@ const selectedCustomer = useMemo(
                         <div>
                             <p class="kicker">${escapeHtml(appBrandName)} Reports</p>
                             <h1>Customer Transaction Report</h1>
-                            <p class="subtitle">Cash and installment purchases with received installment dates.</p>
+                            <p class="subtitle">Cash and installment purchases with received months, pending status, and remaining balance.</p>
                         </div>
                         <div>
                             <span class="label">Printed On</span>
@@ -6944,7 +6948,7 @@ const selectedCustomer = useMemo(
                                 <th>Vehicle</th>
                                 <th>Mode</th>
                                 <th>Status</th>
-                                <th>Received Installment Dates</th>
+                                <th>Installment Collection</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -6955,7 +6959,7 @@ const selectedCustomer = useMemo(
                                     <td>${escapeHtml(`${row.brand || ''} ${row.model || ''}`.trim() || 'Not set')}</td>
                                     <td>${escapeHtml(row.sale_mode || 'Not set')}</td>
                                     <td>${escapeHtml(row.status || 'Not set')}</td>
-                                    <td>${escapeHtml(row.sale_mode === 'INSTALLMENT' ? row.received_installment_dates_label : 'Cash sale')}</td>
+                                    <td>${escapeHtml(String(row.sale_mode || '').toUpperCase() === 'INSTALLMENT' ? row.installment_collection_label : 'Cash sale')}</td>
                                 </tr>
                             `).join('')}
                         </tbody>

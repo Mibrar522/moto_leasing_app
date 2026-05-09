@@ -58,7 +58,7 @@ return (
                                                     <td><span className={getStatusClass(row.status)}>{row.status}</span></td>
                                                     <td className="preserve-breaks">
                                                         {String(row.sale_mode || '').toUpperCase() === 'INSTALLMENT'
-                                                            ? `${row.actual_received_installments}/${row.total_installment_months}\n${row.pending_installments} pending\n${row.received_installment_dates_label}`
+                                                            ? row.installment_collection_label
                                                             : 'Cash sale'}
                                                     </td>
                                                 </tr>
