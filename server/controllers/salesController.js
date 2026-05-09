@@ -793,11 +793,14 @@ exports.receiveInstallment = async (req, res) => {
                 st.financed_amount,
                 st.vehicle_price,
                 st.down_payment,
-                COALESCE(SUM(si.received_amount), 0) AS total_received_amount
+                COALESCE(received_totals.total_received_amount, 0) AS total_received_amount
             FROM sales_transactions st
-            LEFT JOIN sale_installments si ON si.sale_id = st.id
+            LEFT JOIN (
+                SELECT sale_id, SUM(received_amount) AS total_received_amount
+                FROM sale_installments
+                GROUP BY sale_id
+            ) received_totals ON received_totals.sale_id = st.id
             WHERE st.id = $1
-            GROUP BY st.id
             `,
             [saleId]
         );
