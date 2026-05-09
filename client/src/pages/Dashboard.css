@@ -1530,6 +1530,14 @@
     margin-bottom: 18px;
 }
 
+.report-filter-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 .section-caption,
 .meta-inline,
 .invoice-subtitle,

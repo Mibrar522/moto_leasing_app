@@ -1479,6 +1479,19 @@ const mapEmployeeFromApi = (employee) => ({
 const Dashboard = ({ pageKey, PageComponent }) => {
     const navigate = useNavigate();
     const location = useLocation();
+    const getTodayDateKey = () => new Date().toISOString().slice(0, 10);
+    const createDefaultReportFilters = () => {
+        const today = getTodayDateKey();
+        return {
+            dateFrom: today,
+            dateTo: today,
+            branchName: 'ALL',
+            agentName: 'ALL',
+            saleMode: 'ALL',
+            status: 'ALL',
+            keyword: '',
+        };
+    };
     const getCurrentRoutePage = () => (
         pageKey ||
         getDashboardPageFromSearch(location.search) ||
@@ -1562,13 +1575,14 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     });
     const [salaryGenerationEmployeeId, setSalaryGenerationEmployeeId] = useState('');
     const [reportsMenuOpen, setReportsMenuOpen] = useState(false);
-    const [reportDateFrom, setReportDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
-    const [reportDateTo, setReportDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+    const [reportDateFrom, setReportDateFrom] = useState(() => getTodayDateKey());
+    const [reportDateTo, setReportDateTo] = useState(() => getTodayDateKey());
     const [reportBranchName, setReportBranchName] = useState('ALL');
     const [reportAgentName, setReportAgentName] = useState('ALL');
     const [reportSaleMode, setReportSaleMode] = useState('ALL');
     const [reportStatus, setReportStatus] = useState('ALL');
     const [reportKeyword, setReportKeyword] = useState('');
+    const [appliedReportFilters, setAppliedReportFilters] = useState(() => createDefaultReportFilters());
     const [loading, setLoading] = useState(true);
     const [savingCustomer, setSavingCustomer] = useState(false);
     const [savingEmployee, setSavingEmployee] = useState(false);
@@ -1695,6 +1709,19 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleRefreshReport = async () => {
+        setAppliedReportFilters({
+            dateFrom: reportDateFrom,
+            dateTo: reportDateTo,
+            branchName: reportBranchName,
+            agentName: reportAgentName,
+            saleMode: reportSaleMode,
+            status: reportStatus,
+            keyword: reportKeyword,
+        });
+        await loadDashboard();
     };
 
     useEffect(() => {
@@ -3269,12 +3296,26 @@ const selectedCustomer = useMemo(
 
         return Object.values(rows).sort((a, b) => b.profit - a.profit);
     }, [dashboardData.salesTransactions, dashboardData.stockOrders]);
-    const normalizedReportKeyword = normalizeTextValue(reportKeyword);
+    const activeReportDateFrom = appliedReportFilters.dateFrom;
+    const activeReportDateTo = appliedReportFilters.dateTo;
+    const activeReportBranchName = appliedReportFilters.branchName;
+    const activeReportAgentName = appliedReportFilters.agentName;
+    const activeReportSaleMode = appliedReportFilters.saleMode;
+    const activeReportStatus = appliedReportFilters.status;
+    const normalizedReportKeyword = normalizeTextValue(appliedReportFilters.keyword);
+    const hasPendingReportFilters =
+        reportDateFrom !== appliedReportFilters.dateFrom
+        || reportDateTo !== appliedReportFilters.dateTo
+        || reportBranchName !== appliedReportFilters.branchName
+        || reportAgentName !== appliedReportFilters.agentName
+        || reportSaleMode !== appliedReportFilters.saleMode
+        || reportStatus !== appliedReportFilters.status
+        || reportKeyword !== appliedReportFilters.keyword;
     const isWithinReportRange = (value) => {
         const dateValue = String(value || '').slice(0, 10);
         if (!dateValue) return false;
-        if (reportDateFrom && dateValue < reportDateFrom) return false;
-        if (reportDateTo && dateValue > reportDateTo) return false;
+        if (activeReportDateFrom && dateValue < activeReportDateFrom) return false;
+        if (activeReportDateTo && dateValue > activeReportDateTo) return false;
         return true;
     };
     const resolvedBranchName = user?.dealer_name || dashboardData.dealers?.[0]?.dealer_name || 'Main Branch';
@@ -3300,9 +3341,13 @@ const selectedCustomer = useMemo(
     useEffect(() => {
         if (!canViewAllReportBranches && resolvedBranchName && reportBranchName !== resolvedBranchName) {
             setReportBranchName(resolvedBranchName);
+            setAppliedReportFilters((current) => ({
+                ...current,
+                branchName: resolvedBranchName,
+            }));
         }
     }, [canViewAllReportBranches, reportBranchName, resolvedBranchName]);
-    const matchesReportBranch = (value) => reportBranchName === 'ALL' || String(value || '').trim() === reportBranchName;
+    const matchesReportBranch = (value) => activeReportBranchName === 'ALL' || String(value || '').trim() === activeReportBranchName;
     const reportAgentOptions = useMemo(() => {
         const options = new Set();
 
@@ -3318,7 +3363,7 @@ const selectedCustomer = useMemo(
 
         return Array.from(options).sort((a, b) => a.localeCompare(b));
     }, [dashboardData.dealerStaff, dashboardData.employees]);
-    const matchesReportAgent = (value) => reportAgentName === 'ALL' || String(value || '').trim() === reportAgentName;
+    const matchesReportAgent = (value) => activeReportAgentName === 'ALL' || String(value || '').trim() === activeReportAgentName;
     const computeSaleReportAmounts = (sale) => {
         const saleMode = String(sale?.sale_mode || '').toUpperCase();
         const totalPrice = Number(sale?.vehicle_price || 0);
@@ -3385,11 +3430,11 @@ const selectedCustomer = useMemo(
                 if (!isWithinReportRange(sale.purchase_date || sale.agreement_date || sale.created_at)) return false;
                 if (!matchesReportBranch(getReportBranchValue(sale))) return false;
                 if (!matchesReportAgent(sale.agent_name)) return false;
-                if (reportSaleMode !== 'ALL' && saleMode !== reportSaleMode) return false;
-                if (reportStatus !== 'ALL') {
-                    if (reportStatus === 'PENDING') {
+                if (activeReportSaleMode !== 'ALL' && saleMode !== activeReportSaleMode) return false;
+                if (activeReportStatus !== 'ALL') {
+                    if (activeReportStatus === 'PENDING') {
                         if (!['PENDING', 'PARTIAL'].includes(status)) return false;
-                    } else if (status !== reportStatus) {
+                    } else if (status !== activeReportStatus) {
                         return false;
                     }
                 }
@@ -3397,7 +3442,7 @@ const selectedCustomer = useMemo(
                 return true;
             })
             .sort((a, b) => new Date(b.purchase_date || b.created_at || 0) - new Date(a.purchase_date || a.created_at || 0));
-    }, [dashboardData.salesTransactions, normalizedReportKeyword, reportAgentName, reportBranchName, reportDateFrom, reportDateTo, reportSaleMode, reportStatus, resolvedBranchName]);
+    }, [activeReportAgentName, activeReportBranchName, activeReportDateFrom, activeReportDateTo, activeReportSaleMode, activeReportStatus, dashboardData.salesTransactions, normalizedReportKeyword, resolvedBranchName]);
     const reportSalesTotals = useMemo(() => {
         return reportSalesRows.reduce((acc, sale) => {
             acc.deals += 1;
@@ -3431,12 +3476,12 @@ const selectedCustomer = useMemo(
                 if (!isWithinReportRange(order.received_at || order.updated_at || order.created_at)) return false;
                 if (!matchesReportBranch(getReportBranchValue(order))) return false;
                 if (!matchesReportAgent(order.ordered_by_name)) return false;
-                if (reportStatus !== 'ALL' && status !== reportStatus) return false;
+                if (activeReportStatus !== 'ALL' && status !== activeReportStatus) return false;
                 if (normalizedReportKeyword && !searchable.includes(normalizedReportKeyword)) return false;
                 return true;
             })
             .sort((a, b) => new Date(b.received_at || b.updated_at || b.created_at || 0) - new Date(a.received_at || a.updated_at || a.created_at || 0));
-    }, [dashboardData.stockOrders, normalizedReportKeyword, reportAgentName, reportBranchName, reportDateFrom, reportDateTo, reportStatus, resolvedBranchName]);
+    }, [activeReportAgentName, activeReportBranchName, activeReportDateFrom, activeReportDateTo, activeReportStatus, dashboardData.stockOrders, normalizedReportKeyword, resolvedBranchName]);
     const reportCustomerRows = useMemo(() => {
         const getCustomerStatus = (customer) => {
             if (customer.biometric_hash) return 'BIOMETRIC_ENROLLED';
@@ -3461,12 +3506,12 @@ const selectedCustomer = useMemo(
                 ].filter(Boolean).join(' '));
 
                 if (!matchesReportBranch(customer.branch_name)) return false;
-                if (reportStatus !== 'ALL' && customer.report_status !== reportStatus) return false;
+                if (activeReportStatus !== 'ALL' && customer.report_status !== activeReportStatus) return false;
                 if (normalizedReportKeyword && !searchable.includes(normalizedReportKeyword)) return false;
                 return true;
             })
             .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || '')));
-    }, [dashboardData.customers, normalizedReportKeyword, reportBranchName, reportStatus, resolvedBranchName]);
+    }, [activeReportBranchName, activeReportStatus, dashboardData.customers, normalizedReportKeyword, resolvedBranchName]);
     const reportCustomerTransactionRows = useMemo(() => {
         return (dashboardData.salesTransactions || [])
             .map((sale) => {
@@ -3502,13 +3547,13 @@ const selectedCustomer = useMemo(
                 if (!isWithinReportRange(sale.purchase_date || sale.agreement_date || sale.created_at)) return false;
                 if (!matchesReportBranch(sale.branch_name)) return false;
                 if (!matchesReportAgent(sale.agent_name)) return false;
-                if (reportSaleMode !== 'ALL' && saleMode !== reportSaleMode) return false;
-                if (reportStatus !== 'ALL' && status !== reportStatus) return false;
+                if (activeReportSaleMode !== 'ALL' && saleMode !== activeReportSaleMode) return false;
+                if (activeReportStatus !== 'ALL' && status !== activeReportStatus) return false;
                 if (normalizedReportKeyword && !sale.searchable.includes(normalizedReportKeyword)) return false;
                 return true;
             })
             .sort((a, b) => new Date(b.purchase_date || b.created_at || 0) - new Date(a.purchase_date || a.created_at || 0));
-    }, [dashboardData.salesTransactions, normalizedReportKeyword, reportAgentName, reportBranchName, reportDateFrom, reportDateTo, reportSaleMode, reportStatus, resolvedBranchName]);
+    }, [activeReportAgentName, activeReportBranchName, activeReportDateFrom, activeReportDateTo, activeReportSaleMode, activeReportStatus, dashboardData.salesTransactions, normalizedReportKeyword, resolvedBranchName]);
     const reportBusinessTransactionRows = useMemo(() => {
         return (dashboardData.salesTransactions || [])
             .map((sale) => {
@@ -3544,13 +3589,13 @@ const selectedCustomer = useMemo(
                 if (!isWithinReportRange(sale.purchase_date || sale.agreement_date || sale.created_at)) return false;
                 if (!matchesReportBranch(sale.branch_name)) return false;
                 if (!matchesReportAgent(sale.agent_name)) return false;
-                if (reportSaleMode !== 'ALL' && saleMode !== reportSaleMode) return false;
-                if (reportStatus !== 'ALL' && status !== reportStatus && sale.business_status !== reportStatus) return false;
+                if (activeReportSaleMode !== 'ALL' && saleMode !== activeReportSaleMode) return false;
+                if (activeReportStatus !== 'ALL' && status !== activeReportStatus && sale.business_status !== activeReportStatus) return false;
                 if (normalizedReportKeyword && !sale.searchable.includes(normalizedReportKeyword)) return false;
                 return true;
             })
             .sort((a, b) => new Date(b.purchase_date || b.created_at || 0) - new Date(a.purchase_date || a.created_at || 0));
-    }, [dashboardData.salesTransactions, normalizedReportKeyword, reportAgentName, reportBranchName, reportDateFrom, reportDateTo, reportSaleMode, reportStatus, resolvedBranchName]);
+    }, [activeReportAgentName, activeReportBranchName, activeReportDateFrom, activeReportDateTo, activeReportSaleMode, activeReportStatus, dashboardData.salesTransactions, normalizedReportKeyword, resolvedBranchName]);
     const reportBusinessTotals = useMemo(() => {
         return reportBusinessTransactionRows.reduce((acc, sale) => {
             acc.actual += Number(sale.actual_price || 0);
@@ -3590,13 +3635,13 @@ const selectedCustomer = useMemo(
                 if (!isWithinReportRange(sale.purchase_date || sale.agreement_date || sale.created_at)) return false;
                 if (!matchesReportBranch(sale.branch_name)) return false;
                 if (!matchesReportAgent(sale.agent_name)) return false;
-                if (reportSaleMode !== 'ALL' && saleMode !== reportSaleMode) return false;
-                if (reportStatus !== 'ALL' && status !== reportStatus) return false;
+                if (activeReportSaleMode !== 'ALL' && saleMode !== activeReportSaleMode) return false;
+                if (activeReportStatus !== 'ALL' && status !== activeReportStatus) return false;
                 if (normalizedReportKeyword && !sale.searchable.includes(normalizedReportKeyword)) return false;
                 return true;
             })
             .sort((a, b) => new Date(b.purchase_date || b.created_at || 0) - new Date(a.purchase_date || a.created_at || 0));
-    }, [dashboardData.salesTransactions, normalizedReportKeyword, reportAgentName, reportBranchName, reportDateFrom, reportDateTo, reportSaleMode, reportStatus, resolvedBranchName]);
+    }, [activeReportAgentName, activeReportBranchName, activeReportDateFrom, activeReportDateTo, activeReportSaleMode, activeReportStatus, dashboardData.salesTransactions, normalizedReportKeyword, resolvedBranchName]);
     const reportEmployeeRows = useMemo(() => {
         return (dashboardData.employees || [])
             .map((employee) => ({
@@ -3625,12 +3670,12 @@ const selectedCustomer = useMemo(
 
                 if (!matchesReportBranch(employee.branch_name)) return false;
                 if (!matchesReportAgent(employee.full_name)) return false;
-                if (reportStatus !== 'ALL' && employee.report_status !== reportStatus) return false;
+                if (activeReportStatus !== 'ALL' && employee.report_status !== activeReportStatus) return false;
                 if (normalizedReportKeyword && !searchable.includes(normalizedReportKeyword)) return false;
                 return true;
             })
             .sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || '')));
-    }, [dashboardData.employees, employeeCommissionTotalsMap, employeeLatestPayrollMap, employeeOutstandingAdvanceMap, normalizedReportKeyword, reportAgentName, reportBranchName, reportStatus, resolvedBranchName]);
+    }, [activeReportAgentName, activeReportBranchName, activeReportStatus, dashboardData.employees, employeeCommissionTotalsMap, employeeLatestPayrollMap, employeeOutstandingAdvanceMap, normalizedReportKeyword, resolvedBranchName]);
     const reportSalaryRows = useMemo(() => {
         const employeeMap = new Map((dashboardData.employees || []).map((employee) => [employee.id, employee]));
         return (dashboardData.employeePayrolls || [])
@@ -3657,12 +3702,12 @@ const selectedCustomer = useMemo(
                 if (!isWithinReportRange(row.created_at || `${row.payroll_month}-01`)) return false;
                 if (!matchesReportBranch(row.branch_name)) return false;
                 if (!matchesReportAgent(row.full_name)) return false;
-                if (reportStatus !== 'ALL' && row.report_status !== reportStatus) return false;
+                if (activeReportStatus !== 'ALL' && row.report_status !== activeReportStatus) return false;
                 if (normalizedReportKeyword && !searchable.includes(normalizedReportKeyword)) return false;
                 return true;
             })
             .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-    }, [dashboardData.employeePayrolls, dashboardData.employees, normalizedReportKeyword, reportAgentName, reportBranchName, reportDateFrom, reportDateTo, reportStatus, resolvedBranchName]);
+    }, [activeReportAgentName, activeReportBranchName, activeReportDateFrom, activeReportDateTo, activeReportStatus, dashboardData.employeePayrolls, dashboardData.employees, normalizedReportKeyword, resolvedBranchName]);
     const reportDealerInformationRows = useMemo(() => {
         const getDealerEmployeeMergeKey = (employee) => {
             const normalizedDealerId = String(employee?.dealer_id || '').trim().toUpperCase();
@@ -3802,12 +3847,12 @@ const selectedCustomer = useMemo(
         return dealerRows
             .filter((dealer) => {
                 if (!matchesReportBranch(dealer.branch_name)) return false;
-                if (reportStatus !== 'ALL' && dealer.report_status !== reportStatus) return false;
+                if (activeReportStatus !== 'ALL' && dealer.report_status !== activeReportStatus) return false;
                 if (normalizedReportKeyword && !dealer.searchable.includes(normalizedReportKeyword)) return false;
                 return true;
             })
             .sort((a, b) => String(a.dealer_name || '').localeCompare(String(b.dealer_name || '')));
-    }, [dashboardData.dealerStaff, dashboardData.dealers, dashboardData.employees, normalizedReportKeyword, reportBranchName, reportStatus, resolvedBranchName, user?.contact_email, user?.dealer_address, user?.dealer_id, user?.dealer_logo_url, user?.dealer_name, user?.mobile_country_code, user?.mobile_number, user?.currency_code]);
+    }, [activeReportBranchName, activeReportStatus, dashboardData.dealerStaff, dashboardData.dealers, dashboardData.employees, normalizedReportKeyword, resolvedBranchName, user?.contact_email, user?.dealer_address, user?.dealer_id, user?.dealer_logo_url, user?.dealer_name, user?.mobile_country_code, user?.mobile_number, user?.currency_code]);
     const reportDealerEmployeeRows = useMemo(() => {
         const currentRoleName = String(user?.role_name || '').toUpperCase();
         const currentUserId = String(user?.id || '');
@@ -3900,7 +3945,7 @@ const selectedCustomer = useMemo(
                 if (!canSeeDealerEmployeeRow(row)) return false;
                 if (!matchesReportBranch(row.dealer_name)) return false;
                 if (!matchesReportAgent(row.full_name)) return false;
-                if (reportStatus !== 'ALL' && row.status !== reportStatus && row.resigned_status !== reportStatus) return false;
+                if (activeReportStatus !== 'ALL' && row.status !== activeReportStatus && row.resigned_status !== activeReportStatus) return false;
                 if (normalizedReportKeyword && !row.searchable.includes(normalizedReportKeyword)) return false;
                 return true;
             })
@@ -3909,10 +3954,10 @@ const selectedCustomer = useMemo(
                 if (dealerCompare !== 0) return dealerCompare;
                 return String(a.full_name || '').localeCompare(String(b.full_name || ''));
             });
-    }, [dashboardData.dealerStaff, dashboardData.dealers, dashboardData.employees, normalizedReportKeyword, reportAgentName, reportBranchName, reportDateFrom, reportDateTo, reportStatus, user?.dealer_id, user?.dealer_name, user?.id, user?.role_name]);
+    }, [activeReportAgentName, activeReportBranchName, activeReportStatus, dashboardData.dealerStaff, dashboardData.dealers, dashboardData.employees, normalizedReportKeyword, user?.dealer_id, user?.dealer_name, user?.id, user?.role_name]);
     const reportStockInventoryRows = useMemo(() => {
-        const startDateKey = toLocalDateKey(reportDateFrom);
-        const endDateKey = toLocalDateKey(reportDateTo);
+        const startDateKey = toLocalDateKey(activeReportDateFrom);
+        const endDateKey = toLocalDateKey(activeReportDateTo);
         const previousDateKey = shiftDateKey(startDateKey, -1);
         const map = {};
         const saleByVehicleId = new Map(
@@ -4133,21 +4178,21 @@ const selectedCustomer = useMemo(
                 row.engine_number,
             ].join(' '));
             const stockStatusMatch =
-                reportStatus === 'ALL'
-                || (reportStatus === 'OPENING' && row.opening_quantity > 0)
-                || (reportStatus === 'INTRANSIT' && row.intransit_quantity > 0)
-                || (reportStatus === 'CASH_SALES' && row.cash_sales_quantity > 0)
-                || (reportStatus === 'INSTALLMENT_SALES' && row.installment_sales_quantity > 0)
-                || (reportStatus === 'CLOSING' && row.closing_quantity > 0);
+                activeReportStatus === 'ALL'
+                || (activeReportStatus === 'OPENING' && row.opening_quantity > 0)
+                || (activeReportStatus === 'INTRANSIT' && row.intransit_quantity > 0)
+                || (activeReportStatus === 'CASH_SALES' && row.cash_sales_quantity > 0)
+                || (activeReportStatus === 'INSTALLMENT_SALES' && row.installment_sales_quantity > 0)
+                || (activeReportStatus === 'CLOSING' && row.closing_quantity > 0);
             const modeMatch =
-                reportSaleMode === 'ALL'
-                || (reportSaleMode === 'CASH' && row.cash_sales_quantity > 0)
-                || (reportSaleMode === 'INSTALLMENT' && row.installment_sales_quantity > 0);
+                activeReportSaleMode === 'ALL'
+                || (activeReportSaleMode === 'CASH' && row.cash_sales_quantity > 0)
+                || (activeReportSaleMode === 'INSTALLMENT' && row.installment_sales_quantity > 0);
 
             row.closing_value = roundCurrencyValue(Number(stockCostMap[stockCostKey] || stockCostMap[stockCostFallbackKey] || 0) * Number(row.closing_quantity || 0));
             return stockStatusMatch && modeMatch && (!normalizedReportKeyword || searchable.includes(normalizedReportKeyword));
         }).sort((a, b) => `${a.brand} ${a.model} ${a.serial_number} ${a.registration_number}`.localeCompare(`${b.brand} ${b.model} ${b.serial_number} ${b.registration_number}`));
-    }, [dashboardData.inventory, dashboardData.salesTransactions, dashboardData.stockOrders, normalizedReportKeyword, reportBranchName, reportDateFrom, reportDateTo, reportSaleMode, reportStatus, resolvedBranchName]);
+    }, [activeReportBranchName, activeReportDateFrom, activeReportDateTo, activeReportSaleMode, activeReportStatus, dashboardData.inventory, dashboardData.salesTransactions, dashboardData.stockOrders, normalizedReportKeyword, resolvedBranchName]);
     const overviewMetrics = useMemo(() => {
         const salesRows = dashboardData.salesTransactions || [];
         const computedCashTransactions = salesRows.filter((sale) => String(sale.sale_mode || '').toUpperCase() === 'CASH').length;
@@ -6675,7 +6720,7 @@ const selectedCustomer = useMemo(
 
     const handlePrintReport = () => {
         const printedOn = new Date().toLocaleDateString('en-PK');
-        const reportRangeLabel = `${reportDateFrom || 'Start'} to ${reportDateTo || 'Today'}`;
+        const reportRangeLabel = `${activeReportDateFrom || 'Start'} to ${activeReportDateTo || 'Today'}`;
         let reportTitle = 'Report';
         let bodyHtml = '';
 
@@ -7374,7 +7419,13 @@ const selectedCustomer = useMemo(
             <div className="table-card">
                 <div className="section-header">
                     <h3>{title}</h3>
-                    <button type="button" className="primary-btn" onClick={handlePrintReport}>Print Report</button>
+                    <div className="report-filter-actions">
+                        {hasPendingReportFilters ? <span className="section-caption">Preview needs refresh</span> : null}
+                        <button type="button" className="secondary-btn" onClick={handleRefreshReport}>
+                            {hasPendingReportFilters ? 'Preview Report' : 'Refresh Preview'}
+                        </button>
+                        <button type="button" className="primary-btn" onClick={handlePrintReport}>Print Report</button>
+                    </div>
                 </div>
                 <div className="form-grid">
                     {showDateRange ? (
@@ -8022,8 +8073,8 @@ const selectedCustomer = useMemo(
         reportBusinessTransactionRows,
         reportCustomerRows,
         reportCustomerTransactionRows,
-        reportDateFrom,
-        reportDateTo,
+        reportDateFrom: activeReportDateFrom,
+        reportDateTo: activeReportDateTo,
         reportDealerEmployeeRows,
         reportDealerInformationRows,
         reportEmployeeRows,
