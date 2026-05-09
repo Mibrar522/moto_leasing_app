@@ -2896,7 +2896,6 @@ const selectedCustomer = useMemo(
     const getSaleInstallmentRows = (sale) => getNormalizedInstallmentRows(sale);
     const summarizeSaleInstallments = (sale) => {
         const rows = getSaleInstallmentRows(sale);
-        const received = rows.filter((row) => String(row.status || '').toUpperCase() === 'RECEIVED');
         const actuallyCollectedRows = rows.filter((row) => Number(row.received_amount || 0) > 0);
         // Pending months = months not yet collected. If a month is partially paid, we treat it as collected
         // for the "pending installment count" shown to customers.
@@ -2922,20 +2921,22 @@ const selectedCustomer = useMemo(
         const expectedInstallmentBalance = financedAmount > 0
             ? financedAmount
             : Math.max(totalPrice - downPayment, 0);
+        const totalRemainingAmount = Math.max(expectedInstallmentBalance - receivedAmount, 0);
+        const hasRemainingBalance = totalRemainingAmount > 0;
 
         return {
             rows,
-            receivedCount: received.length,
+            receivedCount: actuallyCollectedRows.length,
             actualReceivedCount: actuallyCollectedRows.length,
-            pendingCount,
+            pendingCount: hasRemainingBalance ? pendingCount : 0,
             coveredByAdvanceCount,
             receivedAmount,
             receivedDateLabels,
             receivedDateLines: formatInstallmentDateLines(receivedDateLabels),
             totalPlannedMonths,
-            nextPaymentAmount: Number(pendingRows[0]?.amount || 0),
-            nextPaymentDate: pendingRows[0]?.due_date || '',
-            totalRemainingAmount: Math.max(expectedInstallmentBalance - receivedAmount, 0),
+            nextPaymentAmount: hasRemainingBalance ? Number(pendingRows[0]?.amount || 0) : 0,
+            nextPaymentDate: hasRemainingBalance ? pendingRows[0]?.due_date || '' : '',
+            totalRemainingAmount,
         };
     };
     const getSalePrintContext = (sale) => {
@@ -2952,7 +2953,6 @@ const selectedCustomer = useMemo(
     };
     const installmentSummary = useMemo(() => {
         const rows = selectedInstallmentRows;
-        const received = rows.filter((row) => String(row.status || '').toUpperCase() === 'RECEIVED');
         const collectedRows = rows.filter((row) => Number(row.received_amount || 0) > 0);
         const pendingRows = rows.filter((row) => {
             const status = String(row.status || '').toUpperCase();
@@ -2969,15 +2969,17 @@ const selectedCustomer = useMemo(
             : Math.max(totalPrice - downPayment, 0);
         const totalPlannedMonths = Math.max(Number(selectedInstallmentSale?.installment_months || 0), rows.length || 0);
         const pendingCount = Math.max(totalPlannedMonths - collectedRows.length, 0);
+        const totalRemainingAmount = Math.max(expectedInstallmentBalance - receivedInstallmentAmount, 0);
+        const hasRemainingBalance = totalRemainingAmount > 0;
 
         return {
-            receivedCount: received.length,
-            pendingCount,
+            receivedCount: collectedRows.length,
+            pendingCount: hasRemainingBalance ? pendingCount : 0,
             receivedAmount: receivedInstallmentAmount,
-            pendingAmount: pendingRows.reduce((sum, row) => sum + Number(row.amount || 0), 0),
-            nextPaymentAmount: Number(nextPayment?.amount || 0),
-            nextPaymentDate: nextPayment?.due_date || '',
-            totalRemainingAmount: Math.max(expectedInstallmentBalance - receivedInstallmentAmount, 0),
+            pendingAmount: hasRemainingBalance ? pendingRows.reduce((sum, row) => sum + Number(row.amount || 0), 0) : 0,
+            nextPaymentAmount: hasRemainingBalance ? Number(nextPayment?.amount || 0) : 0,
+            nextPaymentDate: hasRemainingBalance ? nextPayment?.due_date || '' : '',
+            totalRemainingAmount,
         };
     }, [selectedInstallmentRows, selectedInstallmentSale]);
     const visibleSelectedInstallmentRows = useMemo(() => {
