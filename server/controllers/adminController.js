@@ -354,9 +354,8 @@ exports.getDashboardData = async (req, res) => {
         ]);
 
         const requestedPage = String(req.query.page || 'dashboard').trim().toLowerCase();
-        const reportPageRequested = requestedPage === 'reports' || requestedPage.startsWith('report-');
         const dashboardGroupsByPage = {
-            dashboard: ['metrics', 'applications', 'ads', 'notifications', 'dealers'],
+            dashboard: ['metrics', 'ads', 'notifications', 'dealers'],
             customers: ['customers', 'dealers'],
             employees: ['employees', 'dealers', 'roles', 'features', 'employeeFinancials'],
             dealers: ['dealers', 'roles'],
@@ -370,10 +369,21 @@ exports.getDashboardData = async (req, res) => {
             sales: ['salesTransactions', 'customers', 'inventory', 'dealers', 'workflowDefinitions'],
             transactions: ['salesTransactions'],
             installments: ['salesTransactions', 'customers', 'inventory'],
+            reports: [],
+            'report-stock-inventory': ['stockOrders', 'inventory', 'salesTransactions', 'dealers'],
+            'report-daily-sales': ['salesTransactions', 'dealers', 'employeeFinancials'],
+            'report-stock-received': ['stockOrders', 'dealers'],
+            'report-customers': ['customers', 'dealers'],
+            'report-customer-transactions': ['salesTransactions', 'dealers'],
+            'report-business-transactions': ['salesTransactions', 'dealers'],
+            'report-invoice-view': ['salesTransactions', 'dealers'],
+            'report-employees': ['employees', 'dealers', 'employeeFinancials'],
+            'report-salary': ['employees', 'dealers', 'employeeFinancials'],
+            'report-dealer-information': ['dealers', 'employees'],
+            'report-dealer-employees': ['dealers', 'employees'],
         };
         const requestedGroups = new Set([
             ...(dashboardGroupsByPage[requestedPage] || dashboardGroupsByPage.dashboard),
-            ...(reportPageRequested ? ['salesTransactions', 'stockOrders', 'customers', 'employees', 'products', 'inventory', 'dealers', 'employeeFinancials'] : []),
         ]);
         const wantsGroup = (groupKey) => requestedGroups.has(groupKey);
         const dealerScopeColumnsReady = await ensureDashboardDealerScopeColumns(
