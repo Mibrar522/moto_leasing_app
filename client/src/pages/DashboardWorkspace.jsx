@@ -1609,6 +1609,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [installmentReceiptInputs, setInstallmentReceiptInputs] = useState({});
     const [receivingStockOrder, setReceivingStockOrder] = useState(null);
     const [stockReceiveItems, setStockReceiveItems] = useState([createEmptyReceiveItem()]);
+    const [stockReceiveDate, setStockReceiveDate] = useState(() => new Date().toISOString().slice(0, 10));
     const [activeAccessPopup, setActiveAccessPopup] = useState(null);
     const [employeeAccessPopupOpen, setEmployeeAccessPopupOpen] = useState(false);
     const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -4300,12 +4301,13 @@ const selectedCustomer = useMemo(
                 .some((value) => value.toLowerCase().includes(query))
         );
     }, [searchTerm, stockOrders]);
+    const isStockOrderReceived = (order) => Number(order.received_quantity || 0) > 0 || String(order.order_status || '').toUpperCase() === 'RECEIVED';
     const receivedStockOrders = useMemo(
-        () => filteredStockOrders.filter((order) => Number(order.received_quantity || 0) > 0 || String(order.order_status || '').toUpperCase() === 'RECEIVED'),
+        () => filteredStockOrders.filter((order) => isStockOrderReceived(order)),
         [filteredStockOrders]
     );
     const pendingStockOrders = useMemo(
-        () => filteredStockOrders.filter((order) => String(order.order_status || '').toUpperCase() !== 'RECEIVED'),
+        () => filteredStockOrders.filter((order) => !isStockOrderReceived(order)),
         [filteredStockOrders]
     );
     const filteredDealers = useMemo(() => {
@@ -6451,11 +6453,13 @@ const selectedCustomer = useMemo(
         }
 
         setReceivingStockOrder(order);
+        setStockReceiveDate(String(order.received_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10));
         setStockReceiveItems([createEmptyReceiveItem(order.product_color || order.color || '')]);
     };
 
     const closeStockReceiveModal = () => {
         setReceivingStockOrder(null);
+        setStockReceiveDate(new Date().toISOString().slice(0, 10));
         setStockReceiveItems([createEmptyReceiveItem()]);
     };
 
@@ -6493,9 +6497,10 @@ const selectedCustomer = useMemo(
 
         try {
             setSavingStock(true);
+            const receivedDateTime = stockReceiveDate ? `${stockReceiveDate}T12:00:00.000Z` : new Date().toISOString();
             await API.patch(`/stock/orders/${receivingStockOrder.id}`, {
                 received_items: stockReceiveItems,
-                received_at: new Date().toISOString(),
+                received_at: receivedDateTime,
                 notes: receivingStockOrder.notes || '',
             });
             setStockMessage(`Stock order ${receivingStockOrder.id} updated with the received vehicle details.`);
@@ -8982,6 +8987,10 @@ const selectedCustomer = useMemo(
                                 <label className="field">
                                     <span>Default Color</span>
                                     <input value={receivingStockOrder.product_color || receivingStockOrder.color || ''} readOnly />
+                                </label>
+                                <label className="field">
+                                    <span>Received Date</span>
+                                    <input type="date" value={stockReceiveDate} onChange={(event) => setStockReceiveDate(event.target.value)} />
                                 </label>
                             </div>
 
