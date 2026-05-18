@@ -607,7 +607,7 @@ exports.getDashboardData = async (req, res) => {
                 v.image_url,
                 v.status,
                 v.monthly_rate,
-                v.purchase_price,
+                COALESCE(so.unit_price, v.purchase_price) AS purchase_price,
                 v.created_at,
                 pc.cash_markup_percent,
                 pc.cash_markup_value,

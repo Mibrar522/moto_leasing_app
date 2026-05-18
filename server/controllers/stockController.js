@@ -950,6 +950,31 @@ exports.updateStockOrder = async (req, res) => {
             ]
         );
 
+        const updatedOrder = result.rows[0];
+        await client.query(
+            `
+            UPDATE vehicles
+            SET
+                brand = $2,
+                model = $3,
+                vehicle_type = $4,
+                color = COALESCE(color, $5),
+                product_description = $6,
+                purchase_price = $7,
+                monthly_rate = 0
+            WHERE source_stock_order_id = $1
+            `,
+            [
+                currentOrder.id,
+                updatedOrder.brand,
+                updatedOrder.model,
+                normalizeInventoryVehicleType(updatedOrder.vehicle_type),
+                updatedOrder.color || null,
+                updatedOrder.product_description || null,
+                Number(updatedOrder.unit_price || 0),
+            ]
+        );
+
         if (additionalReceivedCount > 0) {
             const registrationPrefix = `STK-${normalizeStockOrderId(currentOrder.id)}-`;
             await client.query(
