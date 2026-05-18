@@ -74,24 +74,17 @@ export default function Products({
             <label className="field full-span"><span>Product Description</span><textarea name="description" value={productForm.description || ''} onChange={handleProductChange} rows="3" placeholder="Short product details, features, or notes" /></label>
             <label className="field full-span"><span>Product Image</span><input type="file" accept="image/*" onChange={handleProductImageUpload} /></label>
             <label className="field full-span"><span>Uploaded Image URL</span><input name="image_url" value={productForm.image_url} onChange={handleProductChange} readOnly /></label>
-            <label className="field"><span>Monthly Rate</span><input name="monthly_rate" value={productForm.monthly_rate} onChange={handleProductChange} type="number" min="0" step="0.01" /></label>
             <label className="field"><span>Actual Price</span><input name="purchase_price" value={productForm.purchase_price} onChange={handleProductChange} type="number" min="0" step="0.01" /></label>
             <div className="field full-span">
-              <span>Installment</span>
-              <div className="field-note">Commission percent added on actual price.</div>
-            </div>
-            <label className="field"><span>Commission %</span><input name="installment_markup_percent" value={productForm.installment_markup_percent} onChange={handleProductChange} type="number" min="0" step="0.01" /></label>
-            <label className="field"><span>Months</span><input name="installment_months" value={productForm.installment_months} onChange={handleProductChange} type="number" min="1" step="1" /></label>
-            <div className="field full-span">
-              <span>Cash</span>
-              <div className="field-note">Margin can be % or fixed value. If value is set, it overrides %.</div>
+              <span>Cash Margin</span>
+              <div className="field-note">Enter margin % or margin value. The other field calculates automatically from actual price.</div>
             </div>
             <label className="field"><span>Margin %</span><input name="cash_markup_percent" value={productForm.cash_markup_percent} onChange={handleProductChange} type="number" min="0" step="0.01" /></label>
             <label className="field"><span>Margin Value</span><input name="cash_markup_value" value={productForm.cash_markup_value} onChange={handleProductChange} type="number" min="0" step="0.01" /></label>
             <div className="field full-span">
-              <span>Computed Totals</span>
+              <span>Computed Total</span>
               <div className="field-note">
-                Cash total: {formatCurrency(Number(productForm.purchase_price || 0) + (Number(productForm.cash_markup_value || 0) > 0 ? Number(productForm.cash_markup_value || 0) : (Number(productForm.purchase_price || 0) * (Number(productForm.cash_markup_percent || 0) / 100))))} | Installment total: {formatCurrency(Number(productForm.purchase_price || 0) * (1 + Number(productForm.installment_markup_percent || 0) / 100))}
+                Cash total: {formatCurrency(Number(productForm.purchase_price || 0) + Number(productForm.cash_markup_value || 0))}
               </div>
             </div>
           </div>
@@ -159,8 +152,7 @@ export default function Products({
                   <td>{vehicle.description || 'No description'}</td>
                   <td>
                     Actual: {formatCurrency(vehicle.purchase_price)}<br />
-                    Cash: {formatCurrency(Number(vehicle.purchase_price || 0) + (Number(vehicle.cash_markup_value || 0) > 0 ? Number(vehicle.cash_markup_value || 0) : (Number(vehicle.purchase_price || 0) * (Number(vehicle.cash_markup_percent || 0) / 100))))}<br />
-                    Installment: {formatCurrency(Number(vehicle.purchase_price || 0) * (1 + Number(vehicle.installment_markup_percent || 0) / 100))} ({Number(vehicle.installment_months || 0) || 12} mo)
+                    Cash: {formatCurrency(Number(vehicle.purchase_price || 0) + (Number(vehicle.cash_markup_value || 0) > 0 ? Number(vehicle.cash_markup_value || 0) : (Number(vehicle.purchase_price || 0) * (Number(vehicle.cash_markup_percent || 0) / 100))))}
                   </td>
                   <td><button type="button" className="view-btn" onClick={() => handleEditProduct(vehicle)}>Edit</button></td>
                 </tr>

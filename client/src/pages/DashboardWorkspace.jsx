@@ -122,8 +122,8 @@ const emptyProductForm = {
     purchase_price: '',
     cash_markup_percent: '',
     cash_markup_value: '',
-    installment_markup_percent: '35',
-    installment_months: '12',
+    installment_markup_percent: '',
+    installment_months: '',
     status: 'AVAILABLE',
 };
 
@@ -158,6 +158,8 @@ const emptySaleForm = {
     financed_amount: '',
     monthly_installment: '',
     installment_months: '',
+    installment_margin_percent: '',
+    installment_margin_value: '',
     first_due_date: '',
     witness_name: '',
     witness_cnic: '',
@@ -4353,30 +4355,35 @@ const selectedCustomer = useMemo(
         const actualPrice = Number(selectedSaleVehicle.purchase_price || 0);
         const cashMarginValue = Number(selectedSaleVehicle.cash_markup_value || 0);
         const cashMarginPercent = Number(selectedSaleVehicle.cash_markup_percent || 0);
-        const installmentPercent = Number(selectedSaleVehicle.installment_markup_percent || 0);
-        const installmentMonthsDefault = Number(selectedSaleVehicle.installment_months || 0) || 12;
 
         const cashSellPrice = actualPrice > 0
             ? cashMarginValue > 0
                 ? actualPrice + cashMarginValue
                 : actualPrice * (1 + cashMarginPercent / 100)
             : 0;
-        const installmentSellPrice = actualPrice > 0 ? actualPrice * (1 + installmentPercent / 100) : 0;
 
         setSaleForm((current) => ({
             ...current,
             vehicle_price:
                 current.sale_mode === 'INSTALLMENT'
-                    ? current.vehicle_price || (installmentSellPrice > 0 ? String(installmentSellPrice) : '')
+                    ? current.vehicle_price || String(actualPrice || '')
                     : current.vehicle_price || (cashSellPrice > 0 ? String(cashSellPrice) : String(selectedSaleVehicle.purchase_price || '')),
             monthly_installment:
                 current.sale_mode === 'INSTALLMENT'
                     ? current.monthly_installment
-                    : current.monthly_installment || String(selectedSaleVehicle.monthly_rate || ''),
+                    : current.monthly_installment,
             installment_months:
                 current.sale_mode === 'INSTALLMENT'
-                    ? current.installment_months || String(installmentMonthsDefault)
+                    ? current.installment_months || '12'
                     : current.installment_months,
+            installment_margin_percent:
+                current.sale_mode === 'INSTALLMENT'
+                    ? current.installment_margin_percent || ''
+                    : current.installment_margin_percent,
+            installment_margin_value:
+                current.sale_mode === 'INSTALLMENT'
+                    ? current.installment_margin_value || ''
+                    : current.installment_margin_value,
             financed_amount:
                 current.sale_mode === 'INSTALLMENT'
                     ? current.financed_amount || String(Math.max(Number(current.vehicle_price || selectedSaleVehicle.purchase_price || 0) - Number(current.down_payment || 0), 0))
@@ -4772,10 +4779,32 @@ const selectedCustomer = useMemo(
 
     const handleProductChange = (event) => {
         const { name, value } = event.target;
-        setProductForm((current) => ({
-            ...current,
-            [name]: value,
-        }));
+        setProductForm((current) => {
+            const nextState = { ...current, [name]: value };
+            const actualPrice = Number(nextState.purchase_price || 0);
+
+            if (actualPrice > 0 && name === 'cash_markup_percent') {
+                const marginValue = roundCurrencyValue(actualPrice * (Number(value || 0) / 100));
+                nextState.cash_markup_value = marginValue ? String(marginValue) : '';
+            }
+
+            if (actualPrice > 0 && name === 'cash_markup_value') {
+                const marginPercent = roundCurrencyValue((Number(value || 0) / actualPrice) * 100);
+                nextState.cash_markup_percent = marginPercent ? String(marginPercent) : '';
+            }
+
+            if (actualPrice > 0 && name === 'purchase_price') {
+                if (Number(nextState.cash_markup_percent || 0) > 0) {
+                    const marginValue = roundCurrencyValue(actualPrice * (Number(nextState.cash_markup_percent || 0) / 100));
+                    nextState.cash_markup_value = marginValue ? String(marginValue) : '';
+                } else if (Number(nextState.cash_markup_value || 0) > 0) {
+                    const marginPercent = roundCurrencyValue((Number(nextState.cash_markup_value || 0) / actualPrice) * 100);
+                    nextState.cash_markup_percent = marginPercent ? String(marginPercent) : '';
+                }
+            }
+
+            return nextState;
+        });
     };
 
     const handleCompanyChange = (event) => {
@@ -4827,19 +4856,15 @@ const selectedCustomer = useMemo(
             }
 
             if (name === 'sale_mode') {
-                const nextMonths = current.installment_months || '12';
                 const actualPrice = Number(selectedSaleVehicle?.purchase_price || 0);
                 const cashMarginValue = Number(selectedSaleVehicle?.cash_markup_value || 0);
                 const cashMarginPercent = Number(selectedSaleVehicle?.cash_markup_percent || 0);
-                const installmentPercent = Number(selectedSaleVehicle?.installment_markup_percent || 0);
-                const installmentMonthsDefault = Number(selectedSaleVehicle?.installment_months || 0) || 12;
 
                 const cashSellPrice = actualPrice > 0
                     ? cashMarginValue > 0
                         ? actualPrice + cashMarginValue
                         : actualPrice * (1 + cashMarginPercent / 100)
                     : 0;
-                const installmentSellPrice = actualPrice > 0 ? actualPrice * (1 + installmentPercent / 100) : 0;
 
                 return {
                     ...current,
@@ -4847,11 +4872,48 @@ const selectedCustomer = useMemo(
                     down_payment: value === 'CASH' ? '' : current.down_payment,
                     financed_amount: value === 'CASH' ? '' : current.financed_amount,
                     monthly_installment: value === 'CASH' ? '' : current.monthly_installment,
-                    installment_months: value === 'CASH' ? '' : (current.installment_months || String(installmentMonthsDefault) || nextMonths),
+                    installment_months: value === 'CASH' ? '' : (current.installment_months || '12'),
+                    installment_margin_percent: value === 'CASH' ? '' : (current.installment_margin_percent || ''),
+                    installment_margin_value: value === 'CASH' ? '' : (current.installment_margin_value || ''),
                     first_due_date: value === 'CASH' ? '' : current.first_due_date,
                     vehicle_price: value === 'CASH'
                         ? (cashSellPrice > 0 ? String(cashSellPrice) : current.vehicle_price)
-                        : (installmentSellPrice > 0 ? String(installmentSellPrice) : current.vehicle_price),
+                        : (current.vehicle_price || String(actualPrice || '')),
+                };
+            }
+
+            if (name === 'installment_margin_percent' || name === 'installment_margin_value') {
+                const actualPrice = Number(selectedSaleVehicle?.purchase_price || 0);
+                const nextState = { ...current, [name]: value };
+
+                if (actualPrice > 0 && name === 'installment_margin_percent') {
+                    const marginValue = roundCurrencyValue(actualPrice * (Number(value || 0) / 100));
+                    const totalPrice = roundCurrencyValue(actualPrice + marginValue);
+                    nextState.installment_margin_value = marginValue ? String(marginValue) : '';
+                    nextState.vehicle_price = totalPrice ? String(totalPrice) : '';
+                }
+
+                if (actualPrice > 0 && name === 'installment_margin_value') {
+                    const marginPercent = roundCurrencyValue((Number(value || 0) / actualPrice) * 100);
+                    const totalPrice = roundCurrencyValue(actualPrice + Number(value || 0));
+                    nextState.installment_margin_percent = marginPercent ? String(marginPercent) : '';
+                    nextState.vehicle_price = totalPrice ? String(totalPrice) : '';
+                }
+
+                return nextState;
+            }
+
+            if (name === 'vehicle_price' && current.sale_mode === 'INSTALLMENT') {
+                const actualPrice = Number(selectedSaleVehicle?.purchase_price || 0);
+                const totalPrice = Number(value || 0);
+                const marginValue = Math.max(roundCurrencyValue(totalPrice - actualPrice), 0);
+                const marginPercent = actualPrice > 0 ? roundCurrencyValue((marginValue / actualPrice) * 100) : 0;
+
+                return {
+                    ...current,
+                    vehicle_price: value,
+                    installment_margin_value: marginValue ? String(marginValue) : '',
+                    installment_margin_percent: marginPercent ? String(marginPercent) : '',
                 };
             }
 
@@ -5214,12 +5276,12 @@ const selectedCustomer = useMemo(
             color: product.color || '',
             description: product.description || '',
             image_url: product.image_url || '',
-            monthly_rate: String(product.monthly_rate || ''),
+            monthly_rate: '',
             purchase_price: String(product.purchase_price || ''),
             cash_markup_percent: String(product.cash_markup_percent ?? ''),
             cash_markup_value: String(product.cash_markup_value ?? ''),
-            installment_markup_percent: String(product.installment_markup_percent ?? ''),
-            installment_months: String(product.installment_months ?? '12'),
+            installment_markup_percent: '',
+            installment_months: '',
             status: product.status || 'AVAILABLE',
         });
         setProductMessage(`Editing ${[product.brand, product.model].filter(Boolean).join(' ')}`);
@@ -5233,6 +5295,10 @@ const selectedCustomer = useMemo(
         }
 
         const resolvedVehicleId = resolveVehicleIdFromSale(sale, dashboardData.inventory);
+        const saleActualPrice = Number(sale.purchase_price || sale.actual_price || 0);
+        const saleTotalPrice = Number(sale.vehicle_price || 0);
+        const saleMarginValue = Math.max(roundCurrencyValue(saleTotalPrice - saleActualPrice), 0);
+        const saleMarginPercent = saleActualPrice > 0 ? roundCurrencyValue((saleMarginValue / saleActualPrice) * 100) : 0;
 
         setSaleForm({
             id: sale.id,
@@ -5254,6 +5320,8 @@ const selectedCustomer = useMemo(
             financed_amount: String(sale.financed_amount || ''),
             monthly_installment: String(sale.monthly_installment || ''),
             installment_months: String(sale.installment_months || ''),
+            installment_margin_percent: sale.sale_mode === 'INSTALLMENT' && saleMarginPercent ? String(saleMarginPercent) : '',
+            installment_margin_value: sale.sale_mode === 'INSTALLMENT' && saleMarginValue ? String(saleMarginValue) : '',
             first_due_date: sale.first_due_date ? String(sale.first_due_date).slice(0, 10) : '',
             witness_name: sale.witness_name || '',
             witness_cnic: sale.witness_cnic || '',
@@ -5286,6 +5354,10 @@ const selectedCustomer = useMemo(
         }
 
         const resolvedVehicleId = resolveVehicleIdFromSale(sale, dashboardData.inventory);
+        const saleActualPrice = Number(sale.purchase_price || sale.actual_price || 0);
+        const saleTotalPrice = Number(sale.vehicle_price || 0);
+        const saleMarginValue = Math.max(roundCurrencyValue(saleTotalPrice - saleActualPrice), 0);
+        const saleMarginPercent = saleActualPrice > 0 ? roundCurrencyValue((saleMarginValue / saleActualPrice) * 100) : 0;
 
         setSaleForm({
             id: sale.id,
@@ -5307,6 +5379,8 @@ const selectedCustomer = useMemo(
             financed_amount: String(sale.financed_amount || ''),
             monthly_installment: String(sale.monthly_installment || ''),
             installment_months: String(sale.installment_months || ''),
+            installment_margin_percent: sale.sale_mode === 'INSTALLMENT' && saleMarginPercent ? String(saleMarginPercent) : '',
+            installment_margin_value: sale.sale_mode === 'INSTALLMENT' && saleMarginValue ? String(saleMarginValue) : '',
             first_due_date: sale.first_due_date ? String(sale.first_due_date).slice(0, 10) : '',
             witness_name: sale.witness_name || '',
             witness_cnic: sale.witness_cnic || '',
@@ -5750,23 +5824,23 @@ const selectedCustomer = useMemo(
             if (productForm.id) {
                 await API.put(`/products/${productForm.id}`, {
                     ...productForm,
-                    monthly_rate: Number(productForm.monthly_rate || 0),
+                    monthly_rate: 0,
                     purchase_price: Number(productForm.purchase_price || 0),
                     cash_markup_percent: Number(productForm.cash_markup_percent || 0),
                     cash_markup_value: Number(productForm.cash_markup_value || 0),
-                    installment_markup_percent: Number(productForm.installment_markup_percent || 0),
-                    installment_months: Number(productForm.installment_months || 12),
+                    installment_markup_percent: 0,
+                    installment_months: 0,
                 });
                 setProductMessage('Product vehicle updated successfully.');
             } else {
                 await API.post('/products', {
                     ...productForm,
-                    monthly_rate: Number(productForm.monthly_rate || 0),
+                    monthly_rate: 0,
                     purchase_price: Number(productForm.purchase_price || 0),
                     cash_markup_percent: Number(productForm.cash_markup_percent || 0),
                     cash_markup_value: Number(productForm.cash_markup_value || 0),
-                    installment_markup_percent: Number(productForm.installment_markup_percent || 0),
-                    installment_months: Number(productForm.installment_months || 12),
+                    installment_markup_percent: 0,
+                    installment_months: 0,
                 });
                 setProductMessage('Product vehicle created successfully.');
             }

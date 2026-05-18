@@ -182,6 +182,14 @@ if (!canCreateSales) {
                                                 <input type="number" min="0" step="0.01" name="vehicle_price" value={saleForm.vehicle_price || ''} onChange={handleSaleChange} />
                                             </label>
                                             <label className="field">
+                                                <span>Margin %</span>
+                                                <input type="number" min="0" step="0.01" name="installment_margin_percent" value={saleForm.installment_margin_percent || ''} onChange={handleSaleChange} />
+                                            </label>
+                                            <label className="field">
+                                                <span>Margin Value</span>
+                                                <input type="number" min="0" step="0.01" name="installment_margin_value" value={saleForm.installment_margin_value || ''} onChange={handleSaleChange} />
+                                            </label>
+                                            <label className="field">
                                                 <span>Markup Percentage</span>
                                                 <input type="text" value={`${installmentMarkupPreview}%`} readOnly />
                                             </label>
