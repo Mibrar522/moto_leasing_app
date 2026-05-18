@@ -1,7 +1,10 @@
 export default function Customers({ ctx }) {
   const {
     buildAssetUrl,
-    canCreateCustomerBiometric,
+    canEditCustomerFingerprintFields,
+    canEditCustomerOcrFields,
+    canProcessCustomerOcr,
+    canScanCustomerFingerprint,
     canDeleteCustomerRecord,
     canEditCustomerDealerDropdown,
     canEditCustomerRecord,
@@ -243,16 +246,16 @@ if (!canOpenCustomers) {
                                     </label>
                                     <label className="field full-span">
                                         <span>OCR Extracted Name</span>
-                                        <input name="extracted_name" value={customerForm.extracted_name} onChange={handleCustomerChange} placeholder="Autofilled from OCR or entered manually" />
+                                        <input name="extracted_name" value={customerForm.extracted_name} onChange={handleCustomerChange} placeholder="Autofilled from OCR or entered manually" disabled={!canEditCustomerOcrFields} />
                                     </label>
                                     <label className="field full-span">
                                         <span>OCR Scan Text</span>
-                                        <textarea name="raw_ocr_text" value={customerForm.raw_ocr_text} onChange={handleCustomerChange} rows="7" placeholder="Paste OCR text from the CNIC image here, then click Process OCR." />
+                                        <textarea name="raw_ocr_text" value={customerForm.raw_ocr_text} onChange={handleCustomerChange} rows="7" placeholder="Paste OCR text from the CNIC image here, then click Process OCR." disabled={!canEditCustomerOcrFields} />
                                     </label>
                                 </div>
 
                                 <div className="inline-actions spaced-top">
-                                    <button type="button" className="secondary-btn" onClick={handleProcessOcr} disabled={!canUseOcr}>
+                                    <button type="button" className="secondary-btn" onClick={handleProcessOcr} disabled={!canProcessCustomerOcr}>
                                         Process OCR
                                     </button>
                                 </div>
@@ -261,7 +264,7 @@ if (!canOpenCustomers) {
                                 <div className="scanner-box">
                                     <div className="section-header">
                                         <h3>Fingerprint Intake</h3>
-                                    <button type="button" className="secondary-btn" onClick={handleCaptureFingerprint} disabled={!canCreateCustomerBiometric || uploadingCustomerAsset}>
+                                    <button type="button" className="secondary-btn" onClick={handleCaptureFingerprint} disabled={!canScanCustomerFingerprint || uploadingCustomerAsset}>
                                         {uploadingCustomerAsset ? 'Scanning...' : 'Scan Thumb Device'}
                                     </button>
                                     </div>
@@ -269,19 +272,19 @@ if (!canOpenCustomers) {
                                     <div className="form-grid">
                                         <label className="field full-span">
                                             <span>Fingerprint Scanner Output</span>
-                                            <textarea name="fingerprint_seed" value={customerForm.fingerprint_seed} onChange={handleCustomerChange} rows="4" placeholder="Filled from the thumb device automatically, or paste enrollment seed here as a fallback." disabled={!canCreateCustomerBiometric} />
+                                            <textarea name="fingerprint_seed" value={customerForm.fingerprint_seed} onChange={handleCustomerChange} rows="4" placeholder="Filled from the thumb device automatically, or paste enrollment seed here as a fallback." disabled={!canEditCustomerFingerprintFields} />
                                         </label>
                                         <label className="field">
                                             <span>Scanner Device</span>
-                                            <input name="fingerprint_device" value={customerForm.fingerprint_device} onChange={handleCustomerChange} placeholder="SecuGen / Mantra / Digital Persona" disabled={!canCreateCustomerBiometric} />
+                                            <input name="fingerprint_device" value={customerForm.fingerprint_device} onChange={handleCustomerChange} placeholder="SecuGen / Mantra / Digital Persona" disabled={!canEditCustomerFingerprintFields} />
                                         </label>
                                         <label className="field">
                                             <span>Scan Quality</span>
-                                            <input name="fingerprint_quality" value={customerForm.fingerprint_quality} onChange={handleCustomerChange} placeholder="HIGH / MEDIUM / LOW" disabled={!canCreateCustomerBiometric} />
+                                            <input name="fingerprint_quality" value={customerForm.fingerprint_quality} onChange={handleCustomerChange} placeholder="HIGH / MEDIUM / LOW" disabled={!canEditCustomerFingerprintFields} />
                                         </label>
                                         <label className="field">
                                             <span>Fingerprint Status</span>
-                                            <select name="fingerprint_status" value={customerForm.fingerprint_status} onChange={handleCustomerChange} disabled={!canCreateCustomerBiometric}>
+                                            <select name="fingerprint_status" value={customerForm.fingerprint_status} onChange={handleCustomerChange} disabled={!canEditCustomerFingerprintFields}>
                                                 <option value="NOT_CAPTURED">Not Captured</option>
                                                 <option value="PENDING">Pending</option>
                                                 <option value="ENROLLED">Enrolled</option>
@@ -289,15 +292,15 @@ if (!canOpenCustomers) {
                                         </label>
                                         <label className="field full-span">
                                             <span>Biometric Hash</span>
-                                            <textarea name="biometric_hash" value={customerForm.biometric_hash} onChange={handleCustomerChange} rows="3" placeholder="Generated fingerprint hash appears here" disabled={!canCreateCustomerBiometric} />
+                                            <textarea name="biometric_hash" value={customerForm.biometric_hash} onChange={handleCustomerChange} rows="3" placeholder="Generated fingerprint hash appears here" disabled={!canEditCustomerFingerprintFields} />
                                         </label>
                                         <label className="field full-span">
                                             <span>Biometric Thumb URL</span>
-                                            <input name="fingerprint_thumb_url" value={customerForm.fingerprint_thumb_url} onChange={handleCustomerChange} placeholder="/uploads/customers/..." disabled={!canCreateCustomerBiometric} />
+                                            <input name="fingerprint_thumb_url" value={customerForm.fingerprint_thumb_url} onChange={handleCustomerChange} placeholder="/uploads/customers/..." disabled={!canEditCustomerFingerprintFields} />
                                         </label>
                                         <label className="field full-span">
                                             <span>Thumb Upload</span>
-                                            <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'fingerprint_thumb_url', 'Thumb image', 'THUMB')} disabled={!canCreateCustomerBiometric || uploadingCustomerAsset} />
+                                            <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'fingerprint_thumb_url', 'Thumb image', 'THUMB')} disabled={!canEditCustomerFingerprintFields || uploadingCustomerAsset} />
                                         </label>
                                         <div className="field full-span">
                                             <span className="meta-label">Thumb Preview</span>

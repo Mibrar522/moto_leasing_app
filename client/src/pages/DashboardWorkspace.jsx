@@ -314,6 +314,13 @@ const ACCESS_PAGE_GROUPS = [
             'FEAT_CUSTOMER_RECORD_EDIT',
             'FEAT_CUSTOMER_RECORD_DELETE',
             'FEAT_CUSTOMER_OWNERSHIP_UNLOCK',
+            'FEAT_OCR_SCAN',
+            'FEAT_CUSTOMER_OCR_FIELDS',
+            'FEAT_CUSTOMER_OCR_PROCESS',
+            'FEAT_CUSTOMER_BIOMETRIC',
+            'FEAT_BIOMETRIC',
+            'FEAT_CUSTOMER_FINGERPRINT_FIELDS',
+            'FEAT_CUSTOMER_FINGERPRINT_SCAN',
         ],
     },
     {
@@ -898,6 +905,13 @@ const FEATURE_ACCESS_LABELS = {
     FEAT_PROFILE_SWITCH: 'Profile Switch',
     FEAT_CUSTOMER_FORM: 'New Customer Intake',
     FEAT_CUSTOMER_FINGERPRINT: 'Fingerprint Intake',
+    FEAT_OCR_SCAN: 'OCR Upload Access',
+    FEAT_CUSTOMER_OCR_FIELDS: 'OCR Text Fields',
+    FEAT_CUSTOMER_OCR_PROCESS: 'Process OCR Button',
+    FEAT_CUSTOMER_BIOMETRIC: 'Customer Biometric Access',
+    FEAT_BIOMETRIC: 'Biometric Verification Access',
+    FEAT_CUSTOMER_FINGERPRINT_FIELDS: 'Fingerprint Text Fields',
+    FEAT_CUSTOMER_FINGERPRINT_SCAN: 'Scan Thumb Button',
     FEAT_CUSTOMER_REGISTER: 'Customer Registry',
     FEAT_CUSTOMER_RECORD_VIEW: 'View Customer Record',
     FEAT_CUSTOMER_RECORD_EDIT: 'Edit Customer Record',
@@ -1817,7 +1831,11 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canViewWorkflow = hasAnyFeature(user, ['FEAT_WORKFLOW_VIEW']);
     const canUseOcr = hasAnyFeature(user, ['FEAT_OCR_SCAN']);
     const canUseBiometric = hasAnyFeature(user, ['FEAT_BIOMETRIC']);
+    const canEditCustomerOcrFields = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_FIELDS', 'FEAT_OCR_SCAN', 'FEAT_CUSTOMER_MGMT']);
+    const canProcessCustomerOcr = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_PROCESS', 'FEAT_OCR_SCAN']);
     const canCreateCustomerBiometric = hasAnyFeature(user, ['FEAT_CUSTOMER_BIOMETRIC', 'FEAT_BIOMETRIC']);
+    const canEditCustomerFingerprintFields = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_FIELDS', 'FEAT_CUSTOMER_BIOMETRIC', 'FEAT_BIOMETRIC']);
+    const canScanCustomerFingerprint = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_SCAN', 'FEAT_CUSTOMER_BIOMETRIC', 'FEAT_BIOMETRIC']);
     const canManageCustomers = hasAnyFeature(user, ['FEAT_CUSTOMER_MGMT']);
     const canManageProducts = hasAnyFeature(user, ['FEAT_PRODUCT_MGMT', 'FEAT_FLEET_MGMT']);
     const canManageStock = hasAnyFeature(user, ['FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT']);
@@ -5315,8 +5333,8 @@ const selectedCustomer = useMemo(
     };
 
     const handleProcessOcr = () => {
-        if (!canUseOcr) {
-            setCustomerMessage('Your account does not have CNIC and Passport Scanning access.');
+        if (!canProcessCustomerOcr) {
+            setCustomerMessage('Your account does not have Process OCR access.');
             return;
         }
 
@@ -5344,8 +5362,8 @@ const selectedCustomer = useMemo(
     };
 
     const handleCaptureFingerprint = async () => {
-        if (!canCreateCustomerBiometric) {
-            setCustomerMessage('Your account does not have customer biometric creation access.');
+        if (!canScanCustomerFingerprint) {
+            setCustomerMessage('Your account does not have Scan Thumb access.');
             return;
         }
 
@@ -8072,6 +8090,10 @@ const selectedCustomer = useMemo(
         buildAssetUrl,
         canChangeEmployeeRecord,
         canCreateCustomerBiometric,
+        canEditCustomerFingerprintFields,
+        canEditCustomerOcrFields,
+        canProcessCustomerOcr,
+        canScanCustomerFingerprint,
         canCreateSales,
         canDeleteCustomerRecord,
         canEditCustomerDealerDropdown,
