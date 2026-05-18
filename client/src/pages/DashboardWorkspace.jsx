@@ -4891,6 +4891,7 @@ const selectedCustomer = useMemo(
 
             if (name === 'installment_margin_percent' || name === 'installment_margin_value') {
                 const actualPrice = Number(selectedSaleVehicle?.purchase_price || 0);
+                const downPayment = Number(current.down_payment || 0);
                 const nextState = { ...current, [name]: value };
 
                 if (actualPrice > 0 && name === 'installment_margin_percent') {
@@ -4898,6 +4899,7 @@ const selectedCustomer = useMemo(
                     const totalPrice = roundCurrencyValue(actualPrice + marginValue);
                     nextState.installment_margin_value = marginValue ? String(marginValue) : '';
                     nextState.vehicle_price = totalPrice ? String(totalPrice) : '';
+                    nextState.financed_amount = String(Math.max(roundCurrencyValue(totalPrice - downPayment), 0));
                 }
 
                 if (actualPrice > 0 && name === 'installment_margin_value') {
@@ -4905,6 +4907,7 @@ const selectedCustomer = useMemo(
                     const totalPrice = roundCurrencyValue(actualPrice + Number(value || 0));
                     nextState.installment_margin_percent = marginPercent ? String(marginPercent) : '';
                     nextState.vehicle_price = totalPrice ? String(totalPrice) : '';
+                    nextState.financed_amount = String(Math.max(roundCurrencyValue(totalPrice - downPayment), 0));
                 }
 
                 return nextState;
@@ -4921,10 +4924,20 @@ const selectedCustomer = useMemo(
                     vehicle_price: value,
                     installment_margin_value: marginValue ? String(marginValue) : '',
                     installment_margin_percent: marginPercent ? String(marginPercent) : '',
+                    financed_amount: String(Math.max(roundCurrencyValue(totalPrice - Number(current.down_payment || 0)), 0)),
                 };
             }
 
-            if (name === 'down_payment' || name === 'installment_months' || name === 'first_due_date') {
+            if (name === 'down_payment') {
+                const totalPrice = Number(current.vehicle_price || 0);
+                return {
+                    ...current,
+                    down_payment: value,
+                    financed_amount: String(Math.max(roundCurrencyValue(totalPrice - Number(value || 0)), 0)),
+                };
+            }
+
+            if (name === 'installment_months' || name === 'first_due_date') {
                 return {
                     ...current,
                     [name]: value,
