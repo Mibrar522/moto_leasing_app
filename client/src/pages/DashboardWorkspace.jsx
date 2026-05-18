@@ -167,6 +167,7 @@ const emptySaleForm = {
 };
 
 const emptyStockOrderForm = {
+    id: '',
     company_profile_id: '',
     company_name: '',
     company_email: '',
@@ -325,7 +326,7 @@ const ACCESS_PAGE_GROUPS = [
         key: 'stock',
         label: 'Stock',
         description: 'Stock ordering, receiving, and company stock operations.',
-        featureKeys: ['FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT', 'FEAT_STOCK_ORDER_FORM', 'FEAT_STOCK_RECEIVED_VIEW', 'FEAT_STOCK_REGISTER'],
+        featureKeys: ['FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT', 'FEAT_STOCK_ORDER_FORM', 'FEAT_STOCK_RECEIVED_VIEW', 'FEAT_STOCK_REGISTER', 'FEAT_STOCK_RECEIVE', 'FEAT_STOCK_UPDATE', 'FEAT_STOCK_DELETE'],
     },
     {
         key: 'sales',
@@ -916,6 +917,9 @@ const FEATURE_ACCESS_LABELS = {
     FEAT_STOCK_ORDER_FORM: 'Order Stock',
     FEAT_STOCK_RECEIVED_VIEW: 'Stock Received From Company',
     FEAT_STOCK_REGISTER: 'Stock Ordering Register',
+    FEAT_STOCK_RECEIVE: 'Receive Stock Button',
+    FEAT_STOCK_UPDATE: 'Update Stock Button',
+    FEAT_STOCK_DELETE: 'Delete Stock Button',
     FEAT_INSTALLMENT_OVERVIEW: 'Installment Page',
     FEAT_INSTALLMENT_COLLECTION: 'Monthly Installment Collection',
     FEAT_EMPLOYEE_FORM: 'New Employee',
@@ -2019,6 +2023,9 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canViewStockOrderForm = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_ORDER_FORM']);
     const canViewStockReceived = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_RECEIVED_VIEW']);
     const canViewStockRegister = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_REGISTER']);
+    const canReceiveStock = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_RECEIVE', 'FEAT_STOCK_RECEIVED_VIEW', 'FEAT_STOCK_MGMT']);
+    const canUpdateStockOrder = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_UPDATE', 'FEAT_STOCK_MGMT']);
+    const canDeleteStockOrder = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_DELETE', 'FEAT_STOCK_MGMT']);
     const canViewInstallmentOverview = canManageInstallments && hasAnyFeature(user, ['FEAT_INSTALLMENT_OVERVIEW']);
     const canViewInstallmentCollection = canManageInstallments && hasAnyFeature(user, ['FEAT_INSTALLMENT_COLLECTION']);
     const canOpenSalesWorkspace = [
@@ -3216,7 +3223,7 @@ const selectedCustomer = useMemo(
             id: `stock-order-${order.id}`,
             type: 'STOCK_ORDER',
             title: `Stock order created for ${order.brand || 'vehicle'} ${order.model || ''}`.trim(),
-            description: `${order.company_name || 'Supplier'}${order.expected_delivery_date ? ` / delivery ${order.expected_delivery_date}` : ''}`,
+            description: `${order.company_name || 'Supplier'}${order.expected_delivery_date ? ` / order ${order.expected_delivery_date}` : ''}`,
             occurredAt: order.created_at || '',
             pageKey: 'stock',
         }));
@@ -6344,22 +6351,80 @@ const selectedCustomer = useMemo(
 
         try {
             setSavingStock(true);
-            await API.post('/stock/orders', {
+            const payload = {
                 ...stockOrderForm,
                 quantity: 1,
                 unit_price: Number(stockOrderForm.unit_price || 0),
                 total_amount: Number(stockOrderForm.total_amount || 0),
-            });
+            };
+
+            if (stockOrderForm.id) {
+                await API.patch(`/stock/orders/${stockOrderForm.id}`, payload);
+                setStockMessage('Stock order updated successfully.');
+            } else {
+                await API.post('/stock/orders', payload);
+                setStockMessage('Stock order created and processing email status has been recorded.');
+            }
+
             await loadDashboard();
             resetStockOrderForm();
-            setStockMessage('Stock order created and processing email status has been recorded.');
         } catch (err) {
-            setStockMessage(err.response?.data?.message || 'Unable to create stock order.');
+            setStockMessage(err.response?.data?.message || (stockOrderForm.id ? 'Unable to update stock order.' : 'Unable to create stock order.'));
         } finally {
             setSavingStock(false);
         }
     };
 
+    const handleEditStockOrder = (order) => {
+        if (order.is_locked_by_sale) {
+            setStockMessage('This stock order is locked because a customer transaction has already been created.');
+            return;
+        }
+
+        setStockOrderForm({
+            id: order.id || '',
+            company_profile_id: order.company_profile_id || '',
+            company_name: order.company_name || order.profile_company_name || '',
+            company_email: order.company_email || order.profile_company_email || '',
+            product_id: order.product_id || '',
+            vehicle_type: order.vehicle_type || '',
+            brand: order.brand || '',
+            model: order.model || '',
+            color: order.product_color || order.color || '',
+            product_description: order.product_description || '',
+            unit_price: order.unit_price || '',
+            total_amount: order.total_amount || '',
+            expected_delivery_date: order.expected_delivery_date || '',
+            bank_slip_url: order.bank_slip_url || '',
+            notes: order.notes || '',
+            order_status: order.order_status || 'PROCESSING',
+        });
+        setStockMessage(`Editing stock order ${order.id}.`);
+    };
+
+    const handleDeleteStockOrder = async (order) => {
+        if (order.is_locked_by_sale) {
+            setStockMessage('This stock order is locked because a customer transaction has already been created.');
+            return;
+        }
+
+        const shouldDelete = window.confirm(`Delete stock order for ${order.brand || 'vehicle'} ${order.model || ''}?`);
+        if (!shouldDelete) return;
+
+        try {
+            setSavingStock(true);
+            await API.delete(`/stock/orders/${order.id}`);
+            if (stockOrderForm.id === order.id) {
+                resetStockOrderForm();
+            }
+            await loadDashboard();
+            setStockMessage('Stock order deleted successfully.');
+        } catch (err) {
+            setStockMessage(err.response?.data?.message || 'Unable to delete stock order.');
+        } finally {
+            setSavingStock(false);
+        }
+    };
     const handleResendStockOrderEmail = async (orderId) => {
         if (!orderId) {
             return;
@@ -6380,6 +6445,11 @@ const selectedCustomer = useMemo(
     };
 
     const openStockReceiveModal = (order) => {
+        if (order.is_locked_by_sale) {
+            setStockMessage('This stock order is locked because a customer transaction has already been created.');
+            return;
+        }
+
         setReceivingStockOrder(order);
         setStockReceiveItems([createEmptyReceiveItem(order.product_color || order.color || '')]);
     };
@@ -8334,6 +8404,12 @@ const selectedCustomer = useMemo(
                     buildAssetUrl={buildAssetUrl}
                     openStockReceiveModal={openStockReceiveModal}
                     handleResendStockOrderEmail={handleResendStockOrderEmail}
+                    canReceiveStock={canReceiveStock}
+                    canUpdateStockOrder={canUpdateStockOrder}
+                    canDeleteStockOrder={canDeleteStockOrder}
+                    handleEditStockOrder={handleEditStockOrder}
+                    handleDeleteStockOrder={handleDeleteStockOrder}
+                    resetStockOrderForm={resetStockOrderForm}
                 />;
 
             case 'installments':

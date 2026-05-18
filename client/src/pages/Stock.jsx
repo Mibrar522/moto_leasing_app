@@ -19,6 +19,12 @@ export default function Stock({
   buildAssetUrl,
   openStockReceiveModal,
   handleResendStockOrderEmail,
+  canReceiveStock,
+  canUpdateStockOrder,
+  canDeleteStockOrder,
+  handleEditStockOrder,
+  handleDeleteStockOrder,
+  resetStockOrderForm,
 }) {
   const getStockEmailStatus = (order) => {
     if (order.email_sent) {
@@ -52,10 +58,13 @@ export default function Stock({
         {canViewStockOrderForm ? (
         <form className="table-card customer-form-card" onSubmit={handleStockOrderSubmit}>
           <div className="section-header">
-            <h3>Order Stock</h3>
+            <h3>{stockOrderForm.id ? 'Update Stock Order' : 'Order Stock'}</h3>
             <button type="submit" className="primary-btn" disabled={savingStock}>
-              {savingStock ? 'Processing...' : 'Create Order'}
+              {savingStock ? 'Processing...' : (stockOrderForm.id ? 'Update Order' : 'Create Order')}
             </button>
+              {stockOrderForm.id ? (
+                <button type="button" className="view-btn" onClick={resetStockOrderForm} disabled={savingStock}>Cancel</button>
+              ) : null}
           </div>
           {stockMessage ? <div className="notice-banner">{stockMessage}</div> : null}
           <div className="form-grid">
@@ -90,7 +99,7 @@ export default function Stock({
             <label className="field full-span"><span>Product Description</span><textarea name="product_description" value={stockOrderForm.product_description || ''} onChange={handleStockOrderChange} rows="3" readOnly /></label>
             <label className="field"><span>Unit Price</span><input type="number" min="0" step="0.01" name="unit_price" value={stockOrderForm.unit_price} onChange={handleStockOrderChange} /></label>
             <label className="field"><span>Total Amount</span><input type="number" min="0" step="0.01" name="total_amount" value={stockOrderForm.total_amount} onChange={handleStockOrderChange} readOnly /></label>
-            <label className="field"><span>Expected Delivery</span><input type="date" name="expected_delivery_date" value={stockOrderForm.expected_delivery_date} onChange={handleStockOrderChange} /></label>
+            <label className="field"><span>Order Date</span><input type="date" name="expected_delivery_date" value={stockOrderForm.expected_delivery_date} onChange={handleStockOrderChange} /></label>
             <label className="field full-span"><span>Bank Online Slip</span><input type="file" accept="application/pdf,image/*" onChange={handleBankSlipUpload} /></label>
             <label className="field full-span"><span>Uploaded Slip URL</span><input name="bank_slip_url" value={stockOrderForm.bank_slip_url} onChange={handleStockOrderChange} readOnly={uploadingBankSlip} /></label>
             <label className="field full-span"><span>Notes</span><textarea rows="4" name="notes" value={stockOrderForm.notes} onChange={handleStockOrderChange} placeholder="Payment reference, supplier note, or bank transaction details" /></label>
@@ -110,8 +119,9 @@ export default function Stock({
                   <th>Company</th>
                   <th>Vehicle</th>
                   <th>Vehicle Received</th>
-                  <th>Received At</th>
+                  <th>Received Date</th>
                   <th>Status</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -122,6 +132,16 @@ export default function Stock({
                     <td>{Number(order.received_quantity || 0) > 0 ? 'Yes' : 'Pending'}</td>
                     <td>{order.received_at ? new Date(order.received_at).toLocaleDateString('en-PK') : 'Pending'}</td>
                     <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>
+                    <td>
+                      {order.is_locked_by_sale ? (
+                        <span className="feature-pill">Locked after sale</span>
+                      ) : (
+                        <div className="inline-actions">
+                          {canUpdateStockOrder ? <button type="button" className="view-btn" onClick={() => handleEditStockOrder(order)} disabled={savingStock}>Update</button> : null}
+                          {canDeleteStockOrder ? <button type="button" className="danger-btn" onClick={() => handleDeleteStockOrder(order)} disabled={savingStock}>Delete</button> : null}
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -143,7 +163,7 @@ export default function Stock({
                 <th>Company</th>
                 <th>Vehicle</th>
                 <th>Amount</th>
-                <th>Delivery</th>
+                <th>Order Date</th>
                 <th>Email</th>
                 <th>Slip</th>
                 <th>Status</th>
@@ -167,7 +187,17 @@ export default function Stock({
                   </td>
                   <td>{order.bank_slip_url ? <a href={buildAssetUrl(order.bank_slip_url)} target="_blank" rel="noreferrer">View Slip</a> : 'No slip'}</td>
                   <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>
-                  <td><button type="button" className="view-btn" onClick={() => openStockReceiveModal(order)} disabled={savingStock}>Receive Stock</button></td>
+                  <td>
+                    {order.is_locked_by_sale ? (
+                      <span className="feature-pill">Locked after sale</span>
+                    ) : (
+                      <div className="inline-actions">
+                        {canReceiveStock ? <button type="button" className="view-btn" onClick={() => openStockReceiveModal(order)} disabled={savingStock}>Receive Stock</button> : null}
+                        {canUpdateStockOrder ? <button type="button" className="view-btn" onClick={() => handleEditStockOrder(order)} disabled={savingStock}>Update</button> : null}
+                        {canDeleteStockOrder ? <button type="button" className="danger-btn" onClick={() => handleDeleteStockOrder(order)} disabled={savingStock}>Delete</button> : null}
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -107,6 +107,17 @@ const ensureStockScopedColumns = async () => {
 const normalizeStockOrderId = (orderId) => String(orderId || '').replace(/-/g, '').toUpperCase();
 const buildStockRegistrationNumber = (orderId, pieceNumber) =>
     `STK-${normalizeStockOrderId(orderId)}-${String(pieceNumber).padStart(3, '0')}`;
+const stockOrderSaleLockSql = `
+    SELECT st.id
+    FROM vehicles v
+    JOIN sales_transactions st ON st.vehicle_id = v.id
+    WHERE v.source_stock_order_id = $1
+    LIMIT 1
+`;
+const getStockOrderSaleLock = async (client, stockOrderId) => {
+    const result = await client.query(stockOrderSaleLockSql, [stockOrderId]);
+    return result.rows[0] || null;
+};
 const sanitizeSerialSegment = (value) =>
     String(value || '')
         .toUpperCase()
@@ -192,7 +203,7 @@ const sendStockOrderEmail = async ({ order, company, product, vehicle_type, tota
         `Vehicle type: ${String(product.vehicle_type || vehicle_type || '').toUpperCase()}`,
         `Quantity: 1`,
         `Total amount: ${amount}`,
-        expected_delivery_date ? `Expected delivery date: ${expected_delivery_date}` : '',
+        expected_delivery_date ? `Order date: ${expected_delivery_date}` : '',
         notes ? `Notes: ${notes}` : '',
     ].filter(Boolean);
     const emailResult = await sendMailSafe({
@@ -505,6 +516,12 @@ exports.listStockOrders = async (req, res) => {
                     pc.monthly_rate AS product_monthly_rate,
                     pc.purchase_price AS product_purchase_price,
                     u.full_name AS ordered_by_name,
+                    EXISTS (
+                        SELECT 1
+                        FROM vehicles sold_vehicle
+                        JOIN sales_transactions sold_sale ON sold_sale.vehicle_id = sold_vehicle.id
+                        WHERE sold_vehicle.source_stock_order_id = so.id
+                    ) AS is_locked_by_sale,
                     COALESCE(
                         so.dealer_id,
                         pc.dealer_id,
@@ -733,11 +750,18 @@ exports.updateStockOrder = async (req, res) => {
     try {
         const globalScope = hasGlobalScope(req.user);
         const dealerId = getEffectiveDealerId(req.user);
+        const hasDealerScope = !globalScope && Boolean(dealerId);
         await ensureStockScopedColumns();
         const {
             order_status,
             received_quantity,
             received_at,
+            company_profile_id,
+            product_id,
+            unit_price,
+            total_amount,
+            expected_delivery_date,
+            bank_slip_url,
             notes,
             received_items = [],
         } = req.body;
@@ -770,6 +794,69 @@ exports.updateStockOrder = async (req, res) => {
         }
 
         const currentOrder = currentOrderResult.rows[0];
+        const saleLock = await getStockOrderSaleLock(client, currentOrder.id);
+        if (saleLock) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ message: 'This stock order is locked because a customer transaction has already been created.' });
+        }
+
+        let nextCompany = {
+            id: currentOrder.company_profile_id,
+            company_name: currentOrder.company_name,
+            company_email: currentOrder.company_email,
+        };
+        if (company_profile_id && company_profile_id !== currentOrder.company_profile_id) {
+            const companyResult = await client.query(
+                `
+                SELECT cp.id, cp.company_name, cp.company_email
+                FROM company_profiles cp
+                LEFT JOIN users creator ON creator.id = cp.created_by
+                WHERE cp.id = $1
+                  AND cp.is_active = TRUE
+                  ${hasDealerScope ? 'AND COALESCE(cp.dealer_id, creator.dealer_id) = $2' : ''}
+                `,
+                hasDealerScope ? [company_profile_id, dealerId] : [company_profile_id]
+            );
+
+            if (companyResult.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Select a valid company profile.' });
+            }
+
+            nextCompany = companyResult.rows[0];
+        }
+
+        let nextProduct = {
+            id: currentOrder.product_id,
+            brand: currentOrder.brand,
+            model: currentOrder.model,
+            serial_number: currentOrder.serial_number,
+            vehicle_type: currentOrder.vehicle_type,
+            color: currentOrder.color,
+            description: currentOrder.product_description,
+            purchase_price: currentOrder.unit_price,
+        };
+        if (product_id && product_id !== currentOrder.product_id) {
+            const productResult = await client.query(
+                `
+                SELECT pc.id, pc.brand, pc.model, pc.serial_number, pc.vehicle_type, pc.purchase_price, pc.color, pc.description
+                FROM product_catalog pc
+                LEFT JOIN users creator ON creator.id = pc.created_by
+                WHERE pc.id = $1
+                  AND pc.is_active = TRUE
+                  ${hasDealerScope ? 'AND COALESCE(pc.dealer_id, creator.dealer_id) = $2' : ''}
+                `,
+                hasDealerScope ? [product_id, dealerId] : [product_id]
+            );
+
+            if (productResult.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Select a valid product vehicle from the product master.' });
+            }
+
+            nextProduct = productResult.rows[0];
+        }
+
         const additionalReceivedItems = Array.isArray(received_items) ? received_items : [];
         const additionalReceivedCount = additionalReceivedItems.length;
         const currentReceivedQuantity = Number(currentOrder.received_quantity || 0);
@@ -824,7 +911,20 @@ exports.updateStockOrder = async (req, res) => {
                 order_status = COALESCE($2, order_status),
                 received_quantity = COALESCE($3, received_quantity),
                 received_at = COALESCE($4, received_at),
-                notes = COALESCE($5, notes)
+                notes = COALESCE($5, notes),
+                company_profile_id = COALESCE($6, company_profile_id),
+                company_name = COALESCE($7, company_name),
+                company_email = COALESCE($8, company_email),
+                product_id = COALESCE($9, product_id),
+                vehicle_type = COALESCE($10, vehicle_type),
+                brand = COALESCE($11, brand),
+                model = COALESCE($12, model),
+                serial_number = COALESCE($13, serial_number),
+                unit_price = COALESCE($14, unit_price),
+                total_amount = COALESCE($15, total_amount),
+                product_description = COALESCE($16, product_description),
+                expected_delivery_date = COALESCE($17, expected_delivery_date),
+                bank_slip_url = COALESCE($18, bank_slip_url)
             WHERE id = $1
             RETURNING *
             `,
@@ -834,6 +934,19 @@ exports.updateStockOrder = async (req, res) => {
                 nextReceivedQuantity,
                 received_at || null,
                 notes || null,
+                nextCompany.id || null,
+                nextCompany.company_name || null,
+                nextCompany.company_email || null,
+                nextProduct.id || null,
+                String(nextProduct.vehicle_type || '').toUpperCase() || null,
+                nextProduct.brand || null,
+                nextProduct.model || null,
+                nextProduct.serial_number || null,
+                unit_price === undefined || unit_price === '' ? null : Number(unit_price),
+                total_amount === undefined || total_amount === '' ? null : Number(total_amount),
+                nextProduct.description || null,
+                expected_delivery_date || null,
+                bank_slip_url || null,
             ]
         );
 
@@ -885,4 +998,51 @@ exports.updateStockOrder = async (req, res) => {
     }
 };
 
+exports.deleteStockOrder = async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
+        await ensureStockScopedColumns();
+
+        await client.query('BEGIN');
+
+        const currentOrderResult = await client.query(
+            `
+            SELECT so.*
+            FROM stock_orders so
+            LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
+            LEFT JOIN users u ON u.id = so.ordered_by
+            WHERE so.id = $1
+              ${globalScope ? '' : stockOrderDealerScopeAndClause(2, 3)}
+            FOR UPDATE OF so
+            `,
+            globalScope ? [req.params.id] : [req.params.id, dealerId, req.user.id]
+        );
+
+        if (currentOrderResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Stock order not found' });
+        }
+
+        const saleLock = await getStockOrderSaleLock(client, req.params.id);
+        if (saleLock) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ message: 'This stock order is locked because a customer transaction has already been created.' });
+        }
+
+        await client.query('DELETE FROM vehicles WHERE source_stock_order_id = $1', [req.params.id]);
+        await client.query('DELETE FROM stock_orders WHERE id = $1', [req.params.id]);
+
+        await client.query('COMMIT');
+        res.status(200).json({ message: 'Stock order deleted successfully.' });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ message: 'Failed to delete stock order', error: error.message });
+    } finally {
+        client.release();
+    }
+};
 exports.reconcileReceivedStockOrders = reconcileReceivedStockOrders;

@@ -1137,6 +1137,12 @@ exports.getDashboardData = async (req, res) => {
                 pc.serial_number AS product_serial_number,
                 pc.description AS product_description,
                 u.full_name AS ordered_by_name,
+                EXISTS (
+                    SELECT 1
+                    FROM vehicles sold_vehicle
+                    JOIN sales_transactions sold_sale ON sold_sale.vehicle_id = sold_vehicle.id
+                    WHERE sold_vehicle.source_stock_order_id = so.id
+                ) AS is_locked_by_sale,
                 stock_scope.resolved_dealer_id,
                 stock_scope.ownership_source,
                 d.id AS dealer_id,
