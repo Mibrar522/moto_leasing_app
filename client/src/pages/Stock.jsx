@@ -121,7 +121,6 @@ export default function Stock({
                   <th>Vehicle Received</th>
                   <th>Received Date</th>
                   <th>Status</th>
-                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,16 +131,6 @@ export default function Stock({
                     <td>{Number(order.received_quantity || 0) > 0 ? 'Yes' : 'Pending'}</td>
                     <td>{order.received_at ? new Date(order.received_at).toLocaleDateString('en-PK') : 'Pending'}</td>
                     <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>
-                    <td>
-                      {order.is_locked_by_sale ? (
-                        <span className="feature-pill">Locked after sale</span>
-                      ) : (
-                        <div className="inline-actions">
-                          {canUpdateStockOrder ? <button type="button" className="view-btn" onClick={() => handleEditStockOrder(order)} disabled={savingStock}>Update</button> : null}
-                          {canDeleteStockOrder ? <button type="button" className="danger-btn" onClick={() => handleDeleteStockOrder(order)} disabled={savingStock}>Delete</button> : null}
-                        </div>
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>
