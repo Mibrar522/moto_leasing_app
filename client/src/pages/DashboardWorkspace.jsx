@@ -4304,6 +4304,27 @@ const selectedCustomer = useMemo(
             receivedInstallments,
         };
     }, [dashboardData.metrics, dashboardData.salesTransactions, salesAnalytics.totals.selling]);
+    const dashboardSalesMix = useMemo(() => {
+        const cashCount = Number(overviewMetrics.cashTransactions || 0);
+        const installmentCount = Number(overviewMetrics.installmentTransactions || 0);
+        const receivedInstallmentCount = Number(overviewMetrics.receivedInstallments || 0);
+        const totalCount = cashCount + installmentCount;
+        const cashPercent = totalCount > 0 ? Math.round((cashCount / totalCount) * 100) : 0;
+        const installmentPercent = totalCount > 0 ? Math.max(100 - cashPercent, 0) : 0;
+
+        return {
+            cashCount,
+            installmentCount,
+            receivedInstallmentCount,
+            totalCount,
+            cashPercent,
+            installmentPercent,
+            chartStyle: {
+                '--cash-share': `${cashPercent}%`,
+                '--installment-share': `${installmentPercent}%`,
+            },
+        };
+    }, [overviewMetrics.cashTransactions, overviewMetrics.installmentTransactions, overviewMetrics.receivedInstallments]);
     const installmentMarkupPreview = useMemo(() => {
         if (saleForm.sale_mode !== 'INSTALLMENT') {
             return 0;
@@ -8657,184 +8678,53 @@ const selectedCustomer = useMemo(
                             )}
                         </div>
 
-                        <div className="dashboard-split">
-                            {canViewDashboardSalesPerformance ? (
-                            <div className="table-card sales-insight-card">
-                                <div className="section-header">
-                                    <div>
-                                        <h3>Sales Performance</h3>
-                                        <p className="section-caption">Live comparison of actual cost, selling price, and realized profit for {salesAnalytics.monthLabel}.</p>
-                                    </div>
-                                    <span className="feature-pill">{salesAnalytics.totalDeals} total sales</span>
-                                </div>
-
-                                <div className="sales-summary-grid">
-                                    <div className="sales-summary-stat">
-                                        <span className="meta-label">Actual Value</span>
-                                        <strong>{formatCompactCurrency(salesAnalytics.totals.actual)}</strong>
-                                    </div>
-                                    <div className="sales-summary-stat">
-                                        <span className="meta-label">Selling Value</span>
-                                        <strong>{formatCompactCurrency(salesAnalytics.totals.selling)}</strong>
-                                    </div>
-                                    <div className="sales-summary-stat">
-                                        <span className="meta-label">Gross Profit</span>
-                                        <strong>{formatCompactCurrency(salesAnalytics.totals.profit)}</strong>
-                                    </div>
-                                    <div className="sales-summary-stat">
-                                        <span className="meta-label">Profit Margin</span>
-                                        <strong>{roundCurrencyValue(salesAnalytics.profitMargin)}%</strong>
-                                    </div>
-                                </div>
-
-                                {salesAnalytics.recentChart.length === 0 ? (
-                                    renderEmptyState('No sales transactions are available yet for charting.')
-                                ) : (
-                                    <div className="sales-chart">
-                                        {salesAnalytics.recentChart.map((sale) => (
-                                            <div key={sale.id} className="sales-chart-item">
-                                                <div className="sales-chart-bars">
-                                                    <div className="sales-chart-bar actual" style={{ height: sale.actualHeight }} title={`Actual: ${formatCurrency(sale.actualPrice)}`} />
-                                                    <div className="sales-chart-bar selling" style={{ height: sale.sellHeight }} title={`Selling: ${formatCurrency(sale.sellPrice)}`} />
-                                                </div>
-                                                <div className="sales-chart-meta">
-                                                    <strong>{sale.shortLabel}</strong>
-                                                    <span>{formatCompactCurrency(sale.actualPrice)} actual</span>
-                                                    <span>{formatCompactCurrency(sale.sellPrice)} selling</span>
-                                                    <span>{formatCurrency(sale.profit)} profit{sale.count > 1 ? ` across ${sale.count} sales` : ''}</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            ) : null}
-
-                            {canViewDashboardProfitTransactions ? (
-                            <div className="table-card sales-insight-card">
-                                <div className="section-header">
-                                    <div>
-                                        <h3>Recent Profit Transactions</h3>
-                                        <p className="section-caption">Actual price, selling price, and profit shown for {salesAnalytics.monthLabel}.</p>
-                                    </div>
-                                </div>
-
-                                {salesAnalytics.recentTransactions.length === 0 ? (
-                                    renderEmptyState(`No sales transactions recorded in ${salesAnalytics.monthLabel} yet.`)
-                                ) : (
-                                    <>
-                                        <table className="pro-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Vehicle</th>
-                                                    <th>Employee</th>
-                                                    <th>Actual</th>
-                                                    <th>Selling</th>
-                                                    <th>Profit</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {getVisibleRows('recent-profit-transactions', salesAnalytics.recentTransactions).map((sale) => (
-                                                    <tr key={sale.id}>
-                                                        <td>{sale.customer_name}<br />{[sale.brand, sale.model].filter(Boolean).join(' ')}</td>
-                                                        <td>{sale.agent_name || 'System'}<br />{sale.dealer_name || 'Not set'}</td>
-                                                        <td>{formatCurrency(sale.actualPrice)}</td>
-                                                        <td>{formatCurrency(sale.sellPrice)}</td>
-                                                        <td>{formatCurrency(sale.profit)}</td>
-                                                        <td><span className={getStatusClass(sale.status)}>{sale.status}</span></td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                        {renderTableLimitControl('recent-profit-transactions', salesAnalytics.recentTransactions.length)}
-                                    </>
-                                )}
-                            </div>
-                            ) : null}
-                        </div>
-
-                        {canViewDashboardCompanyProfitability ? (
-                        <div className="table-card sales-insight-card">
+                        <div className="table-card sales-mix-card">
                             <div className="section-header">
                                 <div>
-                                    <h3>Company Business Profitability</h3>
-                                    <p className="section-caption">Company-wise actual cost, selling value, and profit or loss for {salesAnalytics.monthLabel}.</p>
+                                    <h3>Sales Composition</h3>
+                                    <p className="section-caption">Cash sales, installment sales, and received installment activity in one live view.</p>
+                                </div>
+                                <span className="feature-pill">{dashboardSalesMix.totalCount} total sales</span>
+                            </div>
+
+                            <div className="sales-mix-content">
+                                <div className="sales-donut" style={dashboardSalesMix.chartStyle} aria-label="Cash and installment sales chart">
+                                    <div className="sales-donut-center">
+                                        <span>Total</span>
+                                        <strong>{dashboardSalesMix.totalCount}</strong>
+                                    </div>
+                                </div>
+
+                                <div className="sales-mix-stats">
+                                    <div className="sales-mix-stat cash">
+                                        <span className="sales-mix-dot" />
+                                        <div>
+                                            <span className="meta-label">Cash Sales</span>
+                                            <strong>{dashboardSalesMix.cashCount}</strong>
+                                            <small>{dashboardSalesMix.cashPercent}% of total</small>
+                                        </div>
+                                    </div>
+                                    <div className="sales-mix-stat installment">
+                                        <span className="sales-mix-dot" />
+                                        <div>
+                                            <span className="meta-label">Installment Sales</span>
+                                            <strong>{dashboardSalesMix.installmentCount}</strong>
+                                            <small>{dashboardSalesMix.installmentPercent}% of total</small>
+                                        </div>
+                                    </div>
+                                    <div className="sales-mix-stat received">
+                                        <span className="sales-mix-dot" />
+                                        <div>
+                                            <span className="meta-label">Received Installments</span>
+                                            <strong>{dashboardSalesMix.receivedInstallmentCount}</strong>
+                                            <small>Collected installment entries</small>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-
-                            {companyBusinessAnalytics.length === 0 ? (
-                                renderEmptyState(`No company profitability data available in ${salesAnalytics.monthLabel} yet.`)
-                            ) : (
-                                <>
-                                    <table className="pro-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Company</th>
-                                                <th>Deals</th>
-                                                <th>Actual Cost</th>
-                                                <th>Selling Value</th>
-                                                <th>Profit / Loss</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {getVisibleRows('company-profitability', companyBusinessAnalytics).map((row) => (
-                                                <tr key={row.companyName}>
-                                                    <td>{row.companyName}</td>
-                                                    <td>{row.deals}</td>
-                                                    <td>{formatCurrency(row.actual)}</td>
-                                                    <td>{formatCurrency(row.selling)}</td>
-                                                    <td>
-                                                        <span className={row.profit >= 0 ? 'pill-active' : 'pill-warning'}>
-                                                            {formatCurrency(row.profit)}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                    {renderTableLimitControl('company-profitability', companyBusinessAnalytics.length)}
-                                </>
-                            )}
                         </div>
-                        ) : null}
 
-                        <div className="dashboard-split">
-                            {canViewDashboardRecentApplications ? (
-                            <div className="table-card">
-                                <h3>{Number(user?.role_id) === 3 ? 'My Applications' : 'Recent Applications'}</h3>
-                                {filteredApplications.length === 0 ? (
-                                    renderEmptyState('No lease applications are available yet. Create one to see it here.')
-                                ) : (
-                                    <>
-                                        <table className="pro-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Client Name</th>
-                                                    <th>Vehicle Model</th>
-                                                    <th>Status</th>
-                                                    <th>Monthly Rate</th>
-                                                    <th>Total Amount</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {getVisibleRows('recent-applications', filteredApplications).map((application) => (
-                                                    <tr key={application.id}>
-                                                        <td>{application.customer_name || 'Unassigned Customer'}</td>
-                                                        <td>{[application.brand, application.model].filter(Boolean).join(' ') || 'Vehicle Pending'}</td>
-                                                        <td><span className={getStatusClass(application.status)}>{application.status || 'Unknown'}</span></td>
-                                                        <td>{formatCurrency(application.monthly_installment)}</td>
-                                                        <td>{formatCurrency(application.total_amount)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                        {renderTableLimitControl('recent-applications', filteredApplications.length)}
-                                    </>
-                                )}
-                            </div>
-                            ) : null}
-
+                        <div className="dashboard-split dashboard-split-compact">
                             {canViewDashboardRecentEmployees ? (
                             <div className="table-card">
                                 <h3>Recent Employees</h3>
