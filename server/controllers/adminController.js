@@ -65,7 +65,7 @@ const ensureNotificationReadsSchema = async () => {
     `);
 };
 
-const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies, wantsStockOrders) => {
+const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies, wantsStockOrders, wantsSalesTransactions = false) => {
     try {
         if (wantsProducts || wantsStockOrders) {
             await pool.query(`
@@ -80,6 +80,9 @@ const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies, 
                     ADD COLUMN IF NOT EXISTS dealer_id UUID,
                     ADD COLUMN IF NOT EXISTS created_by UUID
             `);
+        }
+        if (wantsSalesTransactions) {
+            await pool.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS print_actual_price BOOLEAN NOT NULL DEFAULT FALSE');
         }
         if (wantsStockOrders || wantsProducts || wantsCompanies) {
             await pool.query(`
@@ -354,6 +357,23 @@ exports.getDashboardData = async (req, res) => {
         ]);
 
         const requestedPage = String(req.query.page || 'dashboard').trim().toLowerCase();
+        const shouldLoadReportPreview = ['1', 'true', 'yes'].includes(String(req.query.preview || '').trim().toLowerCase());
+        const reportPreviewGroupsByPage = {
+            'report-stock-inventory': ['stockOrders', 'inventory', 'salesTransactions', 'dealers'],
+            'report-daily-sales': ['salesTransactions', 'dealers', 'employeeFinancials'],
+            'report-stock-received': ['stockOrders', 'dealers'],
+            'report-customers': ['customers', 'dealers'],
+            'report-customer-transactions': ['salesTransactions', 'dealers'],
+            'report-business-transactions': ['salesTransactions', 'dealers'],
+            'report-invoice-view': ['salesTransactions', 'dealers'],
+            'report-employees': ['employees', 'dealers', 'employeeFinancials'],
+            'report-salary': ['employees', 'dealers', 'employeeFinancials'],
+            'report-dealer-information': ['dealers', 'employees'],
+            'report-dealer-employees': ['dealers', 'employees'],
+        };
+        const reportFilterGroupsByPage = Object.fromEntries(
+            Object.keys(reportPreviewGroupsByPage).map((pageKey) => [pageKey, ['dealers']])
+        );
         const dashboardGroupsByPage = {
             dashboard: ['metrics', 'ads', 'notifications', 'dealers'],
             customers: ['customers', 'dealers'],
@@ -369,18 +389,8 @@ exports.getDashboardData = async (req, res) => {
             sales: ['salesTransactions', 'customers', 'inventory', 'dealers', 'workflowDefinitions'],
             transactions: ['salesTransactions'],
             installments: ['salesTransactions', 'customers', 'inventory'],
-            reports: [],
-            'report-stock-inventory': ['stockOrders', 'inventory', 'salesTransactions', 'dealers'],
-            'report-daily-sales': ['salesTransactions', 'dealers', 'employeeFinancials'],
-            'report-stock-received': ['stockOrders', 'dealers'],
-            'report-customers': ['customers', 'dealers'],
-            'report-customer-transactions': ['salesTransactions', 'dealers'],
-            'report-business-transactions': ['salesTransactions', 'dealers'],
-            'report-invoice-view': ['salesTransactions', 'dealers'],
-            'report-employees': ['employees', 'dealers', 'employeeFinancials'],
-            'report-salary': ['employees', 'dealers', 'employeeFinancials'],
-            'report-dealer-information': ['dealers', 'employees'],
-            'report-dealer-employees': ['dealers', 'employees'],
+            reports: ['dealers'],
+            ...(shouldLoadReportPreview ? reportPreviewGroupsByPage : reportFilterGroupsByPage),
         };
         const requestedGroups = new Set([
             ...(dashboardGroupsByPage[requestedPage] || dashboardGroupsByPage.dashboard),
@@ -389,7 +399,8 @@ exports.getDashboardData = async (req, res) => {
         const dealerScopeColumnsReady = await ensureDashboardDealerScopeColumns(
             wantsGroup('products'),
             wantsGroup('companies'),
-            wantsGroup('stockOrders') || wantsGroup('inventory')
+            wantsGroup('stockOrders') || wantsGroup('inventory'),
+            wantsGroup('salesTransactions')
         );
         if (wantsGroup('products') || wantsGroup('companies') || wantsGroup('stockOrders') || wantsGroup('inventory')) {
             await syncDealerOwnershipForRequest();
@@ -955,6 +966,7 @@ exports.getDashboardData = async (req, res) => {
                     st.agreement_pdf_url,
                     st.dealer_signature_url,
                     st.purchase_date,
+                    st.print_actual_price,
                     st.vehicle_price,
                     st.down_payment,
                     st.financed_amount,
@@ -1240,6 +1252,7 @@ exports.getDashboardData = async (req, res) => {
                     st.bank_check_url,
                     st.misc_document_url,
                     st.purchase_date,
+                    st.print_actual_price,
                     st.vehicle_price,
                     st.down_payment,
                     st.financed_amount,
@@ -1312,6 +1325,7 @@ exports.getDashboardData = async (req, res) => {
                     st.bank_check_url,
                     st.misc_document_url,
                     st.purchase_date,
+                    st.print_actual_price,
                     st.vehicle_price,
                     st.down_payment,
                     st.financed_amount,

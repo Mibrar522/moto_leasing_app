@@ -31,6 +31,7 @@ const getVehicleDealerExpression = () => 'COALESCE(v.dealer_id, so.dealer_id, ou
 const ensureSalesDealerColumns = async (client) => {
     await client.query('ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS dealer_id UUID');
     await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS dealer_id UUID');
+    await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS print_actual_price BOOLEAN NOT NULL DEFAULT FALSE');
     await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS dealer_id UUID');
     await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS received_amount NUMERIC(12, 2) NOT NULL DEFAULT 0');
     await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS carry_forward_amount NUMERIC(12, 2) NOT NULL DEFAULT 0');
@@ -208,6 +209,7 @@ exports.uploadSaleDocument = async (req, res) => {
 
 exports.listSales = async (req, res) => {
     try {
+        await ensureSalesDealerColumns(pool);
         const scope = getSalesScopeContext(req.user);
         const result = await pool.query(
             `
@@ -293,6 +295,7 @@ exports.createSale = async (req, res) => {
             monthly_installment,
             installment_months,
             first_due_date,
+            print_actual_price,
             witness_name,
             witness_cnic,
             witness_two_name,
@@ -392,9 +395,9 @@ exports.createSale = async (req, res) => {
                 agreement_date, agreement_pdf_url, dealer_signature_url, authorized_signature_url, customer_cnic_front_url, customer_cnic_back_url,
                 bank_check_url, misc_document_url, purchase_date, vehicle_price,
                 down_payment, financed_amount, monthly_installment, installment_months,
-                first_due_date, witness_name, witness_cnic, witness_two_name, witness_two_cnic, remarks, status
+                first_due_date, print_actual_price, witness_name, witness_cnic, witness_two_name, witness_two_cnic, remarks, status
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
             RETURNING *
             `,
             [
@@ -419,6 +422,7 @@ exports.createSale = async (req, res) => {
                 monthly_installment || 0,
                 installment_months || 0,
                 normalizedFirstDueDate,
+                Boolean(print_actual_price),
                 normalizeTextInput(witness_name),
                 normalizeTextInput(witness_cnic),
                 normalizeTextInput(witness_two_name),
@@ -531,6 +535,7 @@ exports.updateSale = async (req, res) => {
             monthly_installment,
             installment_months,
             first_due_date,
+            print_actual_price,
             witness_name,
             witness_cnic,
             witness_two_name,
@@ -657,12 +662,13 @@ exports.updateSale = async (req, res) => {
                 monthly_installment = $19,
                 installment_months = $20,
                 first_due_date = $21,
-                witness_name = $22,
-                witness_cnic = $23,
-                witness_two_name = $24,
-                witness_two_cnic = $25,
-                remarks = $26,
-                status = $27
+                print_actual_price = $22,
+                witness_name = $23,
+                witness_cnic = $24,
+                witness_two_name = $25,
+                witness_two_cnic = $26,
+                remarks = $27,
+                status = $28
             WHERE id = $1
             `,
             [
@@ -687,6 +693,7 @@ exports.updateSale = async (req, res) => {
                 monthly_installment || 0,
                 installment_months || 0,
                 first_due_date || null,
+                Boolean(print_actual_price),
                 witness_name || null,
                 witness_cnic || null,
                 witness_two_name || null,

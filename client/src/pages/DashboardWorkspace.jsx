@@ -160,6 +160,7 @@ const emptySaleForm = {
     installment_months: '',
     installment_margin_percent: '',
     installment_margin_value: '',
+    print_actual_price: false,
     first_due_date: '',
     witness_name: '',
     witness_cnic: '',
@@ -1656,21 +1657,29 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [savingAd, setSavingAd] = useState(false);
     const workflowTasksTableRef = useRef(null);
     const dashboardLoadRequestRef = useRef(0);
+    const initialDashboardLoadedRef = useRef(false);
 
-    const loadDashboard = async () => {
+    const loadDashboard = async (options = {}) => {
         const requestId = dashboardLoadRequestRef.current + 1;
         dashboardLoadRequestRef.current = requestId;
 
         try {
-            setLoading(true);
-            const requestedDashboardPage = routeActivePage || activePage || 'dashboard';
+            if (!initialDashboardLoadedRef.current) {
+                setLoading(true);
+            }
+            const requestedDashboardPage = options.page || routeActivePage || activePage || 'dashboard';
+            const requestParams = { page: requestedDashboardPage };
+            if (options.previewReport) {
+                requestParams.preview = '1';
+            }
             const { data } = await API.get('/admin/dashboard', {
-                params: { page: requestedDashboardPage },
+                params: requestParams,
             });
             if (requestId !== dashboardLoadRequestRef.current) {
                 return;
             }
             setDashboardData(data);
+            initialDashboardLoadedRef.current = true;
             localStorage.setItem('user', JSON.stringify(data.user));
             setReadNotificationKeys(data.notificationReadKeys || []);
             const assignments = (data.roles || []).reduce((acc, role) => {
@@ -1756,7 +1765,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
             status: reportStatus,
             keyword: reportKeyword,
         });
-        await loadDashboard();
+        await loadDashboard({ previewReport: true });
     };
 
     useEffect(() => {
@@ -4850,7 +4859,8 @@ const selectedCustomer = useMemo(
     };
 
     const handleSaleChange = (event) => {
-        const { name, value } = event.target;
+        const { name, type, value, checked } = event.target;
+        const nextValue = type === 'checkbox' ? checked : value;
         setSaleForm((current) => {
             if (name === 'customer_id') {
                 const selectedCustomer = (dashboardData.customers || []).find((customer) => customer.id === value);
@@ -4944,7 +4954,7 @@ const selectedCustomer = useMemo(
                 };
             }
 
-            return { ...current, [name]: value };
+            return { ...current, [name]: nextValue };
         });
     };
 
@@ -5342,6 +5352,7 @@ const selectedCustomer = useMemo(
             installment_months: String(sale.installment_months || ''),
             installment_margin_percent: sale.sale_mode === 'INSTALLMENT' && saleMarginPercent ? String(saleMarginPercent) : '',
             installment_margin_value: sale.sale_mode === 'INSTALLMENT' && saleMarginValue ? String(saleMarginValue) : '',
+            print_actual_price: Boolean(sale.print_actual_price),
             first_due_date: sale.first_due_date ? String(sale.first_due_date).slice(0, 10) : '',
             witness_name: sale.witness_name || '',
             witness_cnic: sale.witness_cnic || '',
@@ -5401,6 +5412,7 @@ const selectedCustomer = useMemo(
             installment_months: String(sale.installment_months || ''),
             installment_margin_percent: sale.sale_mode === 'INSTALLMENT' && saleMarginPercent ? String(saleMarginPercent) : '',
             installment_margin_value: sale.sale_mode === 'INSTALLMENT' && saleMarginValue ? String(saleMarginValue) : '',
+            print_actual_price: Boolean(sale.print_actual_price),
             first_due_date: sale.first_due_date ? String(sale.first_due_date).slice(0, 10) : '',
             witness_name: sale.witness_name || '',
             witness_cnic: sale.witness_cnic || '',
@@ -6432,6 +6444,7 @@ const selectedCustomer = useMemo(
                 financed_amount: Number(saleForm.financed_amount || 0),
                 monthly_installment: Number(saleForm.monthly_installment || 0),
                 installment_months: Number(saleForm.installment_months || 0),
+                print_actual_price: Boolean(saleForm.print_actual_price),
             };
             if (saleForm.id) {
                 await API.put(`/sales/${saleForm.id}`, payload);
@@ -6712,6 +6725,9 @@ const selectedCustomer = useMemo(
     const handlePrintInvoice = () => {
         if (!selectedInstallmentSale) return;
 
+        const showInstallmentActualPrice = Boolean(selectedInstallmentSale.print_actual_price);
+        const installmentActualPrice = Number(selectedInstallmentSale.purchase_price || selectedInstallmentSale.actual_price || 0);
+
         const bodyHtml = `
             <div class="page">
                 ${renderPrintBrandBlock()}
@@ -6739,6 +6755,7 @@ const selectedCustomer = useMemo(
                         <div><span class="label">Registration</span><div class="value">${escapeHtml(selectedInstallmentSale.registration_number || 'Not set')}</div></div>
                         <div><span class="label">Chassis</span><div class="value">${escapeHtml(selectedInstallmentSale.chassis_number || 'Not set')}</div></div>
                         <div><span class="label">Engine</span><div class="value">${escapeHtml(selectedInstallmentSale.engine_number || 'Not set')}</div></div>
+                        ${showInstallmentActualPrice ? `<div><span class="label">Actual Price</span><div class="value">${escapeHtml(formatCurrency(installmentActualPrice))}</div></div>` : ''}
                         <div><span class="label">Total Price</span><div class="value">${escapeHtml(formatCurrency(selectedInstallmentSale.vehicle_price))}</div></div>
                         <div><span class="label">Down Payment</span><div class="value">${escapeHtml(formatCurrency(selectedInstallmentSale.down_payment))}</div></div>
                         <div><span class="label">Monthly Installment</span><div class="value">${escapeHtml(formatCurrency(selectedInstallmentSale.monthly_installment))}</div></div>
@@ -6813,6 +6830,9 @@ const selectedCustomer = useMemo(
         const printContext = getSalePrintContext(sale);
         const isInstallment = String(sale.sale_mode || '').toUpperCase() === 'INSTALLMENT';
 
+        const showTransactionActualPrice = Boolean(sale.print_actual_price);
+        const transactionActualPrice = Number(sale.purchase_price || sale.actual_price || 0);
+
         const bodyHtml = `
             <div class="page">
                 ${renderPrintBrandBlock()}
@@ -6842,6 +6862,7 @@ const selectedCustomer = useMemo(
                         <div><span class="label">Purchase Date</span><div class="value">${escapeHtml(sale.purchase_date || 'Not set')}</div></div>
                         <div><span class="label">Chassis</span><div class="value">${escapeHtml(sale.chassis_number || 'Not set')}</div></div>
                         <div><span class="label">Engine</span><div class="value">${escapeHtml(sale.engine_number || 'Not set')}</div></div>
+                        ${showTransactionActualPrice ? `<div><span class="label">Actual Price</span><div class="value">${escapeHtml(formatCurrency(transactionActualPrice))}</div></div>` : ''}
                         <div><span class="label">Total Price</span><div class="value">${escapeHtml(formatCurrency(sale.vehicle_price))}</div></div>
                         <div><span class="label">Status</span><div class="value">${escapeHtml(sale.status || 'Not set')}</div></div>
                         <div><span class="label">Down Payment</span><div class="value">${escapeHtml(formatCurrency(sale.down_payment || 0))}</div></div>
@@ -6883,6 +6904,7 @@ const selectedCustomer = useMemo(
         if (!row) return;
 
         const printedOn = new Date().toLocaleDateString('en-PK');
+
         const bodyHtml = `
             <div class="page">
                 ${renderPrintBrandBlock()}
@@ -7484,6 +7506,7 @@ const selectedCustomer = useMemo(
         // So the next month's payable is simply the next pending installment's amount (already adjusted).
         const nextMonthPayableRaw = Math.max(Number(context.nextMonthValue || 0), 0);
         const nextMonthPayable = Math.min(nextMonthPayableRaw, Math.max(Number(context.overallRemainingAfter || 0), 0));
+
         const bodyHtml = `
             <div class="page">
                 ${renderPrintBrandBlock()}

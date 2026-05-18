@@ -170,6 +170,7 @@ if (!canCreateSales) {
                                     <label className="field"><span>Agreement Date</span><input type="date" name="agreement_date" value={saleForm.agreement_date || ''} onChange={handleSaleChange} /></label>
                                     <label className="field"><span>Purchase Date</span><input type="date" name="purchase_date" value={saleForm.purchase_date || ''} onChange={handleSaleChange} /></label>
                                     <label className="field"><span>Actual Price</span><input type="number" min="0" step="0.01" value={actualVehiclePrice ?? 0} readOnly /></label>
+                                    <label className="field checkbox-field"><span>Print Actual Price on Invoice</span><input type="checkbox" name="print_actual_price" checked={Boolean(saleForm.print_actual_price)} onChange={handleSaleChange} /></label>
                                     {saleForm.sale_mode === 'CASH' ? (
                                         <>
                                             <label className="field"><span>Purchase Price</span><input type="number" min="0" step="0.01" value={actualVehiclePrice ?? 0} readOnly /></label>
