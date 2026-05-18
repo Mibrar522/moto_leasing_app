@@ -1842,11 +1842,11 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canViewWorkflow = hasAnyFeature(user, ['FEAT_WORKFLOW_VIEW']);
     const canUseOcr = hasAnyFeature(user, ['FEAT_OCR_SCAN']);
     const canUseBiometric = hasAnyFeature(user, ['FEAT_BIOMETRIC']);
-    const canEditCustomerOcrFields = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_FIELDS', 'FEAT_OCR_SCAN', 'FEAT_CUSTOMER_MGMT']);
-    const canProcessCustomerOcr = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_PROCESS', 'FEAT_OCR_SCAN']);
+    const canEditCustomerOcrFields = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_FIELDS']);
+    const canProcessCustomerOcr = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_PROCESS']);
     const canCreateCustomerBiometric = hasAnyFeature(user, ['FEAT_CUSTOMER_BIOMETRIC', 'FEAT_BIOMETRIC']);
-    const canEditCustomerFingerprintFields = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_FIELDS', 'FEAT_CUSTOMER_BIOMETRIC', 'FEAT_BIOMETRIC']);
-    const canScanCustomerFingerprint = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_SCAN', 'FEAT_CUSTOMER_BIOMETRIC', 'FEAT_BIOMETRIC']);
+    const canEditCustomerFingerprintFields = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_FIELDS']);
+    const canScanCustomerFingerprint = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_SCAN']);
     const canManageCustomers = hasAnyFeature(user, ['FEAT_CUSTOMER_MGMT']);
     const canManageProducts = hasAnyFeature(user, ['FEAT_PRODUCT_MGMT', 'FEAT_FLEET_MGMT']);
     const canManageStock = hasAnyFeature(user, ['FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT']);
