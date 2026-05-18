@@ -310,6 +310,7 @@ const ACCESS_PAGE_GROUPS = [
         label: 'Customers',
         description: 'Customer records, OCR, and biometric functions.',
         featureKeys: [
+            'FEAT_CUSTOMER_MGMT',
             'FEAT_CUSTOMER_FORM',
             'FEAT_CUSTOMER_FINGERPRINT',
             'FEAT_CUSTOMER_REGISTER',
@@ -374,7 +375,7 @@ const ACCESS_PAGE_GROUPS = [
         key: 'dealers',
         label: 'Dealers',
         description: 'Dealer application and dealer setup access.',
-        featureKeys: ['FEAT_DEALER_FORM', 'FEAT_DEALER_SUMMARY', 'FEAT_DEALER_DIRECTORY'],
+        featureKeys: ['FEAT_DEALER_MGMT', 'FEAT_DEALER_FORM', 'FEAT_DEALER_SUMMARY', 'FEAT_DEALER_DIRECTORY'],
     },
     {
         key: 'reports',
@@ -906,6 +907,7 @@ const FEATURE_ACCESS_LABELS = {
     FEAT_WORKFLOW_TASKS: 'User Tasks',
     FEAT_WORKFLOW_CONFIG: 'Approval Flow Setup',
     FEAT_PROFILE_SWITCH: 'Profile Switch',
+    FEAT_CUSTOMER_MGMT: 'Open Customers Page',
     FEAT_CUSTOMER_FORM: 'New Customer Intake',
     FEAT_CUSTOMER_FINGERPRINT: 'Fingerprint Intake',
     FEAT_OCR_SCAN: 'OCR Upload Access',
@@ -951,6 +953,7 @@ const FEATURE_ACCESS_LABELS = {
     FEAT_EMPLOYEE_SALARY_RECORD: 'Current Month Salary Record',
     FEAT_EMPLOYEE_ADVANCE_HISTORY: 'Current Month Advance History',
     FEAT_EMPLOYEE_GENERATED_SALARIES: 'Current Month Generated Salaries',
+    FEAT_DEALER_MGMT: 'Open Dealers Page',
     FEAT_DEALER_FORM: 'New Dealer',
     FEAT_DEALER_SUMMARY: 'Fresh Start Summary',
     FEAT_DEALER_DIRECTORY: 'Dealer Directory',
@@ -2008,9 +2011,13 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         'FEAT_CUSTOMER_RECORD_EDIT',
         'FEAT_CUSTOMER_RECORD_DELETE',
         'FEAT_CUSTOMER_FINGERPRINT',
+        'FEAT_CUSTOMER_OCR_FIELDS',
+        'FEAT_CUSTOMER_OCR_PROCESS',
         'FEAT_CUSTOMER_BIOMETRIC',
         'FEAT_OCR_SCAN',
         'FEAT_BIOMETRIC',
+        'FEAT_CUSTOMER_FINGERPRINT_FIELDS',
+        'FEAT_CUSTOMER_FINGERPRINT_SCAN',
     ]) || canManageEmployees;
     const canViewDashboardAccessProfile = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_ACCESS_PROFILE']);
     const canViewDashboardSalesPerformance = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_SALES_PERFORMANCE']);
@@ -2048,14 +2055,14 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canViewSalesAgreementSummary = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_AGREEMENT_SUMMARY']);
     const canViewSalesInstallmentPreview = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_INSTALLMENT_PREVIEW']);
     const canViewSalesRegister = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_REGISTER']);
-    const canUpdateSalesRegister = hasAnyFeature(user, ['FEAT_SALES_UPDATE', 'FEAT_SALES_MGMT']);
+    const canUpdateSalesRegister = hasAnyFeature(user, ['FEAT_SALES_UPDATE']);
     const canViewTransactionRegister = canManageSales && hasAnyFeature(user, ['FEAT_TRANSACTION_REGISTER']);
     const canViewStockOrderForm = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_ORDER_FORM']);
     const canViewStockReceived = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_RECEIVED_VIEW']);
     const canViewStockRegister = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_REGISTER']);
-    const canReceiveStock = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_RECEIVE', 'FEAT_STOCK_RECEIVED_VIEW', 'FEAT_STOCK_MGMT']);
-    const canUpdateStockOrder = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_UPDATE', 'FEAT_STOCK_MGMT']);
-    const canDeleteStockOrder = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_DELETE', 'FEAT_STOCK_MGMT']);
+    const canReceiveStock = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_RECEIVE']);
+    const canUpdateStockOrder = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_UPDATE']);
+    const canDeleteStockOrder = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_DELETE']);
     const canViewInstallmentOverview = canManageInstallments && hasAnyFeature(user, ['FEAT_INSTALLMENT_OVERVIEW']);
     const canViewInstallmentCollection = canManageInstallments && hasAnyFeature(user, ['FEAT_INSTALLMENT_COLLECTION']);
     const canOpenSalesWorkspace = [
@@ -2068,14 +2075,14 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         canViewInstallmentOverview,
         canViewInstallmentCollection,
     ].some(Boolean);
-const canEditCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_EDIT', 'FEAT_CUSTOMER_MGMT']);
-const canDeleteCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_DELETE', 'FEAT_CUSTOMER_MGMT']);
-const canViewCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_VIEW', 'FEAT_CUSTOMER_MGMT', 'FEAT_CUSTOMER_RECORD_EDIT', 'FEAT_CUSTOMER_RECORD_DELETE']);
-const canViewCustomerRegister = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_REGISTER', 'FEAT_CUSTOMER_MGMT', 'FEAT_CUSTOMER_RECORD_VIEW', 'FEAT_CUSTOMER_RECORD_EDIT', 'FEAT_CUSTOMER_RECORD_DELETE']);
-const canViewCustomerFingerprint = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT', 'FEAT_CUSTOMER_MGMT', 'FEAT_CUSTOMER_BIOMETRIC', 'FEAT_BIOMETRIC']);
+const canEditCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_EDIT']);
+const canDeleteCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_DELETE']);
+const canViewCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_VIEW']);
+const canViewCustomerRegister = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_REGISTER']);
+const canViewCustomerFingerprint = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT']);
 // Show the intake form if the role explicitly has it, or if they can edit customer records (edit button uses the form).
-const canViewCustomerForm = canOpenCustomers && (hasAnyFeature(user, ['FEAT_CUSTOMER_FORM', 'FEAT_CUSTOMER_MGMT']) || canEditCustomerRecord);
-const canUnlockCustomerOwnership = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_OWNERSHIP_UNLOCK']) && hasAnyFeature(user, ['FEAT_CUSTOMER_MGMT']);
+const canViewCustomerForm = canOpenCustomers && (hasAnyFeature(user, ['FEAT_CUSTOMER_FORM']) || canEditCustomerRecord);
+const canUnlockCustomerOwnership = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_OWNERSHIP_UNLOCK']);
 const canViewEmployeeForm = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_FORM']);
 const canEditEmployees = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_EDIT']);
 const canChangeEmployeeRecord = canManageEmployees && (!employeeForm.id || canEditEmployees);
@@ -5535,7 +5542,7 @@ const selectedCustomer = useMemo(
             return;
         }
 
-        if (!customerForm.id && !canManageCustomers) {
+        if (!customerForm.id && !hasAnyFeature(user, ['FEAT_CUSTOMER_FORM'])) {
             setCustomerMessage('Your account does not have permission to create new customers.');
             return;
         }

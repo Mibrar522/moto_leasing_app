@@ -322,7 +322,7 @@ if (!canOpenCustomers) {
                                         </label>
                                         <label className="field full-span">
                                             <span>Signature Upload</span>
-                                            <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'signature_image_url', 'Signature', 'SIGNATURE')} disabled={!canManageCustomers || uploadingCustomerAsset} />
+                                            <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'signature_image_url', 'Signature', 'SIGNATURE')} disabled={!canViewCustomerForm || uploadingCustomerAsset} />
                                         </label>
                                         <div className="field full-span">
                                             <span className="meta-label">Signature Preview</span>
