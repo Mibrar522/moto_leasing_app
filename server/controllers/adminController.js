@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const { reconcileReceivedStockOrders } = require('./stockController');
 const { syncAccessCatalogDefaults } = require('../utils/accessBootstrap');
 const { syncDealerOwnership, syncDealerOwnershipForRequest } = require('../utils/dealerOwnershipBootstrap');
+const { ensurePerformanceIndexes } = require('../utils/performanceIndexes');
 
 const PENDING_APPLICATION_STATUSES = ['PENDING', 'SUBMITTED', 'UNDER_REVIEW'];
 const hasAnyFeature = (featureKeys = [], requiredKeys = []) => requiredKeys.some((featureKey) => featureKeys.includes(featureKey));
@@ -405,6 +406,7 @@ exports.getDashboardData = async (req, res) => {
         if (wantsGroup('products') || wantsGroup('companies') || wantsGroup('stockOrders') || wantsGroup('inventory')) {
             await syncDealerOwnershipForRequest();
         }
+        ensurePerformanceIndexes().catch((error) => console.warn('Performance index setup skipped:', error.message));
 
         const metricsResult = wantsGroup('metrics') ? await pool.query(
             `

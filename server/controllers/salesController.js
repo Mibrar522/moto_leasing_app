@@ -5,6 +5,7 @@ const {
     findApplicableSalesWorkflowDefinition,
     queueSaleForWorkflow,
 } = require('../services/workflowService');
+const { ensurePerformanceIndexes } = require('../utils/performanceIndexes');
 
 const isSuperAdminSession = (user = {}) =>
     Number(user?.real_role_id || user?.role_id) === 1 ||
@@ -210,6 +211,7 @@ exports.uploadSaleDocument = async (req, res) => {
 exports.listSales = async (req, res) => {
     try {
         await ensureSalesDealerColumns(pool);
+        ensurePerformanceIndexes().catch((error) => console.warn('Performance index setup skipped:', error.message));
         const scope = getSalesScopeContext(req.user);
         const result = await pool.query(
             `
