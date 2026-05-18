@@ -4362,40 +4362,47 @@ const selectedCustomer = useMemo(
                 : actualPrice * (1 + cashMarginPercent / 100)
             : 0;
 
-        setSaleForm((current) => ({
-            ...current,
-            vehicle_price:
-                current.sale_mode === 'INSTALLMENT'
-                    ? current.vehicle_price || String(actualPrice || '')
-                    : current.vehicle_price || (cashSellPrice > 0 ? String(cashSellPrice) : String(selectedSaleVehicle.purchase_price || '')),
-            monthly_installment:
-                current.sale_mode === 'INSTALLMENT'
-                    ? current.monthly_installment
-                    : current.monthly_installment,
-            installment_months:
-                current.sale_mode === 'INSTALLMENT'
-                    ? current.installment_months || '12'
-                    : current.installment_months,
-            installment_margin_percent:
-                current.sale_mode === 'INSTALLMENT'
-                    ? current.installment_margin_percent || ''
-                    : current.installment_margin_percent,
-            installment_margin_value:
-                current.sale_mode === 'INSTALLMENT'
-                    ? current.installment_margin_value || ''
-                    : current.installment_margin_value,
-            financed_amount:
-                current.sale_mode === 'INSTALLMENT'
-                    ? current.financed_amount || String(Math.max(Number(current.vehicle_price || selectedSaleVehicle.purchase_price || 0) - Number(current.down_payment || 0), 0))
-                    : current.financed_amount,
-        }));
+        setSaleForm((current) => {
+            const marginPercent = Number(current.installment_margin_percent || 0);
+            const marginValue = Number(current.installment_margin_value || 0) || (actualPrice > 0 && marginPercent > 0 ? roundCurrencyValue(actualPrice * (marginPercent / 100)) : 0);
+            const installmentSellPrice = roundCurrencyValue(actualPrice + marginValue);
+            const nextVehiclePrice = current.sale_mode === 'INSTALLMENT'
+                ? String(installmentSellPrice || actualPrice || '')
+                : (cashSellPrice > 0 ? String(cashSellPrice) : String(selectedSaleVehicle.purchase_price || ''));
+
+            return {
+                ...current,
+                vehicle_price: nextVehiclePrice,
+                monthly_installment:
+                    current.sale_mode === 'INSTALLMENT'
+                        ? current.monthly_installment
+                        : current.monthly_installment,
+                installment_months:
+                    current.sale_mode === 'INSTALLMENT'
+                        ? current.installment_months || '12'
+                        : current.installment_months,
+                installment_margin_percent:
+                    current.sale_mode === 'INSTALLMENT'
+                        ? current.installment_margin_percent || ''
+                        : current.installment_margin_percent,
+                installment_margin_value:
+                    current.sale_mode === 'INSTALLMENT'
+                        ? (marginValue ? String(marginValue) : current.installment_margin_value || '')
+                        : current.installment_margin_value,
+                financed_amount:
+                    current.sale_mode === 'INSTALLMENT'
+                        ? String(Math.max(Number(nextVehiclePrice || selectedSaleVehicle.purchase_price || 0) - Number(current.down_payment || 0), 0))
+                        : current.financed_amount,
+            };
+        });
     }, [selectedSaleVehicle]);
 
     useEffect(() => {
         if (!selectedStockProduct) return;
 
         setStockOrderForm((current) => {
-            const nextUnitPrice = current.unit_price || String(selectedStockProduct.purchase_price || '') || '';
+            const latestProductPrice = String(selectedStockProduct.purchase_price || '') || '';
+            const nextUnitPrice = current.id ? (current.unit_price || latestProductPrice) : latestProductPrice;
             const computedTotal = Number(nextUnitPrice || 0) > 0 ? String(Number(nextUnitPrice || 0)) : current.total_amount;
 
             if (
