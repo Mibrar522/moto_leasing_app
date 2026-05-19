@@ -7,6 +7,7 @@ export default function Customers({ ctx }) {
     canScanCustomerFingerprint,
     canDeleteCustomerRecord,
     canEditCustomerDealerDropdown,
+    canEditCustomerField,
     canEditCustomerRecord,
     canManageCustomers,
     canOpenCustomers,
@@ -104,7 +105,7 @@ if (!canOpenCustomers) {
                                 <div className="form-grid">
                                     <label className="field">
                                         <span>Assigned Dealer</span>
-                                        {canUnlockCustomerOwnership && canEditCustomerDealerDropdown ? (
+                                        {canUnlockCustomerOwnership && canEditCustomerDealerDropdown && canEditCustomerField('Assigned Dealer') ? (
                                             <select name="dealer_id" value={customerForm.dealer_id} onChange={handleCustomerChange}>
                                                 {isSuperAdmin ? <option value="">Select dealer</option> : null}
                                                 {customerDealerOptions.map((dealer) => (
@@ -117,7 +118,7 @@ if (!canOpenCustomers) {
                                     </label>
                                     <label className="field">
                                         <span>Created By</span>
-                                        {canUnlockCustomerOwnership ? (
+                                        {canUnlockCustomerOwnership && canEditCustomerField('Created By') ? (
                                             <select name="created_by_agent" value={customerForm.created_by_agent} onChange={handleCustomerChange}>
                                                 <option value="">Select owner</option>
                                                 {customerOwnershipCandidates.map((staff) => (
@@ -135,34 +136,34 @@ if (!canOpenCustomers) {
                                     </label>
                                     <label className="field">
                                         <span>Full Name</span>
-                                        <input name="full_name" value={customerForm.full_name} onChange={handleCustomerChange} placeholder="Customer legal name" />
+                                        <input name="full_name" value={customerForm.full_name} onChange={handleCustomerChange} placeholder="Customer legal name" disabled={!canEditCustomerField('Full Name')} />
                                     </label>
                                     <label className="field">
                                         <span>Father Name</span>
-                                        <input name="father_name" value={customerForm.father_name} onChange={handleCustomerChange} placeholder="Father name from CNIC" />
+                                        <input name="father_name" value={customerForm.father_name} onChange={handleCustomerChange} placeholder="Father name from CNIC" disabled={!canEditCustomerField('Father Name')} />
                                     </label>
                                     <label className="field">
                                         <span>Date Of Birth</span>
-                                        <input name="date_of_birth" value={customerForm.date_of_birth} onChange={handleCustomerChange} placeholder="16.06.1994" />
+                                        <input name="date_of_birth" value={customerForm.date_of_birth} onChange={handleCustomerChange} placeholder="16.06.1994" disabled={!canEditCustomerField('Date Of Birth')} />
                                     </label>
                                     <label className="field">
                                         <span>Gender</span>
-                                        <input name="gender" value={customerForm.gender} onChange={handleCustomerChange} placeholder="Male / Female" />
+                                        <input name="gender" value={customerForm.gender} onChange={handleCustomerChange} placeholder="Male / Female" disabled={!canEditCustomerField('Gender')} />
                                     </label>
                                     <label className="field">
                                         <span>Document Type</span>
-                                        <select name="document_type" value={customerForm.document_type} onChange={handleCustomerChange}>
+                                        <select name="document_type" value={customerForm.document_type} onChange={handleCustomerChange} disabled={!canEditCustomerField('Document Type')}>
                                             <option value="CNIC">CNIC</option>
                                             <option value="PASSPORT">Passport</option>
                                         </select>
                                     </label>
                                     <label className="field">
                                         <span>CNIC / Passport Number</span>
-                                        <input name="cnic_passport_number" value={customerForm.cnic_passport_number} onChange={handleCustomerChange} placeholder="35202-1234567-1 or passport no." />
+                                        <input name="cnic_passport_number" value={customerForm.cnic_passport_number} onChange={handleCustomerChange} placeholder="35202-1234567-1 or passport no." disabled={!canEditCustomerField('CNIC / Passport Number')} />
                                     </label>
                                     <label className="field">
                                         <span>CNIC Front Upload</span>
-                                        <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_url', 'CNIC front', 'CNIC_FRONT')} disabled={!canUseOcr || uploadingCustomerAsset} />
+                                        <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_url', 'CNIC front', 'CNIC_FRONT')} disabled={!canUseOcr || !canEditCustomerField('CNIC Front Upload') || uploadingCustomerAsset} />
                                     </label>
                                     <div className="field full-span">
                                         <span className="meta-label">CNIC Front Preview</span>
@@ -192,7 +193,7 @@ if (!canOpenCustomers) {
                                     </div>
                                     <label className="field">
                                         <span>CNIC Back Upload</span>
-                                        <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_back_url', 'CNIC back', 'CNIC_BACK')} disabled={!canUseOcr || uploadingCustomerAsset} />
+                                        <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_back_url', 'CNIC back', 'CNIC_BACK')} disabled={!canUseOcr || !canEditCustomerField('CNIC Back Upload') || uploadingCustomerAsset} />
                                     </label>
                                     <div className="field full-span">
                                         <span className="meta-label">CNIC Back Preview</span>
@@ -222,27 +223,27 @@ if (!canOpenCustomers) {
                                     </div>
                                     <label className="field">
                                         <span>Contact Email</span>
-                                        <input name="contact_email" value={customerForm.contact_email} onChange={handleCustomerChange} placeholder="customer@example.com" />
+                                        <input name="contact_email" value={customerForm.contact_email} onChange={handleCustomerChange} placeholder="customer@example.com" disabled={!canEditCustomerField('Contact Email')} />
                                     </label>
                                     <label className="field">
                                         <span>Contact Phone</span>
-                                        <input name="contact_phone" value={customerForm.contact_phone} onChange={handleCustomerChange} placeholder="+966..." />
+                                        <input name="contact_phone" value={customerForm.contact_phone} onChange={handleCustomerChange} placeholder="+966..." disabled={!canEditCustomerField('Contact Phone')} />
                                     </label>
                                     <label className="field">
                                         <span>Country</span>
-                                        <input name="country" value={customerForm.country} onChange={handleCustomerChange} placeholder="Pakistan" />
+                                        <input name="country" value={customerForm.country} onChange={handleCustomerChange} placeholder="Pakistan" disabled={!canEditCustomerField('Country')} />
                                     </label>
                                     <label className="field full-span">
                                         <span>Address</span>
-                                        <textarea name="address" value={customerForm.address} onChange={handleCustomerChange} rows="3" placeholder="Customer address from CNIC or entered manually" />
+                                        <textarea name="address" value={customerForm.address} onChange={handleCustomerChange} rows="3" placeholder="Customer address from CNIC or entered manually" disabled={!canEditCustomerField('Address')} />
                                     </label>
                                     <label className="field full-span">
                                         <span>OCR Extracted Name</span>
-                                        <input name="extracted_name" value={customerForm.extracted_name} onChange={handleCustomerChange} placeholder="Autofilled from OCR or entered manually" disabled={!canEditCustomerOcrFields} />
+                                        <input name="extracted_name" value={customerForm.extracted_name} onChange={handleCustomerChange} placeholder="Autofilled from OCR or entered manually" disabled={!canEditCustomerOcrFields || !canEditCustomerField('OCR Extracted Name')} />
                                     </label>
                                     <label className="field full-span">
                                         <span>OCR Scan Text</span>
-                                        <textarea name="raw_ocr_text" value={customerForm.raw_ocr_text} onChange={handleCustomerChange} rows="7" placeholder="Paste OCR text from the CNIC image here, then click Process OCR." disabled={!canEditCustomerOcrFields} />
+                                        <textarea name="raw_ocr_text" value={customerForm.raw_ocr_text} onChange={handleCustomerChange} rows="7" placeholder="Paste OCR text from the CNIC image here, then click Process OCR." disabled={!canEditCustomerOcrFields || !canEditCustomerField('OCR Scan Text')} />
                                     </label>
                                 </div>
 
@@ -264,19 +265,19 @@ if (!canOpenCustomers) {
                                     <div className="form-grid">
                                         <label className="field full-span">
                                             <span>Fingerprint Scanner Output</span>
-                                            <textarea name="fingerprint_seed" value={customerForm.fingerprint_seed} onChange={handleCustomerChange} rows="4" placeholder="Filled from the thumb device automatically, or paste enrollment seed here as a fallback." disabled={!canEditCustomerFingerprintFields} />
+                                            <textarea name="fingerprint_seed" value={customerForm.fingerprint_seed} onChange={handleCustomerChange} rows="4" placeholder="Filled from the thumb device automatically, or paste enrollment seed here as a fallback." disabled={!canEditCustomerFingerprintFields || !canEditCustomerField('Fingerprint Scanner Output')} />
                                         </label>
                                         <label className="field">
                                             <span>Scanner Device</span>
-                                            <input name="fingerprint_device" value={customerForm.fingerprint_device} onChange={handleCustomerChange} placeholder="SecuGen / Mantra / Digital Persona" disabled={!canEditCustomerFingerprintFields} />
+                                            <input name="fingerprint_device" value={customerForm.fingerprint_device} onChange={handleCustomerChange} placeholder="SecuGen / Mantra / Digital Persona" disabled={!canEditCustomerFingerprintFields || !canEditCustomerField('Scanner Device')} />
                                         </label>
                                         <label className="field">
                                             <span>Scan Quality</span>
-                                            <input name="fingerprint_quality" value={customerForm.fingerprint_quality} onChange={handleCustomerChange} placeholder="HIGH / MEDIUM / LOW" disabled={!canEditCustomerFingerprintFields} />
+                                            <input name="fingerprint_quality" value={customerForm.fingerprint_quality} onChange={handleCustomerChange} placeholder="HIGH / MEDIUM / LOW" disabled={!canEditCustomerFingerprintFields || !canEditCustomerField('Scan Quality')} />
                                         </label>
                                         <label className="field">
                                             <span>Fingerprint Status</span>
-                                            <select name="fingerprint_status" value={customerForm.fingerprint_status} onChange={handleCustomerChange} disabled={!canEditCustomerFingerprintFields}>
+                                            <select name="fingerprint_status" value={customerForm.fingerprint_status} onChange={handleCustomerChange} disabled={!canEditCustomerFingerprintFields || !canEditCustomerField('Fingerprint Status')}>
                                                 <option value="NOT_CAPTURED">Not Captured</option>
                                                 <option value="PENDING">Pending</option>
                                                 <option value="ENROLLED">Enrolled</option>
@@ -284,15 +285,15 @@ if (!canOpenCustomers) {
                                         </label>
                                         <label className="field full-span">
                                             <span>Biometric Hash</span>
-                                            <textarea name="biometric_hash" value={customerForm.biometric_hash} onChange={handleCustomerChange} rows="3" placeholder="Generated fingerprint hash appears here" disabled={!canEditCustomerFingerprintFields} />
+                                            <textarea name="biometric_hash" value={customerForm.biometric_hash} onChange={handleCustomerChange} rows="3" placeholder="Generated fingerprint hash appears here" disabled={!canEditCustomerFingerprintFields || !canEditCustomerField('Biometric Hash')} />
                                         </label>
                                         <label className="field full-span">
                                             <span>Biometric Thumb URL</span>
-                                            <input name="fingerprint_thumb_url" value={customerForm.fingerprint_thumb_url} onChange={handleCustomerChange} placeholder="/uploads/customers/..." disabled={!canEditCustomerFingerprintFields} />
+                                            <input name="fingerprint_thumb_url" value={customerForm.fingerprint_thumb_url} onChange={handleCustomerChange} placeholder="/uploads/customers/..." disabled={!canEditCustomerFingerprintFields || !canEditCustomerField('Biometric Thumb URL')} />
                                         </label>
                                         <label className="field full-span">
                                             <span>Thumb Upload</span>
-                                            <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'fingerprint_thumb_url', 'Thumb image', 'THUMB')} disabled={!canEditCustomerFingerprintFields || uploadingCustomerAsset} />
+                                            <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'fingerprint_thumb_url', 'Thumb image', 'THUMB')} disabled={!canEditCustomerFingerprintFields || !canEditCustomerField('Thumb Upload') || uploadingCustomerAsset} />
                                         </label>
                                         <div className="field full-span">
                                             <span className="meta-label">Thumb Preview</span>
@@ -310,11 +311,11 @@ if (!canOpenCustomers) {
                                         </div>
                                         <label className="field full-span">
                                             <span>Signature URL</span>
-                                            <input name="signature_image_url" value={customerForm.signature_image_url} onChange={handleCustomerChange} placeholder="/uploads/customers/..." />
+                                            <input name="signature_image_url" value={customerForm.signature_image_url} onChange={handleCustomerChange} placeholder="/uploads/customers/..." disabled={!canEditCustomerField('Signature URL')} />
                                         </label>
                                         <label className="field full-span">
                                             <span>Signature Upload</span>
-                                            <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'signature_image_url', 'Signature', 'SIGNATURE')} disabled={!canViewCustomerForm || uploadingCustomerAsset} />
+                                            <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'signature_image_url', 'Signature', 'SIGNATURE')} disabled={!canViewCustomerForm || !canEditCustomerField('Signature Upload') || uploadingCustomerAsset} />
                                         </label>
                                         <div className="field full-span">
                                             <span className="meta-label">Signature Preview</span>

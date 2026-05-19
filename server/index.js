@@ -27,7 +27,7 @@ const appOrderRoutes = require('./routes/appOrderRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 
 // Import utilities
-const { syncAccessControlDefaults } = require('./utils/accessBootstrap');
+const { syncAccessControlDefaults, syncAccessCatalogDefaults } = require('./utils/accessBootstrap');
 const { syncCustomerAppSchema } = require('./utils/customerAppBootstrap');
 const { syncCustomerCoreSchema } = require('./utils/customerCoreBootstrap');
 const { syncDealerOwnership } = require('./utils/dealerOwnershipBootstrap');
@@ -146,6 +146,12 @@ const startServer = async () => {
             console.log('Access-control defaults verified.');
         } catch (bootstrapError) {
             console.warn('Access-control bootstrap skipped:', bootstrapError.message);
+            try {
+                await syncAccessCatalogDefaults();
+                console.log('Access-control catalog fallback verified.');
+            } catch (catalogError) {
+                console.warn('Access-control catalog fallback skipped:', catalogError.message);
+            }
         }
 
         try {

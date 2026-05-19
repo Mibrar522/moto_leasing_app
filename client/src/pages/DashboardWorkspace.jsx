@@ -250,6 +250,78 @@ const emptyAdForm = {
     dealer_id: '',
 };
 
+
+const CUSTOMER_FIELD_ACCESS = [
+    ['FEAT_CUSTOMER_FIELD_ASSIGNED_DEALER', 'Assigned Dealer'],
+    ['FEAT_CUSTOMER_FIELD_CREATED_BY', 'Created By'],
+    ['FEAT_CUSTOMER_FIELD_FULL_NAME', 'Full Name'],
+    ['FEAT_CUSTOMER_FIELD_FATHER_NAME', 'Father Name'],
+    ['FEAT_CUSTOMER_FIELD_DATE_OF_BIRTH', 'Date Of Birth'],
+    ['FEAT_CUSTOMER_FIELD_GENDER', 'Gender'],
+    ['FEAT_CUSTOMER_FIELD_DOCUMENT_TYPE', 'Document Type'],
+    ['FEAT_CUSTOMER_FIELD_CNIC_PASSPORT_NUMBER', 'CNIC / Passport Number'],
+    ['FEAT_CUSTOMER_FIELD_CNIC_FRONT_UPLOAD', 'CNIC Front Upload'],
+    ['FEAT_CUSTOMER_FIELD_CNIC_BACK_UPLOAD', 'CNIC Back Upload'],
+    ['FEAT_CUSTOMER_FIELD_CONTACT_EMAIL', 'Contact Email'],
+    ['FEAT_CUSTOMER_FIELD_CONTACT_PHONE', 'Contact Phone'],
+    ['FEAT_CUSTOMER_FIELD_COUNTRY', 'Country'],
+    ['FEAT_CUSTOMER_FIELD_ADDRESS', 'Address'],
+    ['FEAT_CUSTOMER_FIELD_OCR_EXTRACTED_NAME', 'OCR Extracted Name'],
+    ['FEAT_CUSTOMER_FIELD_OCR_SCAN_TEXT', 'OCR Scan Text'],
+    ['FEAT_CUSTOMER_FIELD_FINGERPRINT_SCANNER_OUTPUT', 'Fingerprint Scanner Output'],
+    ['FEAT_CUSTOMER_FIELD_SCANNER_DEVICE', 'Scanner Device'],
+    ['FEAT_CUSTOMER_FIELD_SCAN_QUALITY', 'Scan Quality'],
+    ['FEAT_CUSTOMER_FIELD_FINGERPRINT_STATUS', 'Fingerprint Status'],
+    ['FEAT_CUSTOMER_FIELD_BIOMETRIC_HASH', 'Biometric Hash'],
+    ['FEAT_CUSTOMER_FIELD_BIOMETRIC_THUMB_URL', 'Biometric Thumb URL'],
+    ['FEAT_CUSTOMER_FIELD_THUMB_UPLOAD', 'Thumb Upload'],
+    ['FEAT_CUSTOMER_FIELD_SIGNATURE_URL', 'Signature URL'],
+    ['FEAT_CUSTOMER_FIELD_SIGNATURE_UPLOAD', 'Signature Upload'],
+];
+
+const SALES_FIELD_ACCESS = [
+    ['FEAT_SALES_FIELD_CUSTOMER', 'Customer'],
+    ['FEAT_SALES_FIELD_AVAILABLE_STOCK', 'Available Stock'],
+    ['FEAT_SALES_FIELD_SALE_MODE', 'Sale Mode'],
+    ['FEAT_SALES_FIELD_AGREEMENT_NUMBER', 'Agreement Number'],
+    ['FEAT_SALES_FIELD_AGREEMENT_DATE', 'Agreement Date'],
+    ['FEAT_SALES_FIELD_PURCHASE_DATE', 'Purchase Date'],
+    ['FEAT_SALES_FIELD_ACTUAL_PRICE', 'Actual Price'],
+    ['FEAT_SALES_FIELD_PRINT_ACTUAL_PRICE_ON_INVOICE', 'Print Actual Price on Invoice'],
+    ['FEAT_SALES_FIELD_PURCHASE_PRICE', 'Purchase Price'],
+    ['FEAT_SALES_FIELD_SELLING_PRICE', 'Selling Price'],
+    ['FEAT_SALES_FIELD_TOTAL_PRICE', 'Total Price'],
+    ['FEAT_SALES_FIELD_MARGIN_PERCENT', 'Margin %'],
+    ['FEAT_SALES_FIELD_MARGIN_VALUE', 'Margin Value'],
+    ['FEAT_SALES_FIELD_MARKUP_PERCENTAGE', 'Markup Percentage'],
+    ['FEAT_SALES_FIELD_DOWN_PAYMENT', 'Down Payment'],
+    ['FEAT_SALES_FIELD_MONTHLY_INSTALLMENT', 'Monthly Installment'],
+    ['FEAT_SALES_FIELD_WITNESS_NAME', 'Witness Name'],
+    ['FEAT_SALES_FIELD_WITNESS_CNIC', 'Witness CNIC'],
+    ['FEAT_SALES_FIELD_WITNESS_2_NAME', 'Witness 2 Name'],
+    ['FEAT_SALES_FIELD_WITNESS_2_CNIC', 'Witness 2 CNIC'],
+    ['FEAT_SALES_FIELD_AGREEMENT_PDF', 'Agreement PDF'],
+    ['FEAT_SALES_FIELD_UPLOADED_AGREEMENT_URL', 'Uploaded Agreement URL'],
+    ['FEAT_SALES_FIELD_DEALER_SIGNATURE_UPLOAD', 'Dealer Signature Upload'],
+    ['FEAT_SALES_FIELD_DEALER_SIGNATURE_URL', 'Dealer Signature URL'],
+    ['FEAT_SALES_FIELD_AUTHORIZED_SIGNATURE_UPLOAD', 'Authorized Signature Upload'],
+    ['FEAT_SALES_FIELD_AUTHORIZED_SIGNATURE_URL', 'Authorized Signature URL'],
+    ['FEAT_SALES_FIELD_CUSTOMER_CNIC_FRONT_UPLOAD', 'Customer CNIC Front Upload'],
+    ['FEAT_SALES_FIELD_CUSTOMER_CNIC_FRONT_URL', 'Customer CNIC Front URL'],
+    ['FEAT_SALES_FIELD_CUSTOMER_CNIC_BACK_UPLOAD', 'Customer CNIC Back Upload'],
+    ['FEAT_SALES_FIELD_CUSTOMER_CNIC_BACK_URL', 'Customer CNIC Back URL'],
+    ['FEAT_SALES_FIELD_BANK_CHECK_UPLOAD', 'Bank Check Upload'],
+    ['FEAT_SALES_FIELD_UPLOADED_BANK_CHECK_URL', 'Uploaded Bank Check URL'],
+    ['FEAT_SALES_FIELD_MISC_DOCUMENT_UPLOAD', 'Misc Document Upload'],
+    ['FEAT_SALES_FIELD_UPLOADED_MISC_DOCUMENT_URL', 'Uploaded Misc Document URL'],
+    ['FEAT_SALES_FIELD_REMARKS', 'Remarks'],
+    ['FEAT_SALES_FIELD_FINANCED_AMOUNT', 'Financed Amount'],
+    ['FEAT_SALES_FIELD_INSTALLMENT_MONTHS', 'Installment Months'],
+    ['FEAT_SALES_FIELD_FIRST_DUE_DATE', 'First Due Date'],
+];
+
+const CUSTOMER_FIELD_FEATURE_MAP = Object.fromEntries(CUSTOMER_FIELD_ACCESS.map(([featureKey, label]) => [label, featureKey]));
+const SALES_FIELD_FEATURE_MAP = Object.fromEntries(SALES_FIELD_ACCESS.map(([featureKey, label]) => [label, featureKey]));
 const ACCESS_PAGE_GROUPS = [
     {
         key: 'dashboard',
@@ -325,6 +397,7 @@ const ACCESS_PAGE_GROUPS = [
             'FEAT_BIOMETRIC',
             'FEAT_CUSTOMER_FINGERPRINT_FIELDS',
             'FEAT_CUSTOMER_FINGERPRINT_SCAN',
+            ...CUSTOMER_FIELD_ACCESS.map(([featureKey]) => featureKey),
         ],
     },
     {
@@ -343,7 +416,7 @@ const ACCESS_PAGE_GROUPS = [
         key: 'sales',
         label: 'Sales',
         description: 'Sale creation, sales register, and transaction register access.',
-        featureKeys: ['FEAT_SALES_CREATE', 'FEAT_SALES_MGMT', 'FEAT_SALES_AGREEMENT_FORM', 'FEAT_SALES_AGREEMENT_SUMMARY', 'FEAT_SALES_INSTALLMENT_PREVIEW', 'FEAT_SALES_REGISTER', 'FEAT_SALES_UPDATE', 'FEAT_SALES_URL_FIELDS', 'FEAT_TRANSACTION_REGISTER'],
+        featureKeys: ['FEAT_SALES_CREATE', 'FEAT_SALES_MGMT', 'FEAT_SALES_AGREEMENT_FORM', 'FEAT_SALES_AGREEMENT_SUMMARY', 'FEAT_SALES_INSTALLMENT_PREVIEW', 'FEAT_SALES_REGISTER', 'FEAT_SALES_UPDATE', 'FEAT_SALES_URL_FIELDS', 'FEAT_TRANSACTION_REGISTER', ...SALES_FIELD_ACCESS.map(([featureKey]) => featureKey)],
     },
     {
         key: 'installments',
@@ -937,6 +1010,7 @@ const FEATURE_ACCESS_LABELS = {
     FEAT_CUSTOMER_RECORD_EDIT: 'Edit Customer Record',
     FEAT_CUSTOMER_RECORD_DELETE: 'Delete Customer Record',
     FEAT_CUSTOMER_OWNERSHIP_UNLOCK: 'Unlock Assigned Dealer and Created By',
+    ...Object.fromEntries(CUSTOMER_FIELD_ACCESS.map(([featureKey, label]) => [featureKey, label])),
     FEAT_PRODUCT_FORM: 'New Product Master',
     FEAT_PRODUCT_TYPE_MGMT: 'Vehicle Type Master',
     FEAT_PRODUCT_REGISTER: 'Product Master Register',
@@ -949,6 +1023,7 @@ const FEATURE_ACCESS_LABELS = {
     FEAT_SALES_UPDATE: 'Sales Register Update Button',
     FEAT_SALES_URL_FIELDS: 'Sales Attachment URL Fields',
     FEAT_TRANSACTION_REGISTER: 'Transaction Register',
+    ...Object.fromEntries(SALES_FIELD_ACCESS.map(([featureKey, label]) => [featureKey, label])),
     FEAT_STOCK_ORDER_FORM: 'Order Stock',
     FEAT_STOCK_RECEIVED_VIEW: 'Stock Received From Company',
     FEAT_STOCK_REGISTER: 'Stock Ordering Register',
@@ -2124,6 +2199,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     // Show the intake form if the role explicitly has it, or if they can edit customer records (edit button uses the form).
     const canViewCustomerForm = canOpenCustomers && (hasAnyFeature(user, ['FEAT_CUSTOMER_FORM']) || canEditCustomerRecord);
     const canUnlockCustomerOwnership = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_OWNERSHIP_UNLOCK']);
+    const canEditCustomerField = (label) => canViewCustomerForm && hasAnyFeature(user, [CUSTOMER_FIELD_FEATURE_MAP[label]]);
+    const canEditSalesField = (label) => canViewSalesAgreementForm && hasAnyFeature(user, [SALES_FIELD_FEATURE_MAP[label]]);
     const canViewEmployeeForm = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_FORM']);
     const canEditEmployees = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_EDIT']);
     const canChangeEmployeeRecord = canManageEmployees && (!employeeForm.id || canEditEmployees);
@@ -8455,6 +8532,7 @@ const selectedCustomer = useMemo(
         canCreateSales,
         canDeleteCustomerRecord,
         canEditCustomerDealerDropdown,
+        canEditCustomerField,
         canEditCustomerRecord,
         canEditEmployees,
         canManageCustomers,
@@ -8479,6 +8557,7 @@ const selectedCustomer = useMemo(
         canViewSalesRegister,
         canUpdateSalesRegister,
         canViewSalesUrlFields,
+        canEditSalesField,
         canViewTransactionRegister,
         canViewWorkflowConfig,
         canViewWorkflowTasks,

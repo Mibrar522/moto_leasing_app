@@ -11,6 +11,7 @@ export default function Sales({ ctx }) {
     canViewSalesRegister,
     canUpdateSalesRegister,
     canViewSalesUrlFields,
+    canEditSalesField,
     currentSalesDealerSignatureUrl,
     dashboardData,
     editingSaleRecord,
@@ -99,7 +100,7 @@ if (!canCreateSales) {
                                 <div className="form-grid">
                                     <label className="field">
                                         <span>Customer</span>
-                                        <select name="customer_id" value={saleForm.customer_id} onChange={handleSaleChange}>
+                                        <select name="customer_id" value={saleForm.customer_id} onChange={handleSaleChange} disabled={!canEditSalesField('Customer')}>
                                             <option value="">Select customer</option>
                                             {dashboardData.customers.map((customer) => (
                                                 <option key={customer.id} value={customer.id}>{customer.full_name}</option>
@@ -120,6 +121,7 @@ if (!canCreateSales) {
                                                 type="button"
                                                 className={`custom-select-trigger ${salesVehicleDropdownOpen ? 'open' : ''}`}
                                                 onClick={() => setSalesVehicleDropdownOpen((current) => !current)}
+                                                disabled={!canEditSalesField('Available Stock')}
                                                 aria-haspopup="listbox"
                                                 aria-expanded={salesVehicleDropdownOpen}
                                             >
@@ -169,58 +171,58 @@ if (!canCreateSales) {
                                             ) : null}
                                         </div>
                                     </label>
-                                    <label className="field"><span>Sale Mode</span><select name="sale_mode" value={saleForm.sale_mode} onChange={handleSaleChange}><option value="CASH">Cash</option><option value="INSTALLMENT">Installment</option></select></label>
-                                    <label className="field"><span>Agreement Number</span><input name="agreement_number" value={saleForm.agreement_number || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field"><span>Agreement Date</span><input type="date" name="agreement_date" value={saleForm.agreement_date || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field"><span>Purchase Date</span><input type="date" name="purchase_date" value={saleForm.purchase_date || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field"><span>Actual Price</span><input type="number" min="0" step="0.01" value={actualVehiclePrice ?? 0} readOnly /></label>
-                                    <label className="field checkbox-field"><span>Print Actual Price on Invoice</span><input type="checkbox" name="print_actual_price" checked={Boolean(saleForm.print_actual_price)} onChange={handleSaleChange} /></label>
+                                    <label className="field"><span>Sale Mode</span><select name="sale_mode" value={saleForm.sale_mode} onChange={handleSaleChange} disabled={!canEditSalesField('Sale Mode')}><option value="CASH">Cash</option><option value="INSTALLMENT">Installment</option></select></label>
+                                    <label className="field"><span>Agreement Number</span><input name="agreement_number" value={saleForm.agreement_number || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Agreement Number')} /></label>
+                                    <label className="field"><span>Agreement Date</span><input type="date" name="agreement_date" value={saleForm.agreement_date || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Agreement Date')} /></label>
+                                    <label className="field"><span>Purchase Date</span><input type="date" name="purchase_date" value={saleForm.purchase_date || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Purchase Date')} /></label>
+                                    <label className="field"><span>Actual Price</span><input type="number" min="0" step="0.01" value={actualVehiclePrice ?? 0} readOnly disabled={!canEditSalesField('Actual Price')} /></label>
+                                    <label className="field checkbox-field"><span>Print Actual Price on Invoice</span><input type="checkbox" name="print_actual_price" checked={Boolean(saleForm.print_actual_price)} onChange={handleSaleChange} disabled={!canEditSalesField('Print Actual Price on Invoice')} /></label>
                                     {saleForm.sale_mode === 'CASH' ? (
                                         <>
-                                            <label className="field"><span>Purchase Price</span><input type="number" min="0" step="0.01" value={actualVehiclePrice ?? 0} readOnly /></label>
-                                            <label className="field"><span>Selling Price</span><input type="number" min="0" step="0.01" name="vehicle_price" value={saleForm.vehicle_price || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field"><span>Purchase Price</span><input type="number" min="0" step="0.01" value={actualVehiclePrice ?? 0} readOnly disabled={!canEditSalesField('Purchase Price')} /></label>
+                                            <label className="field"><span>Selling Price</span><input type="number" min="0" step="0.01" name="vehicle_price" value={saleForm.vehicle_price || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Selling Price')} /></label>
                                         </>
                                     ) : (
                                         <>
                                             <label className="field">
                                                 <span>Total Price</span>
-                                                <input type="number" min="0" step="0.01" name="vehicle_price" value={saleForm.vehicle_price || ''} onChange={handleSaleChange} />
+                                                <input type="number" min="0" step="0.01" name="vehicle_price" value={saleForm.vehicle_price || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Total Price')} />
                                             </label>
                                             <label className="field">
                                                 <span>Margin %</span>
-                                                <input type="number" min="0" step="0.01" name="installment_margin_percent" value={saleForm.installment_margin_percent || ''} onChange={handleSaleChange} />
+                                                <input type="number" min="0" step="0.01" name="installment_margin_percent" value={saleForm.installment_margin_percent || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Margin %')} />
                                             </label>
                                             <label className="field">
                                                 <span>Margin Value</span>
-                                                <input type="number" min="0" step="0.01" name="installment_margin_value" value={saleForm.installment_margin_value || ''} onChange={handleSaleChange} />
+                                                <input type="number" min="0" step="0.01" name="installment_margin_value" value={saleForm.installment_margin_value || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Margin Value')} />
                                             </label>
                                             <label className="field">
                                                 <span>Markup Percentage</span>
-                                                <input type="text" value={`${installmentMarkupPreview}%`} readOnly />
+                                                <input type="text" value={`${installmentMarkupPreview}%`} readOnly disabled={!canEditSalesField('Markup Percentage')} />
                                             </label>
-                                            <label className="field"><span>Down Payment</span><input type="number" min="0" step="0.01" name="down_payment" value={saleForm.down_payment || ''} onChange={handleSaleChange} /></label>
-                                            <label className="field"><span>Monthly Installment</span><input type="number" min="0" step="0.01" name="monthly_installment" value={saleForm.monthly_installment || ''} readOnly /></label>
+                                            <label className="field"><span>Down Payment</span><input type="number" min="0" step="0.01" name="down_payment" value={saleForm.down_payment || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Down Payment')} /></label>
+                                            <label className="field"><span>Monthly Installment</span><input type="number" min="0" step="0.01" name="monthly_installment" value={saleForm.monthly_installment || ''} readOnly disabled={!canEditSalesField('Monthly Installment')} /></label>
                                         </>
                                     )}
-                                    <label className="field"><span>Witness Name</span><input name="witness_name" value={saleForm.witness_name || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field"><span>Witness CNIC</span><input name="witness_cnic" value={saleForm.witness_cnic || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field"><span>Witness 2 Name</span><input name="witness_two_name" value={saleForm.witness_two_name || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field"><span>Witness 2 CNIC</span><input name="witness_two_cnic" value={saleForm.witness_two_cnic || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field full-span"><span>Agreement PDF</span><input type="file" accept="application/pdf" onChange={handleAgreementUpload} /></label>
-                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Uploaded Agreement URL</span><input name="agreement_pdf_url" value={saleForm.agreement_pdf_url || ''} onChange={handleSaleChange} readOnly={uploadingAgreement} /></label> : null}
-                                    <label className="field full-span"><span>Dealer Signature Upload</span><input type="file" accept="image/*" onChange={handleSaleDealerSignatureUpload} disabled={saleFormReadOnly || savingSale} /></label>
-                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Dealer Signature URL</span><input name="dealer_signature_url" value={saleForm.dealer_signature_url || currentSalesDealerSignatureUrl || ''} onChange={handleSaleChange} readOnly /></label> : null}
-                                    <label className="field full-span"><span>Authorized Signature Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleDocumentUpload(event, 'authorized_signature_url', 'Authorized signature', setUploadingSaleAuthorizedSignature)} disabled={saleFormReadOnly || savingSale} /></label>
-                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Authorized Signature URL</span><input name="authorized_signature_url" value={saleForm.authorized_signature_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleAuthorizedSignature} /></label> : null}
-                                    <label className="field full-span"><span>Customer CNIC Front Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleCnicUpload(event, 'customer_cnic_front_url', 'Customer CNIC front', 'front')} disabled={saleFormReadOnly || savingSale || uploadingSaleCnicFront} /></label>
-                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Customer CNIC Front URL</span><input name="customer_cnic_front_url" value={saleCustomerCnicFrontUrl || ''} readOnly /></label> : null}
-                                    <label className="field full-span"><span>Customer CNIC Back Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleCnicUpload(event, 'customer_cnic_back_url', 'Customer CNIC back', 'back')} disabled={saleFormReadOnly || savingSale || uploadingSaleCnicBack} /></label>
-                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Customer CNIC Back URL</span><input name="customer_cnic_back_url" value={saleCustomerCnicBackUrl || ''} readOnly /></label> : null}
-                                    <label className="field full-span"><span>Bank Check Upload</span><input type="file" accept="*/*" onChange={(event) => handleSaleDocumentUpload(event, 'bank_check_url', 'Bank check', setUploadingSaleBankCheck)} /></label>
-                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Uploaded Bank Check URL</span><input name="bank_check_url" value={saleForm.bank_check_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleBankCheck} /></label> : null}
-                                    <label className="field full-span"><span>Misc Document Upload</span><input type="file" accept="*/*" onChange={(event) => handleSaleDocumentUpload(event, 'misc_document_url', 'Misc document', setUploadingSaleMiscDocument)} /></label>
-                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Uploaded Misc Document URL</span><input name="misc_document_url" value={saleForm.misc_document_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleMiscDocument} /></label> : null}
-                                    <label className="field full-span"><span>Remarks</span><textarea rows="4" name="remarks" value={saleForm.remarks || ''} onChange={handleSaleChange} /></label>
+                                    <label className="field"><span>Witness Name</span><input name="witness_name" value={saleForm.witness_name || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Witness Name')} /></label>
+                                    <label className="field"><span>Witness CNIC</span><input name="witness_cnic" value={saleForm.witness_cnic || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Witness CNIC')} /></label>
+                                    <label className="field"><span>Witness 2 Name</span><input name="witness_two_name" value={saleForm.witness_two_name || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Witness 2 Name')} /></label>
+                                    <label className="field"><span>Witness 2 CNIC</span><input name="witness_two_cnic" value={saleForm.witness_two_cnic || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Witness 2 CNIC')} /></label>
+                                    <label className="field full-span"><span>Agreement PDF</span><input type="file" accept="application/pdf" onChange={handleAgreementUpload} disabled={!canEditSalesField('Agreement PDF')} /></label>
+                                    {canViewSalesUrlFields && canEditSalesField('Uploaded Agreement URL') ? <label className="field full-span"><span>Uploaded Agreement URL</span><input name="agreement_pdf_url" value={saleForm.agreement_pdf_url || ''} onChange={handleSaleChange} readOnly={uploadingAgreement} /></label> : null}
+                                    <label className="field full-span"><span>Dealer Signature Upload</span><input type="file" accept="image/*" onChange={handleSaleDealerSignatureUpload} disabled={saleFormReadOnly || savingSale || !canEditSalesField('Dealer Signature Upload')} /></label>
+                                    {canViewSalesUrlFields && canEditSalesField('Dealer Signature URL') ? <label className="field full-span"><span>Dealer Signature URL</span><input name="dealer_signature_url" value={saleForm.dealer_signature_url || currentSalesDealerSignatureUrl || ''} onChange={handleSaleChange} readOnly /></label> : null}
+                                    <label className="field full-span"><span>Authorized Signature Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleDocumentUpload(event, 'authorized_signature_url', 'Authorized signature', setUploadingSaleAuthorizedSignature)} disabled={saleFormReadOnly || savingSale || !canEditSalesField('Authorized Signature Upload')} /></label>
+                                    {canViewSalesUrlFields && canEditSalesField('Authorized Signature URL') ? <label className="field full-span"><span>Authorized Signature URL</span><input name="authorized_signature_url" value={saleForm.authorized_signature_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleAuthorizedSignature} /></label> : null}
+                                    <label className="field full-span"><span>Customer CNIC Front Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleCnicUpload(event, 'customer_cnic_front_url', 'Customer CNIC front', 'front')} disabled={saleFormReadOnly || savingSale || uploadingSaleCnicFront || !canEditSalesField('Customer CNIC Front Upload')} /></label>
+                                    {canViewSalesUrlFields && canEditSalesField('Customer CNIC Front URL') ? <label className="field full-span"><span>Customer CNIC Front URL</span><input name="customer_cnic_front_url" value={saleCustomerCnicFrontUrl || ''} readOnly /></label> : null}
+                                    <label className="field full-span"><span>Customer CNIC Back Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleCnicUpload(event, 'customer_cnic_back_url', 'Customer CNIC back', 'back')} disabled={saleFormReadOnly || savingSale || uploadingSaleCnicBack || !canEditSalesField('Customer CNIC Back Upload')} /></label>
+                                    {canViewSalesUrlFields && canEditSalesField('Customer CNIC Back URL') ? <label className="field full-span"><span>Customer CNIC Back URL</span><input name="customer_cnic_back_url" value={saleCustomerCnicBackUrl || ''} readOnly /></label> : null}
+                                    <label className="field full-span"><span>Bank Check Upload</span><input type="file" accept="*/*" onChange={(event) => handleSaleDocumentUpload(event, 'bank_check_url', 'Bank check', setUploadingSaleBankCheck)} disabled={!canEditSalesField('Bank Check Upload')} /></label>
+                                    {canViewSalesUrlFields && canEditSalesField('Uploaded Bank Check URL') ? <label className="field full-span"><span>Uploaded Bank Check URL</span><input name="bank_check_url" value={saleForm.bank_check_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleBankCheck} /></label> : null}
+                                    <label className="field full-span"><span>Misc Document Upload</span><input type="file" accept="*/*" onChange={(event) => handleSaleDocumentUpload(event, 'misc_document_url', 'Misc document', setUploadingSaleMiscDocument)} disabled={!canEditSalesField('Misc Document Upload')} /></label>
+                                    {canViewSalesUrlFields && canEditSalesField('Uploaded Misc Document URL') ? <label className="field full-span"><span>Uploaded Misc Document URL</span><input name="misc_document_url" value={saleForm.misc_document_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleMiscDocument} /></label> : null}
+                                    <label className="field full-span"><span>Remarks</span><textarea rows="4" name="remarks" value={saleForm.remarks || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Remarks')} /></label>
                                 </div>
 
                                 {saleForm.sale_mode === 'INSTALLMENT' && canViewSalesInstallmentPreview ? (
@@ -230,9 +232,9 @@ if (!canCreateSales) {
                                             <span className="section-caption">Customer, vehicle, and purchase data stay visible while you build the installment plan.</span>
                                         </div>
                                         <div className="form-grid">
-                                            <label className="field"><span>Financed Amount</span><input type="number" min="0" step="0.01" name="financed_amount" value={saleForm.financed_amount || ''} readOnly /></label>
-                                            <label className="field"><span>Installment Months</span><input type="number" min="1" name="installment_months" value={saleForm.installment_months || ''} onChange={handleSaleChange} /></label>
-                                            <label className="field"><span>First Due Date</span><input type="date" name="first_due_date" value={saleForm.first_due_date || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field"><span>Financed Amount</span><input type="number" min="0" step="0.01" name="financed_amount" value={saleForm.financed_amount || ''} readOnly disabled={!canEditSalesField('Financed Amount')} /></label>
+                                            <label className="field"><span>Installment Months</span><input type="number" min="1" name="installment_months" value={saleForm.installment_months || ''} onChange={handleSaleChange} disabled={!canEditSalesField('Installment Months')} /></label>
+                                            <label className="field"><span>First Due Date</span><input type="date" name="first_due_date" value={saleForm.first_due_date || ''} onChange={handleSaleChange} disabled={!canEditSalesField('First Due Date')} /></label>
                                         </div>
                                     </div>
                                 ) : null}
