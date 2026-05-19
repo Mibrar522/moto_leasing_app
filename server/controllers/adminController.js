@@ -2,7 +2,6 @@ const pool = require('../config/db');
 const { reconcileReceivedStockOrders } = require('./stockController');
 const { syncAccessCatalogDefaults } = require('../utils/accessBootstrap');
 const { syncDealerOwnership, syncDealerOwnershipForRequest } = require('../utils/dealerOwnershipBootstrap');
-const { ensurePerformanceIndexes } = require('../utils/performanceIndexes');
 
 const PENDING_APPLICATION_STATUSES = ['PENDING', 'SUBMITTED', 'UNDER_REVIEW'];
 const hasAnyFeature = (featureKeys = [], requiredKeys = []) => requiredKeys.some((featureKey) => featureKeys.includes(featureKey));
@@ -190,8 +189,6 @@ const getRolePermissions = async () => {
 
 exports.getDashboardData = async (req, res) => {
     try {
-        runDashboardMaintenance();
-
         const isEmployeeLogin = Number(req.user.role_id) === 3 || req.user.role_name === 'AGENT';
         const isSuperAdmin = Number(req.user.role_id) === 1 || req.user.role_name === 'SUPER_ADMIN';
         const isManagerLogin = req.user.role_name === 'MANAGER';
@@ -406,9 +403,7 @@ exports.getDashboardData = async (req, res) => {
         if (wantsGroup('products') || wantsGroup('companies') || wantsGroup('stockOrders') || wantsGroup('inventory')) {
             await syncDealerOwnershipForRequest();
         }
-        ensurePerformanceIndexes().catch((error) => console.warn('Performance index setup skipped:', error.message));
-
-        const metricsResult = wantsGroup('metrics') ? await pool.query(
+        const metricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
             SELECT
                 COUNT(*) FILTER (WHERE UPPER(v.status) = 'AVAILABLE')::int AS available_vehicles,
@@ -424,7 +419,7 @@ exports.getDashboardData = async (req, res) => {
             isDealerScopedView ? [effectiveDealerId] : []
         ) : { rows: [{ available_vehicles: 0, total_vehicles: 0 }] };
 
-        const leaseMetricsResult = wantsGroup('metrics') ? await pool.query(
+        const leaseMetricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
             SELECT
                 COUNT(*) FILTER (WHERE UPPER(status) = ANY($1::text[]))::int AS pending_applications,
@@ -437,7 +432,7 @@ exports.getDashboardData = async (req, res) => {
             applicationsParams
         ) : { rows: [{ pending_applications: 0, total_applications: 0, total_revenue: 0 }] };
 
-        const settledLeaseMetricsResult = wantsGroup('metrics') ? await pool.query(
+        const settledLeaseMetricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
             SELECT
                 COUNT(*) FILTER (
@@ -467,7 +462,7 @@ exports.getDashboardData = async (req, res) => {
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
         ) : { rows: [{ settled_leases: 0, pending_leases: 0 }] };
 
-        const salesMetricsResult = wantsGroup('metrics') ? await pool.query(
+        const salesMetricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
             SELECT
                 COUNT(*)::int AS total_sales,
@@ -486,7 +481,7 @@ exports.getDashboardData = async (req, res) => {
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
         ) : { rows: [{ total_sales: 0, active_installment_sales: 0, pending_sales: 0, total_sales_revenue: 0 }] };
 
-        const dashboardSalesCardMetricsResult = wantsGroup('metrics') ? await pool.query(
+        const dashboardSalesCardMetricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
             SELECT
                 COUNT(DISTINCT st.id) FILTER (
@@ -510,7 +505,7 @@ exports.getDashboardData = async (req, res) => {
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
         ) : { rows: [{ cash_transactions: 0, installment_transactions: 0, received_installments: 0 }] };
 
-        const installmentTaskMetricsResult = wantsGroup('metrics') ? await pool.query(
+        const installmentTaskMetricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
             SELECT
                 COUNT(*)::int AS pending_installments
@@ -523,8 +518,8 @@ exports.getDashboardData = async (req, res) => {
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
         ) : { rows: [{ pending_installments: 0 }] };
 
-        const employeeSalesResult = wantsGroup('metrics') && isEmployeeLogin
-            ? await pool.query(
+        const employeeSalesResultPromise = wantsGroup('metrics') && isEmployeeLogin
+            ? pool.query(
                 `
                 SELECT
                     COUNT(*) FILTER (WHERE UPPER(status) = ANY($1::text[]))::int AS received_count,
@@ -542,7 +537,7 @@ exports.getDashboardData = async (req, res) => {
             )
             : { rows: [{ received_count: 0, pending_count: 0, received_value: 0, pending_value: 0, overdue_followups: 0 }] };
 
-        const customerMetricsResult = wantsGroup('metrics') ? await pool.query(
+        const customerMetricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
             SELECT
                 COUNT(*)::int AS total_customers,
@@ -556,7 +551,7 @@ exports.getDashboardData = async (req, res) => {
             isDealerScopedView ? [effectiveDealerId] : []
         ) : { rows: [{ total_customers: 0, enrolled_biometrics: 0, scanned_documents: 0 }] };
 
-        const employeeMetricsResult = wantsGroup('metrics') ? await pool.query(
+        const employeeMetricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
             SELECT
                 COUNT(*)::int AS total_employees,
@@ -567,7 +562,7 @@ exports.getDashboardData = async (req, res) => {
             isDealerScopedView ? [effectiveDealerId] : []
         ) : { rows: [{ total_employees: 0, active_employees: 0 }] };
 
-        const dealerMetricsResult = wantsGroup('metrics') ? await pool.query(
+        const dealerMetricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
             SELECT
                 COUNT(*)::int AS total_dealers,
@@ -578,6 +573,29 @@ exports.getDashboardData = async (req, res) => {
             isDealerScopedView ? [effectiveDealerId] : []
         ) : { rows: [{ total_dealers: 0, active_dealers: 0 }] };
 
+        const [
+            metricsResult,
+            leaseMetricsResult,
+            settledLeaseMetricsResult,
+            salesMetricsResult,
+            dashboardSalesCardMetricsResult,
+            installmentTaskMetricsResult,
+            employeeSalesResult,
+            customerMetricsResult,
+            employeeMetricsResult,
+            dealerMetricsResult,
+        ] = await Promise.all([
+            metricsResultPromise,
+            leaseMetricsResultPromise,
+            settledLeaseMetricsResultPromise,
+            salesMetricsResultPromise,
+            dashboardSalesCardMetricsResultPromise,
+            installmentTaskMetricsResultPromise,
+            employeeSalesResultPromise,
+            customerMetricsResultPromise,
+            employeeMetricsResultPromise,
+            dealerMetricsResultPromise,
+        ]);
         const applicationsResult = wantsGroup('applications') ? await pool.query(
             `
             SELECT
