@@ -2842,9 +2842,9 @@
     inset: 0;
     z-index: 40;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    padding: 28px;
+    padding: 34px 28px 28px;
     background: rgba(248, 250, 252, 0.34);
     backdrop-filter: blur(1.5px);
     pointer-events: all;
@@ -2852,6 +2852,7 @@
 
 .content-loading-overlay-static {
     min-height: calc(100vh - 96px);
+    padding-top: 54px;
     background: transparent;
     backdrop-filter: none;
 }
