@@ -1662,8 +1662,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [uploadingSaleCnicFront, setUploadingSaleCnicFront] = useState(false);
     const [uploadingSaleCnicBack, setUploadingSaleCnicBack] = useState(false);
     const [uploadingCustomerAsset, setUploadingCustomerAsset] = useState(false);
-    const [customerCnicCropOptions, setCustomerCnicCropOptions] = useState({ front: false, back: false });
-    const [saleCnicCropOptions, setSaleCnicCropOptions] = useState({ front: false, back: false });
+    const [cnicUploadPreview, setCnicUploadPreview] = useState(null);
     const [uploadingEmployeeDocument, setUploadingEmployeeDocument] = useState(false);
     const [error, setError] = useState('');
     const [customerMessage, setCustomerMessage] = useState('');
@@ -1879,13 +1878,13 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canViewDashboard = hasAnyFeature(user, ['FEAT_DASHBOARD_VIEW']) || Boolean(user);
     const canViewApplications = hasAnyFeature(user, ['FEAT_APPLICATIONS_VIEW']);
     const canViewWorkflow = hasAnyFeature(user, ['FEAT_WORKFLOW_VIEW']);
-    const canUseOcr = hasAnyFeature(user, ['FEAT_OCR_SCAN']);
-    const canUseBiometric = hasAnyFeature(user, ['FEAT_BIOMETRIC']);
-    const canEditCustomerOcrFields = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_FIELDS']);
-    const canProcessCustomerOcr = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_PROCESS']);
+    const canUseOcrFeature = hasAnyFeature(user, ['FEAT_OCR_SCAN']);
+    const canUseBiometric = hasAnyFeature(user, ['FEAT_BIOMETRIC', 'FEAT_CUSTOMER_BIOMETRIC']);
+    const canEditCustomerOcrFieldsFeature = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_FIELDS']);
+    const canProcessCustomerOcrFeature = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_PROCESS']);
     const canCreateCustomerBiometric = hasAnyFeature(user, ['FEAT_CUSTOMER_BIOMETRIC', 'FEAT_BIOMETRIC']);
-    const canEditCustomerFingerprintFields = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_FIELDS']);
-    const canScanCustomerFingerprint = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_SCAN']);
+    const canEditCustomerFingerprintFieldsFeature = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_FIELDS']);
+    const canScanCustomerFingerprintFeature = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_SCAN']);
     const canManageCustomers = hasAnyFeature(user, ['FEAT_CUSTOMER_MGMT']);
     const canManageProducts = hasAnyFeature(user, ['FEAT_PRODUCT_MGMT', 'FEAT_FLEET_MGMT']);
     const canManageStock = hasAnyFeature(user, ['FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT']);
@@ -2112,19 +2111,24 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         canViewInstallmentOverview,
         canViewInstallmentCollection,
     ].some(Boolean);
-const canEditCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_EDIT']);
-const canDeleteCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_DELETE']);
-const canViewCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_VIEW']);
-const canViewCustomerRegister = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_REGISTER']);
-const canViewCustomerFingerprint = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT']);
-// Show the intake form if the role explicitly has it, or if they can edit customer records (edit button uses the form).
-const canViewCustomerForm = canOpenCustomers && (hasAnyFeature(user, ['FEAT_CUSTOMER_FORM']) || canEditCustomerRecord);
-const canUnlockCustomerOwnership = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_OWNERSHIP_UNLOCK']);
-const canViewEmployeeForm = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_FORM']);
-const canEditEmployees = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_EDIT']);
-const canChangeEmployeeRecord = canManageEmployees && (!employeeForm.id || canEditEmployees);
-const canUnlockEmployeeSecurityFields = canEditEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_SECURITY_UNLOCK']);
-const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_ROLE_FEATURES_DISPLAY']);
+    const canUseOcr = canOpenCustomers && canUseOcrFeature;
+    const canEditCustomerOcrFields = canUseOcr && canEditCustomerOcrFieldsFeature;
+    const canProcessCustomerOcr = canUseOcr && canProcessCustomerOcrFeature;
+    const canViewCustomerFingerprint = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT']) && canUseBiometric;
+    const canEditCustomerFingerprintFields = canViewCustomerFingerprint && canEditCustomerFingerprintFieldsFeature;
+    const canScanCustomerFingerprint = canViewCustomerFingerprint && canScanCustomerFingerprintFeature;
+    const canEditCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_EDIT']);
+    const canDeleteCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_DELETE']);
+    const canViewCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_VIEW']);
+    const canViewCustomerRegister = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_REGISTER']);
+    // Show the intake form if the role explicitly has it, or if they can edit customer records (edit button uses the form).
+    const canViewCustomerForm = canOpenCustomers && (hasAnyFeature(user, ['FEAT_CUSTOMER_FORM']) || canEditCustomerRecord);
+    const canUnlockCustomerOwnership = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_OWNERSHIP_UNLOCK']);
+    const canViewEmployeeForm = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_FORM']);
+    const canEditEmployees = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_EDIT']);
+    const canChangeEmployeeRecord = canManageEmployees && (!employeeForm.id || canEditEmployees);
+    const canUnlockEmployeeSecurityFields = canEditEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_SECURITY_UNLOCK']);
+    const canViewEmployeeRoleFeaturesDisplay = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_ROLE_FEATURES_DISPLAY']);
     const canViewEmployeeExtraFeatures = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_EXTRA_FEATURES']);
     const canViewEmployeeAdvanceCash = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_ADVANCE_CASH']);
     const canViewEmployeeSalaryGeneration = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_SALARY_GENERATION']);
@@ -6017,8 +6021,7 @@ const selectedCustomer = useMemo(
         }
     };
 
-    const handleSaleDocumentUpload = async (event, targetField, targetLabel, setUploadingState, options = {}) => {
-        const file = event.target.files?.[0];
+    const uploadSaleDocumentFile = async (file, targetField, targetLabel, setUploadingState, options = {}) => {
         if (!file) return;
 
         try {
@@ -6036,17 +6039,33 @@ const selectedCustomer = useMemo(
             setSaleMessage(err.response?.data?.message || err.message || `Unable to upload ${targetLabel.toLowerCase()}.`);
         } finally {
             setUploadingState(false);
+        }
+    };
+
+    const handleSaleDocumentUpload = async (event, targetField, targetLabel, setUploadingState, options = {}) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            await uploadSaleDocumentFile(file, targetField, targetLabel, setUploadingState, options);
+        } finally {
             event.target.value = '';
         }
     };
 
-    const handleSaleCnicUpload = (event, targetField, targetLabel, side) => handleSaleDocumentUpload(
-        event,
-        targetField,
-        targetLabel,
-        side === 'back' ? setUploadingSaleCnicBack : setUploadingSaleCnicFront,
-        { cropCnic: Boolean(saleCnicCropOptions[side]), cropSide: side }
-    );
+    const handleSaleCnicUpload = (event, targetField, targetLabel, side) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        openCnicUploadPreview({
+            source: 'sale',
+            file,
+            targetField,
+            targetLabel,
+            side,
+        });
+        event.target.value = '';
+    };
 
     const handleBankSlipUpload = async (event) => {
         const file = event.target.files?.[0];
@@ -6298,17 +6317,12 @@ const selectedCustomer = useMemo(
         }
     };
 
-    const handleCustomerAssetUpload = async (event, targetField, successLabel, assetType = '') => {
-        const file = event.target.files?.[0];
+    const uploadCustomerAssetFromFile = async (file, targetField, successLabel, assetType = '', options = {}) => {
         if (!file) return;
 
         try {
             setUploadingCustomerAsset(true);
-            const cropEnabled = assetType === 'CNIC_FRONT'
-                ? Boolean(customerCnicCropOptions.front)
-                : assetType === 'CNIC_BACK'
-                    ? Boolean(customerCnicCropOptions.back)
-                    : false;
+            const cropEnabled = Boolean(options.cropCnic) && (assetType === 'CNIC_FRONT' || assetType === 'CNIC_BACK');
             const uploadFile = cropEnabled ? await cropCnicDocumentImage(file, assetType) : file;
             const uploadAssetType = assetType === 'CNIC_BACK' ? 'CNIC_BACK_ORIGINAL' : assetType;
             const data = await uploadCustomerAssetFile(uploadFile, uploadAssetType);
@@ -6373,21 +6387,103 @@ const selectedCustomer = useMemo(
                 setCustomerMessage(`${successLabel} uploaded: ${data.originalName}`);
             }
         } catch (err) {
-            setCustomerMessage(err.response?.data?.message || `Unable to upload ${successLabel.toLowerCase()}.`);
+            setCustomerMessage(err.response?.data?.message || err.message || `Unable to upload ${successLabel.toLowerCase()}.`);
         } finally {
             setUploadingCustomerAsset(false);
-            event.target.value = '';
         }
     };
 
-    const handleEmployeeDocumentUpload = async (event, targetField = 'cnic_front_url') => {
+    const handleCustomerAssetUpload = async (event, targetField, successLabel, assetType = '') => {
         const file = event.target.files?.[0];
         if (!file) return;
 
         try {
+            if (assetType === 'CNIC_FRONT' || assetType === 'CNIC_BACK') {
+                openCnicUploadPreview({
+                    source: 'customer',
+                    file,
+                    targetField,
+                    targetLabel: successLabel,
+                    assetType,
+                    side: assetType === 'CNIC_BACK' ? 'back' : 'front',
+                });
+                return;
+            }
+
+            await uploadCustomerAssetFromFile(file, targetField, successLabel, assetType);
+        } finally {
+            event.target.value = '';
+        }
+    };
+
+    const openCnicUploadPreview = (previewConfig) => {
+        if (!previewConfig?.file) return;
+
+        setCnicUploadPreview((current) => {
+            if (current?.previewUrl) {
+                URL.revokeObjectURL(current.previewUrl);
+            }
+
+            return {
+                ...previewConfig,
+                previewUrl: URL.createObjectURL(previewConfig.file),
+                isImage: String(previewConfig.file.type || '').startsWith('image/'),
+            };
+        });
+    };
+
+    const closeCnicUploadPreview = () => {
+        setCnicUploadPreview((current) => {
+            if (current?.previewUrl) {
+                URL.revokeObjectURL(current.previewUrl);
+            }
+            return null;
+        });
+    };
+
+    const handleConfirmCnicUpload = async (cropCnic = false) => {
+        const pending = cnicUploadPreview;
+        if (!pending?.file) return;
+
+        const shouldCrop = Boolean(cropCnic && pending.isImage);
+
+        try {
+            if (pending.source === 'sale') {
+                await uploadSaleDocumentFile(
+                    pending.file,
+                    pending.targetField,
+                    pending.targetLabel,
+                    pending.side === 'back' ? setUploadingSaleCnicBack : setUploadingSaleCnicFront,
+                    { cropCnic: shouldCrop, cropSide: pending.side }
+                );
+            } else if (pending.source === 'employee') {
+                await uploadEmployeeDocumentFile(
+                    pending.file,
+                    pending.targetField,
+                    { cropCnic: shouldCrop, cropSide: pending.side }
+                );
+            } else {
+                await uploadCustomerAssetFromFile(
+                    pending.file,
+                    pending.targetField,
+                    pending.targetLabel,
+                    pending.assetType,
+                    { cropCnic: shouldCrop }
+                );
+            }
+        } finally {
+            closeCnicUploadPreview();
+        }
+    };
+
+    const uploadEmployeeDocumentFile = async (file, targetField = 'cnic_front_url', options = {}) => {
+        if (!file) return;
+
+        try {
             setUploadingEmployeeDocument(true);
+            const uploadFile = options.cropCnic ? await cropCnicDocumentImage(file, options.cropSide) : file;
             const formData = new FormData();
-            formData.append('employeeDocument', file);
+            formData.append('employeeDocument', uploadFile);
             const { data } = await API.post('/employees/upload-cnic', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
@@ -6401,11 +6497,24 @@ const selectedCustomer = useMemo(
             }));
             setEmployeeMessage(`Employee ${targetField === 'cnic_back_url' ? 'CNIC back' : 'CNIC front'} uploaded: ${data.originalName}`);
         } catch (err) {
-            setEmployeeMessage(err.response?.data?.message || 'Unable to upload employee CNIC.');
+            setEmployeeMessage(err.response?.data?.message || err.message || 'Unable to upload employee CNIC.');
         } finally {
             setUploadingEmployeeDocument(false);
-            event.target.value = '';
         }
+    };
+
+    const handleEmployeeDocumentUpload = async (event, targetField = 'cnic_front_url') => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        openCnicUploadPreview({
+            source: 'employee',
+            file,
+            targetField,
+            targetLabel: targetField === 'cnic_back_url' ? 'Employee CNIC back' : 'Employee CNIC front',
+            side: targetField === 'cnic_back_url' ? 'back' : 'front',
+        });
+        event.target.value = '';
     };
 
     const handleProfileLogoUpload = async (event) => {
@@ -8378,7 +8487,6 @@ const selectedCustomer = useMemo(
         currentPayrollMonth,
         currentSalesDealerSignatureUrl,
         customerDealerOptions,
-        customerCnicCropOptions,
         customerForm,
         customerMessage,
         customerOwnershipCandidates,
@@ -8485,7 +8593,6 @@ const selectedCustomer = useMemo(
         saleCustomerCnicFrontUrl,
         saleDealerSignatureUrl,
         saleForm,
-        saleCnicCropOptions,
         saleFormReadOnly,
         saleMessage,
         salesVehicleDropdownOpen,
@@ -8521,9 +8628,7 @@ const selectedCustomer = useMemo(
         setEmployeeAccessPopupOpen,
         setPayrollMonth,
         setSalaryGenerationEmployeeId,
-        setCustomerCnicCropOptions,
         setSaleForm,
-        setSaleCnicCropOptions,
         setSalesVehicleDropdownOpen,
         setSelectedCustomerId,
         setSelectedEmployeeId,
@@ -9125,6 +9230,50 @@ const selectedCustomer = useMemo(
                     </>
                 )}
             </main>
+
+            {cnicUploadPreview ? (
+                <div className="receive-modal-backdrop" onClick={closeCnicUploadPreview}>
+                    <div className="receive-modal cnic-preview-modal" onClick={(event) => event.stopPropagation()}>
+                        <div className="section-header">
+                            <div>
+                                <h3>{cnicUploadPreview.targetLabel || 'CNIC Upload Preview'}</h3>
+                                <p className="section-caption">Review the selected file, then upload original or cropped image.</p>
+                            </div>
+                            <button type="button" className="view-btn" onClick={closeCnicUploadPreview}>
+                                Close
+                            </button>
+                        </div>
+                        <div className="cnic-preview-stage">
+                            {cnicUploadPreview.isImage ? (
+                                <img src={cnicUploadPreview.previewUrl} alt="CNIC upload preview" className="cnic-preview-image" />
+                            ) : (
+                                <iframe src={cnicUploadPreview.previewUrl} title="CNIC upload preview" className="cnic-preview-frame" />
+                            )}
+                        </div>
+                        <div className="cnic-preview-actions">
+                            <button type="button" className="view-btn" onClick={closeCnicUploadPreview}>
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="secondary-btn"
+                                onClick={() => handleConfirmCnicUpload(false)}
+                                disabled={uploadingCustomerAsset || uploadingEmployeeDocument || uploadingSaleCnicFront || uploadingSaleCnicBack}
+                            >
+                                Upload Original
+                            </button>
+                            <button
+                                type="button"
+                                className="primary-btn"
+                                onClick={() => handleConfirmCnicUpload(true)}
+                                disabled={!cnicUploadPreview.isImage || uploadingCustomerAsset || uploadingEmployeeDocument || uploadingSaleCnicFront || uploadingSaleCnicBack}
+                            >
+                                Crop & Upload
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             {receivingStockOrder ? (
             <div className="receive-modal-backdrop" onClick={closeStockReceiveModal}>

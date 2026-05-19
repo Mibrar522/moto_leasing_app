@@ -38,7 +38,6 @@ export default function Sales({ ctx }) {
     saleCustomerCnicBackUrl,
     saleCustomerCnicFrontUrl,
     saleDealerSignatureUrl,
-    saleCnicCropOptions,
     saleForm,
     saleFormReadOnly,
     saleMessage,
@@ -51,7 +50,6 @@ export default function Sales({ ctx }) {
     selectedSaleVehicleName,
     selectedSaleVehicleSecondaryLine,
     setSaleForm,
-    setSaleCnicCropOptions,
     setSalesVehicleDropdownOpen,
     setUploadingSaleAuthorizedSignature,
     setUploadingSaleBankCheck,
@@ -215,10 +213,8 @@ if (!canCreateSales) {
                                     <label className="field full-span"><span>Authorized Signature Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleDocumentUpload(event, 'authorized_signature_url', 'Authorized signature', setUploadingSaleAuthorizedSignature)} disabled={saleFormReadOnly || savingSale} /></label>
                                     {canViewSalesUrlFields ? <label className="field full-span"><span>Authorized Signature URL</span><input name="authorized_signature_url" value={saleForm.authorized_signature_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleAuthorizedSignature} /></label> : null}
                                     <label className="field full-span"><span>Customer CNIC Front Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleCnicUpload(event, 'customer_cnic_front_url', 'Customer CNIC front', 'front')} disabled={saleFormReadOnly || savingSale || uploadingSaleCnicFront} /></label>
-                                    <label className="field checkbox-field"><span>Crop CNIC Front Before Upload</span><input type="checkbox" checked={Boolean(saleCnicCropOptions.front)} onChange={(event) => setSaleCnicCropOptions((current) => ({ ...current, front: event.target.checked }))} /></label>
                                     {canViewSalesUrlFields ? <label className="field full-span"><span>Customer CNIC Front URL</span><input name="customer_cnic_front_url" value={saleCustomerCnicFrontUrl || ''} readOnly /></label> : null}
                                     <label className="field full-span"><span>Customer CNIC Back Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleCnicUpload(event, 'customer_cnic_back_url', 'Customer CNIC back', 'back')} disabled={saleFormReadOnly || savingSale || uploadingSaleCnicBack} /></label>
-                                    <label className="field checkbox-field"><span>Crop CNIC Back Before Upload</span><input type="checkbox" checked={Boolean(saleCnicCropOptions.back)} onChange={(event) => setSaleCnicCropOptions((current) => ({ ...current, back: event.target.checked }))} /></label>
                                     {canViewSalesUrlFields ? <label className="field full-span"><span>Customer CNIC Back URL</span><input name="customer_cnic_back_url" value={saleCustomerCnicBackUrl || ''} readOnly /></label> : null}
                                     <label className="field full-span"><span>Bank Check Upload</span><input type="file" accept="*/*" onChange={(event) => handleSaleDocumentUpload(event, 'bank_check_url', 'Bank check', setUploadingSaleBankCheck)} /></label>
                                     {canViewSalesUrlFields ? <label className="field full-span"><span>Uploaded Bank Check URL</span><input name="bank_check_url" value={saleForm.bank_check_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleBankCheck} /></label> : null}
