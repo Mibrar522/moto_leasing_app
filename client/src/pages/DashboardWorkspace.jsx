@@ -753,13 +753,14 @@ const sidebarTabIcons = {
 const isSuperAdminUser = (user) =>
     Number(user?.real_role_id || user?.role_id) === 1 ||
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
+const isEffectiveSuperAdminUser = (user) =>
+    Number(user?.role_id) === 1 || user?.role_name === 'SUPER_ADMIN';
 const hasFeature = (user, featureKey) =>
-    isSuperAdminUser(user) ||
+    isEffectiveSuperAdminUser(user) ||
     (Array.isArray(user?.feature_keys) && user.feature_keys.includes(featureKey)) ||
-    (Array.isArray(user?.real_feature_keys) && user.real_feature_keys.includes(featureKey)) ||
     (user?.features || []).some((feature) => feature.key === featureKey);
 const hasAnyFeature = (user, featureKeys = []) =>
-    isSuperAdminUser(user) || featureKeys.some((featureKey) => hasFeature(user, featureKey));
+    isEffectiveSuperAdminUser(user) || featureKeys.some((featureKey) => hasFeature(user, featureKey));
 const roundCurrencyValue = (value) => Math.round(Number(value || 0) * 100) / 100;
 const normalizeTextValue = (value) => String(value || '').trim().toUpperCase();
 const formatDateKeyPart = (value) => String(value || '').padStart(2, '0');
