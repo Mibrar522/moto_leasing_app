@@ -2198,8 +2198,18 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     // Show the intake form if the role explicitly has it, or if they can edit customer records (edit button uses the form).
     const canViewCustomerForm = canOpenCustomers && (hasAnyFeature(user, ['FEAT_CUSTOMER_FORM']) || canEditCustomerRecord);
     const canUnlockCustomerOwnership = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_OWNERSHIP_UNLOCK']);
-    const canEditCustomerField = (label) => canViewCustomerForm && hasAssignedFeature(user, CUSTOMER_FIELD_FEATURE_MAP[label]);
-    const canEditSalesField = (label) => canViewSalesAgreementForm && hasAssignedFeature(user, SALES_FIELD_FEATURE_MAP[label]);
+    const hasCurrentRoleFeature = (featureKey) => {
+        if (!featureKey) return false;
+        const featureId = featureByKey[featureKey]?.id;
+        const currentRoleId = user?.role_id;
+        const assignedFeatureIds = roleAssignments[currentRoleId];
+        if (featureId && Array.isArray(assignedFeatureIds)) {
+            return assignedFeatureIds.includes(Number(featureId));
+        }
+        return hasAssignedFeature(user, featureKey);
+    };
+    const canEditCustomerField = (label) => canViewCustomerForm && hasCurrentRoleFeature(CUSTOMER_FIELD_FEATURE_MAP[label]);
+    const canEditSalesField = (label) => canViewSalesAgreementForm && hasCurrentRoleFeature(SALES_FIELD_FEATURE_MAP[label]);
     const canViewEmployeeForm = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_FORM']);
     const canEditEmployees = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_EDIT']);
     const canChangeEmployeeRecord = canManageEmployees && (!employeeForm.id || canEditEmployees);

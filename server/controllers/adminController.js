@@ -298,6 +298,7 @@ exports.getDashboardData = async (req, res) => {
             real_role_name: req.user.real_role_name || req.user.role_name,
             real_dealer_id: req.user.real_dealer_id || null,
             real_feature_keys: req.user.real_feature_keys || req.user.feature_keys || [],
+            feature_keys: req.user.feature_keys || [],
             profile_mode: req.user.profile_mode || (isSuperAdmin ? 'SUPER_ADMIN' : 'DEFAULT'),
             switched_profile: Boolean(req.user.switched_profile),
         });
