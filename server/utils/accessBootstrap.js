@@ -1250,7 +1250,6 @@ exports.syncAccessCatalogDefaults = async () => {
         await ensureDefaultRolePermissions(client, roleIdByName.APPLICATION_ADMIN, APPLICATION_ADMIN_FEATURES);
         await ensureDefaultRolePermissions(client, roleIdByName.MANAGER, MANAGER_FEATURES);
         await ensureDefaultRolePermissions(client, roleIdByName.AGENT, AGENT_FEATURES);
-        await repairExistingUserRoleAssignments(client, roleIdByName);
 
         await client.query('COMMIT');
 
