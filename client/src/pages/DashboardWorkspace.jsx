@@ -2196,9 +2196,9 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         canViewInstallmentCollection,
     ].some(Boolean);
     const canUseOcr = canOpenCustomers && canUseOcrFeature;
-    const canEditCustomerOcrFields = canUseOcr && canEditCustomerOcrFieldsFeature;
-    const canProcessCustomerOcr = canUseOcr && canProcessCustomerOcrFeature;
-    const canViewCustomerFingerprint = canOpenCustomers && hasCurrentRoleFeatureKey('FEAT_CUSTOMER_FINGERPRINT') && canUseBiometric;
+    const canEditCustomerOcrFields = canOpenCustomers && canEditCustomerOcrFieldsFeature;
+    const canProcessCustomerOcr = canOpenCustomers && canProcessCustomerOcrFeature;
+    const canViewCustomerFingerprint = canOpenCustomers && hasCurrentRoleFeatureKey('FEAT_CUSTOMER_FINGERPRINT');
     const canEditCustomerFingerprintFields = canViewCustomerFingerprint && canEditCustomerFingerprintFieldsFeature;
     const canScanCustomerFingerprint = canViewCustomerFingerprint && canScanCustomerFingerprintFeature;
     const canEditCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_EDIT']);

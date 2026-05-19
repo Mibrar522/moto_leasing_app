@@ -61,6 +61,18 @@ export default function Customers({ ctx }) {
     return customer.created_by_name || customer.dealer_name || customer.created_by_email || 'Not set';
   };
 
+  const showCustomerCnicFront = canEditCustomerField('CNIC Front Upload');
+  const showCustomerCnicBack = canEditCustomerField('CNIC Back Upload');
+  const showCustomerOcrExtractedName = canEditCustomerOcrFields && canEditCustomerField('OCR Extracted Name');
+  const showCustomerOcrScanText = canEditCustomerOcrFields && canEditCustomerField('OCR Scan Text');
+  const showCustomerFingerprintScannerOutput = canEditCustomerFingerprintFields && canEditCustomerField('Fingerprint Scanner Output');
+  const showCustomerScannerDevice = canEditCustomerFingerprintFields && canEditCustomerField('Scanner Device');
+  const showCustomerScanQuality = canEditCustomerFingerprintFields && canEditCustomerField('Scan Quality');
+  const showCustomerFingerprintStatus = canEditCustomerFingerprintFields && canEditCustomerField('Fingerprint Status');
+  const showCustomerBiometricHash = canEditCustomerFingerprintFields && canEditCustomerField('Biometric Hash');
+  const showCustomerThumbUpload = canEditCustomerFingerprintFields && canEditCustomerField('Thumb Upload');
+  const showCustomerSignatureUpload = canEditCustomerField('Signature Upload');
+
 if (!canOpenCustomers) {
                     return <div className="feedback-card error">Your account does not have customer onboarding access.</div>;
                 }
@@ -161,11 +173,13 @@ if (!canOpenCustomers) {
                                         <span>CNIC / Passport Number</span>
                                         <input name="cnic_passport_number" value={customerForm.cnic_passport_number} onChange={handleCustomerChange} placeholder="35202-1234567-1 or passport no." />
                                     </label>
-                                    <label className="field" hidden={!canUseOcr || !canEditCustomerField('CNIC Front Upload')}>
+                                    {showCustomerCnicFront ? (
+                                    <>
+                                    <label className="field">
                                         <span>CNIC Front Upload</span>
-                                        <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_url', 'CNIC front', 'CNIC_FRONT')} disabled={!canUseOcr || uploadingCustomerAsset} />
+                                        <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_url', 'CNIC front', 'CNIC_FRONT')} disabled={uploadingCustomerAsset} />
                                     </label>
-                                    <div className="field full-span" hidden={!canUseOcr || !canEditCustomerField('CNIC Front Upload')}>
+                                    <div className="field full-span">
                                         <span className="meta-label">CNIC Front Preview</span>
                                         <div className="employee-document-preview">
                                             {customerForm.identity_doc_url ? (
@@ -191,11 +205,15 @@ if (!canOpenCustomers) {
                                             )}
                                         </div>
                                     </div>
-                                    <label className="field" hidden={!canUseOcr || !canEditCustomerField('CNIC Back Upload')}>
+                                    </>
+                                    ) : null}
+                                    {showCustomerCnicBack ? (
+                                    <>
+                                    <label className="field">
                                         <span>CNIC Back Upload</span>
-                                        <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_back_url', 'CNIC back', 'CNIC_BACK')} disabled={!canUseOcr || uploadingCustomerAsset} />
+                                        <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_back_url', 'CNIC back', 'CNIC_BACK')} disabled={uploadingCustomerAsset} />
                                     </label>
-                                    <div className="field full-span" hidden={!canUseOcr || !canEditCustomerField('CNIC Back Upload')}>
+                                    <div className="field full-span">
                                         <span className="meta-label">CNIC Back Preview</span>
                                         <div className="employee-document-preview">
                                             {customerForm.identity_doc_back_url ? (
@@ -221,6 +239,8 @@ if (!canOpenCustomers) {
                                             )}
                                         </div>
                                     </div>
+                                    </>
+                                    ) : null}
                                     <label className="field" hidden={!canEditCustomerField('Contact Email')}>
                                         <span>Contact Email</span>
                                         <input name="contact_email" value={customerForm.contact_email} onChange={handleCustomerChange} placeholder="customer@example.com" />
@@ -237,14 +257,18 @@ if (!canOpenCustomers) {
                                         <span>Address</span>
                                         <textarea name="address" value={customerForm.address} onChange={handleCustomerChange} rows="3" placeholder="Customer address from CNIC or entered manually" />
                                     </label>
-                                    <label className="field full-span" hidden={!canEditCustomerOcrFields || !canEditCustomerField('OCR Extracted Name')}>
+                                    {showCustomerOcrExtractedName ? (
+                                    <label className="field full-span">
                                         <span>OCR Extracted Name</span>
                                         <input name="extracted_name" value={customerForm.extracted_name} onChange={handleCustomerChange} placeholder="Autofilled from OCR or entered manually" />
                                     </label>
-                                    <label className="field full-span" hidden={!canEditCustomerOcrFields || !canEditCustomerField('OCR Scan Text')}>
+                                    ) : null}
+                                    {showCustomerOcrScanText ? (
+                                    <label className="field full-span">
                                         <span>OCR Scan Text</span>
                                         <textarea name="raw_ocr_text" value={customerForm.raw_ocr_text} onChange={handleCustomerChange} rows="7" placeholder="Paste OCR text from the CNIC image here, then click Process OCR." />
                                     </label>
+                                    ) : null}
                                 </div>
                                 {canProcessCustomerOcr ? (
                                 <div className="inline-actions spaced-top">
