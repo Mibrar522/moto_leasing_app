@@ -2824,6 +2824,41 @@
     }
 }
 
+
+.query-loading-pill {
+    position: sticky;
+    top: 12px;
+    z-index: 20;
+    width: fit-content;
+    margin: 0 0 14px auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 1px solid rgba(116, 132, 156, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #24324a;
+    font-size: 0.86rem;
+    font-weight: 700;
+    box-shadow: 0 12px 28px rgba(31, 45, 61, 0.12);
+    backdrop-filter: blur(8px);
+}
+
+.query-loading-spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(37, 99, 235, 0.2);
+    border-top-color: #2563eb;
+    animation: query-spin 0.7s linear infinite;
+}
+
+@keyframes query-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
 @media (max-width: 1500px) {
     .metrics-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));

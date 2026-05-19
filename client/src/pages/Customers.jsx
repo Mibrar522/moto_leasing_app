@@ -17,6 +17,7 @@ export default function Customers({ ctx }) {
     canViewCustomerRecord,
     canViewCustomerRegister,
     customerDealerOptions,
+    customerCnicCropOptions,
     customerForm,
     customerMessage,
     customerOwnershipCandidates,
@@ -37,6 +38,7 @@ export default function Customers({ ctx }) {
     resetCustomerForm,
     savingCustomer,
     selectedCustomer,
+    setCustomerCnicCropOptions,
     setSelectedCustomerId,
     uploadingCustomerAsset,
     user,
@@ -161,13 +163,10 @@ if (!canOpenCustomers) {
                                         <input name="cnic_passport_number" value={customerForm.cnic_passport_number} onChange={handleCustomerChange} placeholder="35202-1234567-1 or passport no." />
                                     </label>
                                     <label className="field">
-                                        <span>Identity Document URL</span>
-                                        <input name="identity_doc_url" value={customerForm.identity_doc_url} onChange={handleCustomerChange} placeholder="https://... or internal document path" />
-                                    </label>
-                                    <label className="field">
                                         <span>CNIC Front Upload</span>
                                         <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_url', 'CNIC front', 'CNIC_FRONT')} disabled={!canUseOcr || uploadingCustomerAsset} />
                                     </label>
+                                    <label className="field checkbox-field"><span>Crop CNIC Front Before Upload</span><input type="checkbox" checked={Boolean(customerCnicCropOptions.front)} onChange={(event) => setCustomerCnicCropOptions((current) => ({ ...current, front: event.target.checked }))} disabled={!canUseOcr || uploadingCustomerAsset} /></label>
                                     <div className="field full-span">
                                         <span className="meta-label">CNIC Front Preview</span>
                                         <div className="employee-document-preview">
@@ -195,13 +194,10 @@ if (!canOpenCustomers) {
                                         </div>
                                     </div>
                                     <label className="field">
-                                        <span>CNIC Back URL</span>
-                                        <input name="identity_doc_back_url" value={customerForm.identity_doc_back_url} onChange={handleCustomerChange} placeholder="/uploads/customers/..." />
-                                    </label>
-                                    <label className="field">
                                         <span>CNIC Back Upload</span>
                                         <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_back_url', 'CNIC back', 'CNIC_BACK')} disabled={!canUseOcr || uploadingCustomerAsset} />
                                     </label>
+                                    <label className="field checkbox-field"><span>Crop CNIC Back Before Upload</span><input type="checkbox" checked={Boolean(customerCnicCropOptions.back)} onChange={(event) => setCustomerCnicCropOptions((current) => ({ ...current, back: event.target.checked }))} disabled={!canUseOcr || uploadingCustomerAsset} /></label>
                                     <div className="field full-span">
                                         <span className="meta-label">CNIC Back Preview</span>
                                         <div className="employee-document-preview">

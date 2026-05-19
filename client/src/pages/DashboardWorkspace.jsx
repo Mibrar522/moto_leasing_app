@@ -343,7 +343,7 @@ const ACCESS_PAGE_GROUPS = [
         key: 'sales',
         label: 'Sales',
         description: 'Sale creation, sales register, and transaction register access.',
-        featureKeys: ['FEAT_SALES_CREATE', 'FEAT_SALES_MGMT', 'FEAT_SALES_AGREEMENT_FORM', 'FEAT_SALES_AGREEMENT_SUMMARY', 'FEAT_SALES_INSTALLMENT_PREVIEW', 'FEAT_SALES_REGISTER', 'FEAT_SALES_UPDATE', 'FEAT_TRANSACTION_REGISTER'],
+        featureKeys: ['FEAT_SALES_CREATE', 'FEAT_SALES_MGMT', 'FEAT_SALES_AGREEMENT_FORM', 'FEAT_SALES_AGREEMENT_SUMMARY', 'FEAT_SALES_INSTALLMENT_PREVIEW', 'FEAT_SALES_REGISTER', 'FEAT_SALES_UPDATE', 'FEAT_SALES_URL_FIELDS', 'FEAT_TRANSACTION_REGISTER'],
     },
     {
         key: 'installments',
@@ -932,6 +932,7 @@ const FEATURE_ACCESS_LABELS = {
     FEAT_SALES_INSTALLMENT_PREVIEW: 'Installment Page',
     FEAT_SALES_REGISTER: 'Sales Transaction Register',
     FEAT_SALES_UPDATE: 'Sales Register Update Button',
+    FEAT_SALES_URL_FIELDS: 'Sales Attachment URL Fields',
     FEAT_TRANSACTION_REGISTER: 'Transaction Register',
     FEAT_STOCK_ORDER_FORM: 'Order Stock',
     FEAT_STOCK_RECEIVED_VIEW: 'Stock Received From Company',
@@ -1610,6 +1611,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [reportKeyword, setReportKeyword] = useState('');
     const [appliedReportFilters, setAppliedReportFilters] = useState(() => createDefaultReportFilters());
     const [loading, setLoading] = useState(true);
+    const [queryLoading, setQueryLoading] = useState(false);
     const [savingCustomer, setSavingCustomer] = useState(false);
     const [savingEmployee, setSavingEmployee] = useState(false);
     const [savingAdvance, setSavingAdvance] = useState(false);
@@ -1641,7 +1643,11 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [uploadingSaleBankCheck, setUploadingSaleBankCheck] = useState(false);
     const [uploadingSaleMiscDocument, setUploadingSaleMiscDocument] = useState(false);
     const [uploadingSaleAuthorizedSignature, setUploadingSaleAuthorizedSignature] = useState(false);
+    const [uploadingSaleCnicFront, setUploadingSaleCnicFront] = useState(false);
+    const [uploadingSaleCnicBack, setUploadingSaleCnicBack] = useState(false);
     const [uploadingCustomerAsset, setUploadingCustomerAsset] = useState(false);
+    const [customerCnicCropOptions, setCustomerCnicCropOptions] = useState({ front: false, back: false });
+    const [saleCnicCropOptions, setSaleCnicCropOptions] = useState({ front: false, back: false });
     const [uploadingEmployeeDocument, setUploadingEmployeeDocument] = useState(false);
     const [error, setError] = useState('');
     const [customerMessage, setCustomerMessage] = useState('');
@@ -1665,6 +1671,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const loadDashboard = async (options = {}) => {
         const requestId = dashboardLoadRequestRef.current + 1;
         dashboardLoadRequestRef.current = requestId;
+
+        setQueryLoading(true);
 
         try {
             if (!initialDashboardLoadedRef.current) {
@@ -1754,6 +1762,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         } finally {
             if (requestId === dashboardLoadRequestRef.current) {
                 setLoading(false);
+                setQueryLoading(false);
             }
         }
     };
@@ -2056,6 +2065,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canViewSalesInstallmentPreview = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_INSTALLMENT_PREVIEW']);
     const canViewSalesRegister = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_REGISTER']);
     const canUpdateSalesRegister = hasAnyFeature(user, ['FEAT_SALES_UPDATE']);
+    const canViewSalesUrlFields = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_URL_FIELDS']);
     const canViewTransactionRegister = canManageSales && hasAnyFeature(user, ['FEAT_TRANSACTION_REGISTER']);
     const canViewStockOrderForm = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_ORDER_FORM']);
     const canViewStockReceived = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_RECEIVED_VIEW']);
@@ -5980,26 +5990,36 @@ const selectedCustomer = useMemo(
         }
     };
 
-    const handleSaleDocumentUpload = async (event, targetField, targetLabel, setUploadingState) => {
+    const handleSaleDocumentUpload = async (event, targetField, targetLabel, setUploadingState, options = {}) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
-        const formData = new FormData();
-        formData.append('document', file);
-
         try {
             setUploadingState(true);
+            const uploadFile = options.cropCnic ? await cropCnicDocumentImage(file, options.cropSide) : file;
+            const formData = new FormData();
+            formData.append('document', uploadFile);
+
             const { data } = await API.post('/sales/upload-document', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
             setSaleForm((current) => ({ ...current, [targetField]: data.url }));
             setSaleMessage(`${targetLabel} uploaded: ${data.originalName}`);
         } catch (err) {
-            setSaleMessage(err.response?.data?.message || `Unable to upload ${targetLabel.toLowerCase()}.`);
+            setSaleMessage(err.response?.data?.message || err.message || `Unable to upload ${targetLabel.toLowerCase()}.`);
         } finally {
             setUploadingState(false);
+            event.target.value = '';
         }
     };
+
+    const handleSaleCnicUpload = (event, targetField, targetLabel, side) => handleSaleDocumentUpload(
+        event,
+        targetField,
+        targetLabel,
+        side === 'back' ? setUploadingSaleCnicBack : setUploadingSaleCnicFront,
+        { cropCnic: Boolean(saleCnicCropOptions[side]), cropSide: side }
+    );
 
     const handleBankSlipUpload = async (event) => {
         const file = event.target.files?.[0];
@@ -6095,6 +6115,50 @@ const selectedCustomer = useMemo(
         return data;
     };
 
+
+    const cropCnicDocumentImage = async (file, side = 'front') => {
+        if (!String(file?.type || '').startsWith('image/')) {
+            return file;
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+
+        try {
+            const image = await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Unable to read CNIC image for crop.'));
+                img.src = objectUrl;
+            });
+
+            const cropWidth = Math.round(image.width * 0.9);
+            const cropHeight = Math.round(image.height * 0.84);
+            const cropX = Math.max(0, Math.round((image.width - cropWidth) / 2));
+            const cropY = Math.max(0, Math.round(image.height * (String(side).toLowerCase().includes('back') ? 0.08 : 0.09)));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = cropWidth;
+            canvas.height = cropHeight;
+
+            const context = canvas.getContext('2d');
+            if (!context) {
+                throw new Error('Unable to prepare CNIC crop.');
+            }
+
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, cropWidth, cropHeight);
+            context.drawImage(image, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+            if (!blob) {
+                throw new Error('Unable to generate CNIC crop.');
+            }
+
+            return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'cnic'}-crop.png`, { type: 'image/png' });
+        } finally {
+            URL.revokeObjectURL(objectUrl);
+        }
+    };
     const extractSignatureCropFromCnic = async (file) => {
         if (!String(file?.type || '').startsWith('image/')) {
             return null;
@@ -6213,12 +6277,18 @@ const selectedCustomer = useMemo(
 
         try {
             setUploadingCustomerAsset(true);
+            const cropEnabled = assetType === 'CNIC_FRONT'
+                ? Boolean(customerCnicCropOptions.front)
+                : assetType === 'CNIC_BACK'
+                    ? Boolean(customerCnicCropOptions.back)
+                    : false;
+            const uploadFile = cropEnabled ? await cropCnicDocumentImage(file, assetType) : file;
             const uploadAssetType = assetType === 'CNIC_BACK' ? 'CNIC_BACK_ORIGINAL' : assetType;
-            const data = await uploadCustomerAssetFile(file, uploadAssetType);
+            const data = await uploadCustomerAssetFile(uploadFile, uploadAssetType);
             let ocrData = data;
 
             if (assetType === 'CNIC_BACK') {
-                const addressCropFile = await extractBackAddressCropFromCnic(file);
+                const addressCropFile = await extractBackAddressCropFromCnic(uploadFile);
                 if (addressCropFile) {
                     ocrData = await uploadCustomerAssetFile(addressCropFile, 'CNIC_BACK');
                 }
@@ -6248,7 +6318,7 @@ const selectedCustomer = useMemo(
 
             if (assetType === 'CNIC_FRONT') {
                 try {
-                    const signatureCropFile = await extractSignatureCropFromCnic(file);
+                    const signatureCropFile = await extractSignatureCropFromCnic(uploadFile);
                     if (signatureCropFile) {
                         const signatureData = await uploadCustomerAssetFile(signatureCropFile, 'SIGNATURE');
                         setCustomerForm((current) => ({
@@ -8265,6 +8335,7 @@ const selectedCustomer = useMemo(
         canViewSalesInstallmentPreview,
         canViewSalesRegister,
         canUpdateSalesRegister,
+        canViewSalesUrlFields,
         canViewTransactionRegister,
         canViewWorkflowConfig,
         canViewWorkflowTasks,
@@ -8273,6 +8344,7 @@ const selectedCustomer = useMemo(
         currentPayrollMonth,
         currentSalesDealerSignatureUrl,
         customerDealerOptions,
+        customerCnicCropOptions,
         customerForm,
         customerMessage,
         customerOwnershipCandidates,
@@ -8322,6 +8394,7 @@ const selectedCustomer = useMemo(
         handleSaleChange,
         handleSaleDealerSignatureUpload,
         handleSaleDocumentUpload,
+        handleSaleCnicUpload,
         handleSaleSubmit,
         handleViewSale,
         handleViewTransaction,
@@ -8378,6 +8451,7 @@ const selectedCustomer = useMemo(
         saleCustomerCnicFrontUrl,
         saleDealerSignatureUrl,
         saleForm,
+        saleCnicCropOptions,
         saleFormReadOnly,
         saleMessage,
         salesVehicleDropdownOpen,
@@ -8413,7 +8487,9 @@ const selectedCustomer = useMemo(
         setEmployeeAccessPopupOpen,
         setPayrollMonth,
         setSalaryGenerationEmployeeId,
+        setCustomerCnicCropOptions,
         setSaleForm,
+        setSaleCnicCropOptions,
         setSalesVehicleDropdownOpen,
         setSelectedCustomerId,
         setSelectedEmployeeId,
@@ -8431,6 +8507,8 @@ const selectedCustomer = useMemo(
         uploadingCustomerAsset,
         uploadingEmployeeDocument,
         uploadingSaleAuthorizedSignature,
+        uploadingSaleCnicFront,
+        uploadingSaleCnicBack,
         uploadingSaleBankCheck,
         uploadingSaleMiscDocument,
         user,
@@ -8986,6 +9064,12 @@ const selectedCustomer = useMemo(
             </header>
 
             <main className="content-area">
+                {queryLoading && !loading ? (
+                    <div className="query-loading-pill" role="status" aria-live="polite">
+                        <span className="query-loading-spinner" aria-hidden="true" />
+                        Loading latest data...
+                    </div>
+                ) : null}
                 {loading ? (
                     <div className="feedback-card">Loading dashboard data...</div>
                 ) : error ? (

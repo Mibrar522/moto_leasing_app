@@ -10,6 +10,7 @@ export default function Sales({ ctx }) {
     canViewSalesInstallmentPreview,
     canViewSalesRegister,
     canUpdateSalesRegister,
+    canViewSalesUrlFields,
     currentSalesDealerSignatureUrl,
     dashboardData,
     editingSaleRecord,
@@ -24,6 +25,7 @@ export default function Sales({ ctx }) {
     handleSaleChange,
     handleSaleDealerSignatureUpload,
     handleSaleDocumentUpload,
+    handleSaleCnicUpload,
     handleSaleSubmit,
     handleViewSale,
     installmentMarkupPreview,
@@ -36,6 +38,7 @@ export default function Sales({ ctx }) {
     saleCustomerCnicBackUrl,
     saleCustomerCnicFrontUrl,
     saleDealerSignatureUrl,
+    saleCnicCropOptions,
     saleForm,
     saleFormReadOnly,
     saleMessage,
@@ -48,6 +51,7 @@ export default function Sales({ ctx }) {
     selectedSaleVehicleName,
     selectedSaleVehicleSecondaryLine,
     setSaleForm,
+    setSaleCnicCropOptions,
     setSalesVehicleDropdownOpen,
     setUploadingSaleAuthorizedSignature,
     setUploadingSaleBankCheck,
@@ -57,6 +61,8 @@ export default function Sales({ ctx }) {
     transactionActionState,
     uploadingAgreement,
     uploadingSaleAuthorizedSignature,
+    uploadingSaleCnicFront,
+    uploadingSaleCnicBack,
     uploadingSaleBankCheck,
     uploadingSaleMiscDocument,
     user,
@@ -203,17 +209,21 @@ if (!canCreateSales) {
                                     <label className="field"><span>Witness 2 Name</span><input name="witness_two_name" value={saleForm.witness_two_name || ''} onChange={handleSaleChange} /></label>
                                     <label className="field"><span>Witness 2 CNIC</span><input name="witness_two_cnic" value={saleForm.witness_two_cnic || ''} onChange={handleSaleChange} /></label>
                                     <label className="field full-span"><span>Agreement PDF</span><input type="file" accept="application/pdf" onChange={handleAgreementUpload} /></label>
-                                    <label className="field full-span"><span>Uploaded Agreement URL</span><input name="agreement_pdf_url" value={saleForm.agreement_pdf_url || ''} onChange={handleSaleChange} readOnly={uploadingAgreement} /></label>
+                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Uploaded Agreement URL</span><input name="agreement_pdf_url" value={saleForm.agreement_pdf_url || ''} onChange={handleSaleChange} readOnly={uploadingAgreement} /></label> : null}
                                     <label className="field full-span"><span>Dealer Signature Upload</span><input type="file" accept="image/*" onChange={handleSaleDealerSignatureUpload} disabled={saleFormReadOnly || savingSale} /></label>
-                                    <label className="field full-span"><span>Dealer Signature URL</span><input name="dealer_signature_url" value={saleForm.dealer_signature_url || currentSalesDealerSignatureUrl || ''} onChange={handleSaleChange} readOnly /></label>
+                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Dealer Signature URL</span><input name="dealer_signature_url" value={saleForm.dealer_signature_url || currentSalesDealerSignatureUrl || ''} onChange={handleSaleChange} readOnly /></label> : null}
                                     <label className="field full-span"><span>Authorized Signature Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleDocumentUpload(event, 'authorized_signature_url', 'Authorized signature', setUploadingSaleAuthorizedSignature)} disabled={saleFormReadOnly || savingSale} /></label>
-                                    <label className="field full-span"><span>Authorized Signature URL</span><input name="authorized_signature_url" value={saleForm.authorized_signature_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleAuthorizedSignature} /></label>
-                                    <label className="field full-span"><span>Customer CNIC Front URL</span><input name="customer_cnic_front_url" value={saleCustomerCnicFrontUrl || ''} readOnly /></label>
-                                    <label className="field full-span"><span>Customer CNIC Back URL</span><input name="customer_cnic_back_url" value={saleCustomerCnicBackUrl || ''} readOnly /></label>
+                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Authorized Signature URL</span><input name="authorized_signature_url" value={saleForm.authorized_signature_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleAuthorizedSignature} /></label> : null}
+                                    <label className="field full-span"><span>Customer CNIC Front Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleCnicUpload(event, 'customer_cnic_front_url', 'Customer CNIC front', 'front')} disabled={saleFormReadOnly || savingSale || uploadingSaleCnicFront} /></label>
+                                    <label className="field checkbox-field"><span>Crop CNIC Front Before Upload</span><input type="checkbox" checked={Boolean(saleCnicCropOptions.front)} onChange={(event) => setSaleCnicCropOptions((current) => ({ ...current, front: event.target.checked }))} /></label>
+                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Customer CNIC Front URL</span><input name="customer_cnic_front_url" value={saleCustomerCnicFrontUrl || ''} readOnly /></label> : null}
+                                    <label className="field full-span"><span>Customer CNIC Back Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleCnicUpload(event, 'customer_cnic_back_url', 'Customer CNIC back', 'back')} disabled={saleFormReadOnly || savingSale || uploadingSaleCnicBack} /></label>
+                                    <label className="field checkbox-field"><span>Crop CNIC Back Before Upload</span><input type="checkbox" checked={Boolean(saleCnicCropOptions.back)} onChange={(event) => setSaleCnicCropOptions((current) => ({ ...current, back: event.target.checked }))} /></label>
+                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Customer CNIC Back URL</span><input name="customer_cnic_back_url" value={saleCustomerCnicBackUrl || ''} readOnly /></label> : null}
                                     <label className="field full-span"><span>Bank Check Upload</span><input type="file" accept="*/*" onChange={(event) => handleSaleDocumentUpload(event, 'bank_check_url', 'Bank check', setUploadingSaleBankCheck)} /></label>
-                                    <label className="field full-span"><span>Uploaded Bank Check URL</span><input name="bank_check_url" value={saleForm.bank_check_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleBankCheck} /></label>
+                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Uploaded Bank Check URL</span><input name="bank_check_url" value={saleForm.bank_check_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleBankCheck} /></label> : null}
                                     <label className="field full-span"><span>Misc Document Upload</span><input type="file" accept="*/*" onChange={(event) => handleSaleDocumentUpload(event, 'misc_document_url', 'Misc document', setUploadingSaleMiscDocument)} /></label>
-                                    <label className="field full-span"><span>Uploaded Misc Document URL</span><input name="misc_document_url" value={saleForm.misc_document_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleMiscDocument} /></label>
+                                    {canViewSalesUrlFields ? <label className="field full-span"><span>Uploaded Misc Document URL</span><input name="misc_document_url" value={saleForm.misc_document_url || ''} onChange={handleSaleChange} readOnly={uploadingSaleMiscDocument} /></label> : null}
                                     <label className="field full-span"><span>Remarks</span><textarea rows="4" name="remarks" value={saleForm.remarks || ''} onChange={handleSaleChange} /></label>
                                 </div>
 
