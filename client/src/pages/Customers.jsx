@@ -161,7 +161,7 @@ if (!canOpenCustomers) {
                                         <span>CNIC / Passport Number</span>
                                         <input name="cnic_passport_number" value={customerForm.cnic_passport_number} onChange={handleCustomerChange} placeholder="35202-1234567-1 or passport no." />
                                     </label>
-                                    <label className="field" hidden={!canEditCustomerField('CNIC Front Upload')}>
+                                    <label className="field" hidden={!canUseOcr || !canEditCustomerField('CNIC Front Upload')}>
                                         <span>CNIC Front Upload</span>
                                         <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_url', 'CNIC front', 'CNIC_FRONT')} disabled={!canUseOcr || uploadingCustomerAsset} />
                                     </label>
@@ -191,7 +191,7 @@ if (!canOpenCustomers) {
                                             )}
                                         </div>
                                     </div>
-                                    <label className="field" hidden={!canEditCustomerField('CNIC Back Upload')}>
+                                    <label className="field" hidden={!canUseOcr || !canEditCustomerField('CNIC Back Upload')}>
                                         <span>CNIC Back Upload</span>
                                         <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_back_url', 'CNIC back', 'CNIC_BACK')} disabled={!canUseOcr || uploadingCustomerAsset} />
                                     </label>
@@ -258,9 +258,11 @@ if (!canOpenCustomers) {
                                 <div className="scanner-box">
                                     <div className="section-header">
                                         <h3>Fingerprint Intake</h3>
-                                    <button type="button" className="secondary-btn" onClick={handleCaptureFingerprint} disabled={!canScanCustomerFingerprint || uploadingCustomerAsset}>
+                                    {canScanCustomerFingerprint ? (
+                                    <button type="button" className="secondary-btn" onClick={handleCaptureFingerprint} disabled={uploadingCustomerAsset}>
                                         {uploadingCustomerAsset ? 'Scanning...' : 'Scan Thumb Device'}
                                     </button>
+                                    ) : null}
                                     </div>
 
                                     <div className="form-grid">

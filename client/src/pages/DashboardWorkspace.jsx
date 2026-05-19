@@ -761,6 +761,13 @@ const hasFeature = (user, featureKey) =>
     (user?.features || []).some((feature) => feature.key === featureKey);
 const hasAnyFeature = (user, featureKeys = []) =>
     isEffectiveSuperAdminUser(user) || featureKeys.some((featureKey) => hasFeature(user, featureKey));
+const hasAssignedFeature = (user, featureKey) => {
+    if (!featureKey) return false;
+    if (Array.isArray(user?.feature_keys)) {
+        return user.feature_keys.includes(featureKey);
+    }
+    return (user?.features || []).some((feature) => feature.key === featureKey);
+};
 const roundCurrencyValue = (value) => Math.round(Number(value || 0) * 100) / 100;
 const normalizeTextValue = (value) => String(value || '').trim().toUpperCase();
 const formatDateKeyPart = (value) => String(value || '').padStart(2, '0');
@@ -2191,8 +2198,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     // Show the intake form if the role explicitly has it, or if they can edit customer records (edit button uses the form).
     const canViewCustomerForm = canOpenCustomers && (hasAnyFeature(user, ['FEAT_CUSTOMER_FORM']) || canEditCustomerRecord);
     const canUnlockCustomerOwnership = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_OWNERSHIP_UNLOCK']);
-    const canEditCustomerField = (label) => canViewCustomerForm && hasAnyFeature(user, [CUSTOMER_FIELD_FEATURE_MAP[label]]);
-    const canEditSalesField = (label) => canViewSalesAgreementForm && hasAnyFeature(user, [SALES_FIELD_FEATURE_MAP[label]]);
+    const canEditCustomerField = (label) => canViewCustomerForm && hasAssignedFeature(user, CUSTOMER_FIELD_FEATURE_MAP[label]);
+    const canEditSalesField = (label) => canViewSalesAgreementForm && hasAssignedFeature(user, SALES_FIELD_FEATURE_MAP[label]);
     const canViewEmployeeForm = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_FORM']);
     const canEditEmployees = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_EDIT']);
     const canChangeEmployeeRecord = canManageEmployees && (!employeeForm.id || canEditEmployees);
