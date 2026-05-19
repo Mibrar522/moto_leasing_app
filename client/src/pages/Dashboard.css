@@ -1,3 +1,7 @@
+[hidden] {
+    display: none !important;
+}
+
 :root {
     --sidebar-width: 290px;
     --header-height: 92px;
