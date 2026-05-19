@@ -817,6 +817,21 @@ const getDashboardPageFromSearch = (search) => {
 
     return legacyPage;
 };
+const LAZY_REPORT_PAGE_KEYS = new Set([
+    'reports',
+    'report-stock-inventory',
+    'report-daily-sales',
+    'report-stock-received',
+    'report-customers',
+    'report-customer-transactions',
+    'report-business-transactions',
+    'report-invoice-view',
+    'report-employees',
+    'report-salary',
+    'report-dealer-information',
+    'report-dealer-employees',
+]);
+const isLazyReportPage = (page) => LAZY_REPORT_PAGE_KEYS.has(String(page || '').toLowerCase());
 const getDashboardTokenForPage = (page) => DASHBOARD_PAGE_TOKENS[page] || DASHBOARD_PAGE_TOKENS.dashboard;
 const DASHBOARD_PAGE_PATHS = {
     dashboard: '/dashboard',
@@ -1610,6 +1625,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [reportStatus, setReportStatus] = useState('ALL');
     const [reportKeyword, setReportKeyword] = useState('');
     const [appliedReportFilters, setAppliedReportFilters] = useState(() => createDefaultReportFilters());
+    const [activeReportPreviewPage, setActiveReportPreviewPage] = useState('');
     const [loading, setLoading] = useState(true);
     const [queryLoading, setQueryLoading] = useState(false);
     const [savingCustomer, setSavingCustomer] = useState(false);
@@ -1768,6 +1784,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     };
 
     const handleRefreshReport = async () => {
+        const previewPage = visibleActivePage;
         setAppliedReportFilters({
             dateFrom: reportDateFrom,
             dateTo: reportDateTo,
@@ -1777,7 +1794,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
             status: reportStatus,
             keyword: reportKeyword,
         });
-        await loadDashboard({ previewReport: true });
+        await loadDashboard({ previewReport: true, page: previewPage });
+        setActiveReportPreviewPage(previewPage);
     };
 
     useEffect(() => {
@@ -1788,8 +1806,17 @@ const Dashboard = ({ pageKey, PageComponent }) => {
             return;
         }
 
-        loadDashboard();
-    }, [navigate, pageKey, location.pathname, location.search]);
+        const requestedPage = routeActivePage || 'dashboard';
+        if (isLazyReportPage(requestedPage)) {
+            setActiveReportPreviewPage((current) => (current === requestedPage ? current : ''));
+            setLoading(false);
+            setQueryLoading(false);
+            setError('');
+            return;
+        }
+
+        loadDashboard({ page: requestedPage });
+    }, [navigate, pageKey, location.pathname, location.search, routeActivePage]);
 
     const goToPage = (nextPage, options = {}) => {
         if (!nextPage) {
@@ -7065,6 +7092,11 @@ const selectedCustomer = useMemo(
     };
 
     const handlePrintReport = () => {
+        if (isLazyReportPage(visibleActivePage) && activeReportPreviewPage !== visibleActivePage) {
+            window.alert('Please click Preview Report before printing.');
+            return;
+        }
+
         const printedOn = new Date().toLocaleDateString('en-PK');
         const reportRangeLabel = `${activeReportDateFrom || 'Start'} to ${activeReportDateTo || 'Today'}`;
         let reportTitle = 'Report';
@@ -8295,6 +8327,8 @@ const selectedCustomer = useMemo(
         );
     };
 
+    const reportPreviewReady = !isLazyReportPage(visibleActivePage) || activeReportPreviewPage === visibleActivePage;
+
     const workspaceContext = {
         actualVehiclePrice,
         advanceForm,
@@ -8423,22 +8457,22 @@ const selectedCustomer = useMemo(
         renderReportFilters,
         renderReportsSelector,
         renderTableLimitControl,
-        reportBusinessTotals,
-        reportBusinessTransactionRows,
-        reportCustomerRows,
-        reportCustomerTransactionRows,
+        reportBusinessTotals: reportPreviewReady ? reportBusinessTotals : { actual: 0, selling: 0, profit: 0, loss: 0 },
+        reportBusinessTransactionRows: reportPreviewReady ? reportBusinessTransactionRows : [],
+        reportCustomerRows: reportPreviewReady ? reportCustomerRows : [],
+        reportCustomerTransactionRows: reportPreviewReady ? reportCustomerTransactionRows : [],
         reportDateFrom: activeReportDateFrom,
         reportDateTo: activeReportDateTo,
-        reportDealerEmployeeRows,
-        reportDealerInformationRows,
-        reportEmployeeRows,
-        reportInvoiceRows,
-        reportSalaryRows,
-        reportSalesCommissionTotal,
-        reportSalesRows,
-        reportSalesTotals,
-        reportStockInventoryRows,
-        reportStockReceivedRows,
+        reportDealerEmployeeRows: reportPreviewReady ? reportDealerEmployeeRows : [],
+        reportDealerInformationRows: reportPreviewReady ? reportDealerInformationRows : [],
+        reportEmployeeRows: reportPreviewReady ? reportEmployeeRows : [],
+        reportInvoiceRows: reportPreviewReady ? reportInvoiceRows : [],
+        reportSalaryRows: reportPreviewReady ? reportSalaryRows : [],
+        reportSalesCommissionTotal: reportPreviewReady ? reportSalesCommissionTotal : 0,
+        reportSalesRows: reportPreviewReady ? reportSalesRows : [],
+        reportSalesTotals: reportPreviewReady ? reportSalesTotals : { deals: 0, amount: 0, received: 0, pending: 0 },
+        reportStockInventoryRows: reportPreviewReady ? reportStockInventoryRows : [],
+        reportStockReceivedRows: reportPreviewReady ? reportStockReceivedRows : [],
         resetCustomerForm,
         resetEmployeeForm,
         resetSaleForm,
@@ -9071,7 +9105,7 @@ const selectedCustomer = useMemo(
                     </div>
                 ) : null}
                 {loading ? (
-                    <div className="feedback-card">Loading dashboard data...</div>
+                    <div className="feedback-card dashboard-loading-card"><span className="query-loading-spinner" aria-hidden="true" /> Loading dashboard data...</div>
                 ) : error ? (
                     <div className="feedback-card error">{error}</div>
                 ) : (

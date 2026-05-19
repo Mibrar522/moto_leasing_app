@@ -2845,6 +2845,13 @@
     backdrop-filter: blur(8px);
 }
 
+.dashboard-loading-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
 .query-loading-spinner {
     width: 16px;
     height: 16px;
