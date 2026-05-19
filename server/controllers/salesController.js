@@ -8,11 +8,10 @@ const {
 const { ensurePerformanceIndexes } = require('../utils/performanceIndexes');
 
 const isSuperAdminSession = (user = {}) =>
-    Number(user?.real_role_id || user?.role_id) === 1 ||
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
 
 const getSalesScopeContext = (user = {}) => {
-    const isEmployeeLogin = Number(user?.role_id) === 3 || user?.role_name === 'AGENT';
+    const isEmployeeLogin = user?.role_name === 'AGENT';
     const isSuperAdmin = isSuperAdminSession(user);
     const effectiveDealerId = user?.effective_dealer_id || user?.dealer_id || null;
     const hasGlobalScope = isSuperAdmin && !user?.effective_dealer_id;

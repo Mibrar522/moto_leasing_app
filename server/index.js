@@ -140,18 +140,19 @@ const startServer = async () => {
         await pool.query('SELECT NOW()');
         console.log('✓ Database connection successful.');
 
-        // Keep access roles/features present in hosted PostgreSQL.
+        // Keep access roles/features present in hosted PostgreSQL before any heavier schema sync can fail.
+        try {
+            await syncAccessCatalogDefaults();
+            console.log('Access-control catalog verified.');
+        } catch (catalogError) {
+            console.warn('Access-control catalog skipped:', catalogError.message);
+        }
+
         try {
             await syncAccessControlDefaults();
             console.log('Access-control defaults verified.');
         } catch (bootstrapError) {
             console.warn('Access-control bootstrap skipped:', bootstrapError.message);
-            try {
-                await syncAccessCatalogDefaults();
-                console.log('Access-control catalog fallback verified.');
-            } catch (catalogError) {
-                console.warn('Access-control catalog fallback skipped:', catalogError.message);
-            }
         }
 
         try {

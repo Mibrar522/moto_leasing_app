@@ -4,7 +4,6 @@ const pool = require('../config/db');
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'secret';
 const isSuperAdminSession = (user = {}) =>
-    Number(user?.real_role_id || user?.role_id) === 1 ||
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
 
 const getResolvedDealerSql = () => `
@@ -150,11 +149,10 @@ exports.requireDealerScope = (req, res, next) => {
     }
 
     const roleName = String(req.user?.role_name || req.user?.real_role_name || '').toUpperCase();
-    const isEmployeeLogin = Number(req.user?.role_id) === 3;
     const isAgentLogin = roleName === 'AGENT';
 
     // Employees/agents are scoped to their own user id in controllers.
-    if (isEmployeeLogin || isAgentLogin) {
+    if (isAgentLogin) {
         return next();
     }
 

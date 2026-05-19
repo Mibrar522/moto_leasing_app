@@ -751,10 +751,9 @@ const sidebarTabIcons = {
     ),
 };
 const isSuperAdminUser = (user) =>
-    Number(user?.real_role_id || user?.role_id) === 1 ||
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
 const isEffectiveSuperAdminUser = (user) =>
-    Number(user?.role_id) === 1 || user?.role_name === 'SUPER_ADMIN';
+    user?.role_name === 'SUPER_ADMIN';
 const hasFeature = (user, featureKey) =>
     isEffectiveSuperAdminUser(user) ||
     (Array.isArray(user?.feature_keys) && user.feature_keys.includes(featureKey)) ||
@@ -1907,8 +1906,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
 
     const user = dashboardData.user || JSON.parse(localStorage.getItem('user') || 'null');
     const currentSalesDealerSignatureUrl = user?.dealer_signature_url || '';
-    const isSuperAdmin = Number(user?.role_id) === 1 || user?.role_name === 'SUPER_ADMIN';
-    const realIsSuperAdmin = Number(user?.real_role_id || user?.role_id) === 1 || (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
+    const isSuperAdmin = user?.role_name === 'SUPER_ADMIN';
+    const realIsSuperAdmin = (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
     const effectiveIsApplicationAdmin = user?.role_name === 'APPLICATION_ADMIN';
     const canUseProfileSwitch = realIsSuperAdmin && (
         (user?.real_feature_keys || []).includes('FEAT_PROFILE_SWITCH') ||
@@ -8942,14 +8941,14 @@ const selectedCustomer = useMemo(
                         <div className="page-heading">
                             <h1>Executive Overview</h1>
                             <p>
-                                {Number(user?.role_id) === 3
+                                {user?.role_name === 'AGENT'
                                     ? 'Tracking your sales pipeline, received business, and overdue follow-ups for this month.'
                                     : 'Monitoring live leasing activity, fleet readiness, customer onboarding, and revenue.'}
                             </p>
                         </div>
 
                         <div className="metrics-grid">
-                            {Number(user?.role_id) === 3 ? (
+                            {user?.role_name === 'AGENT' ? (
                                 <>
                                     <div className="metric-card"><label>Received Sales</label><div className="value success">{formatCompactCurrency(dashboardData.employeeSales.receivedValue)}</div></div>
                                     <div className="metric-card"><label>Pending Sales</label><div className="value warning">{formatCompactCurrency(dashboardData.employeeSales.pendingValue)}</div></div>

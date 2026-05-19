@@ -189,11 +189,11 @@ const getRolePermissions = async () => {
 
 exports.getDashboardData = async (req, res) => {
     try {
-        const isEmployeeLogin = Number(req.user.role_id) === 3 || req.user.role_name === 'AGENT';
-        const isSuperAdmin = Number(req.user.role_id) === 1 || req.user.role_name === 'SUPER_ADMIN';
+        const isEmployeeLogin = req.user.role_name === 'AGENT';
+        const isSuperAdmin = req.user.role_name === 'SUPER_ADMIN';
         const isManagerLogin = req.user.role_name === 'MANAGER';
         const isApplicationAdminLogin = req.user.role_name === 'APPLICATION_ADMIN';
-        const isAgentLogin = req.user.role_name === 'AGENT' || Number(req.user.role_id) === 3;
+        const isAgentLogin = req.user.role_name === 'AGENT';
 
         // Prefer the dealer embedded in the JWT (supports super-admin dealer switching),
         // but fall back to the dealer linked in the DB access profile for dealer-scoped roles.
@@ -375,7 +375,7 @@ exports.getDashboardData = async (req, res) => {
         );
         const dashboardGroupsByPage = {
             dashboard: ['metrics', 'ads', 'notifications', 'dealers'],
-            customers: ['customers', 'dealers'],
+            customers: ['customers', 'dealers', 'roles', 'features', 'rolePermissions'],
             employees: ['employees', 'dealers', 'roles', 'features', 'employeeFinancials'],
             dealers: ['dealers', 'roles'],
             access: ['roles', 'features', 'rolePermissions'],
@@ -385,7 +385,7 @@ exports.getDashboardData = async (req, res) => {
             products: ['products', 'vehicleTypes'],
             companies: ['companies'],
             stock: ['stockOrders', 'products', 'companies', 'vehicleTypes'],
-            sales: ['salesTransactions', 'customers', 'inventory', 'dealers', 'workflowDefinitions'],
+            sales: ['salesTransactions', 'customers', 'inventory', 'dealers', 'workflowDefinitions', 'roles', 'features', 'rolePermissions'],
             transactions: ['salesTransactions'],
             installments: ['salesTransactions', 'customers', 'inventory'],
             reports: ['dealers'],

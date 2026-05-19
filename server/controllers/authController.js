@@ -63,7 +63,7 @@ const buildSessionUser = ({
 
 const applyEffectiveDealerContext = async (user, effectiveDealerId = null) => {
     const normalizedEffectiveDealerId = effectiveDealerId || null;
-    const isSuperAdmin = Number(user?.role_id) === 1 || user?.role_name === 'SUPER_ADMIN';
+    const isSuperAdmin = user?.role_name === 'SUPER_ADMIN';
 
     if (!isSuperAdmin || !normalizedEffectiveDealerId) {
         return {
@@ -380,9 +380,12 @@ exports.register = async (req, res) => {
         }
 
         // Prevent creating dealer-scoped staff without dealer binding.
-        const requestedRoleId = role_id ? Number(role_id) : 3;
+        const requestedRoleId = role_id ? Number(role_id) : null;
         const roleResult = await pool.query(
-            'SELECT id, role_name FROM roles WHERE id = $1 LIMIT 1',
+            `SELECT id, role_name
+             FROM roles
+             WHERE id = COALESCE($1, (SELECT id FROM roles WHERE role_name = 'AGENT' LIMIT 1))
+             LIMIT 1`,
             [requestedRoleId]
         );
         const roleName = roleResult.rows[0]?.role_name || 'AGENT';
@@ -404,7 +407,7 @@ exports.register = async (req, res) => {
         // Updated to use "password_hash" based on your database error logs
         const newUser = await pool.query(
             'INSERT INTO users (full_name, email, password_hash, role_id, dealer_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, role_id, dealer_id',
-            [full_name, email, hashedPassword, requestedRoleId, roleName === 'SUPER_ADMIN' ? null : String(dealer_id).trim()]
+            [full_name, email, hashedPassword, roleResult.rows[0]?.id || requestedRoleId, roleName === 'SUPER_ADMIN' ? null : String(dealer_id).trim()]
         );
 
         res.status(201).json(newUser.rows[0]);
@@ -430,7 +433,7 @@ exports.login = async (req, res) => {
         const sessionUser = buildSessionUser({
             realUser: user,
             effectiveUser: await applyEffectiveDealerContext(user, null),
-            profileMode: Number(user?.role_id) === 1 || user?.role_name === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'DEFAULT',
+            profileMode: user?.role_name === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'DEFAULT',
             switchedProfile: false,
             effectiveDealerId: user?.dealer_id || null,
         });
@@ -456,7 +459,7 @@ exports.getProfile = async (req, res) => {
         const sessionUser = buildSessionUser({
             realUser,
             effectiveUser: await applyEffectiveDealerContext(effectiveUser, req.user.effective_dealer_id || null),
-            profileMode: req.user.profile_mode || ((Number(realUser?.role_id) === 1 || realUser?.role_name === 'SUPER_ADMIN') ? 'SUPER_ADMIN' : 'DEFAULT'),
+            profileMode: req.user.profile_mode || (realUser?.role_name === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'DEFAULT'),
             switchedProfile: Boolean(req.user.switched_profile),
             effectiveDealerId: req.user.effective_dealer_id || effectiveUser?.dealer_id || null,
         });
@@ -563,7 +566,7 @@ exports.uploadProfileLogo = async (req, res) => {
 
 exports.switchProfile = async (req, res) => {
     try {
-        const isSuperAdmin = Number(req.user?.real_role_id || req.user?.role_id) === 1 || (req.user?.real_role_name || req.user?.role_name) === 'SUPER_ADMIN';
+        const isSuperAdmin = (req.user?.real_role_name || req.user?.role_name) === 'SUPER_ADMIN';
         if (!isSuperAdmin) {
             return res.status(403).json({ message: 'Only the super admin can switch profiles.' });
         }

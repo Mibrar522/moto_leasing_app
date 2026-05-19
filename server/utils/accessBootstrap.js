@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 
-const ROLE_NAMES = ['SUPER_ADMIN', 'APPLICATION_ADMIN', 'MANAGER', 'AGENT'];
+const ROLE_NAMES = ['SUPER_ADMIN', 'APPLICATION_ADMIN', 'AGENT', 'MANAGER'];
 
 
 const CUSTOMER_FIELD_ACCESS = [
@@ -436,6 +436,19 @@ const ensureAccessTableShape = async (client) => {
 };
 
 const ensureRole = async (client, roleName) => {
+    if (roleName === 'SUPER_ADMIN') {
+        await client.query(`
+            UPDATE roles
+            SET role_name = 'SUPER_ADMIN',
+                name = COALESCE(name, 'SUPER_ADMIN')
+            WHERE id = 1
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM roles
+                  WHERE role_name = 'SUPER_ADMIN' OR name = 'SUPER_ADMIN'
+              )
+        `);
+    }
     await client.query(
         `
         INSERT INTO roles (id, name, role_name)
@@ -1220,61 +1233,6 @@ exports.syncAccessCatalogDefaults = async () => {
         await client.query('BEGIN');
         await ensureAccessTableShape(client);
 
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS product_catalog (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                brand VARCHAR(120) NOT NULL,
-                model VARCHAR(120) NOT NULL,
-                serial_number VARCHAR(220),
-                registration_number VARCHAR(120),
-                vehicle_type VARCHAR(80) NOT NULL,
-                chassis_number VARCHAR(160),
-                engine_number VARCHAR(160),
-                color VARCHAR(80),
-                description TEXT,
-                image_url TEXT NOT NULL,
-                monthly_rate NUMERIC(12, 2) NOT NULL DEFAULT 0,
-                purchase_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
-                cash_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
-                cash_markup_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
-                installment_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
-                installment_months INTEGER NOT NULL DEFAULT 12,
-                is_active BOOLEAN NOT NULL DEFAULT TRUE,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        `);
-
-        await client.query(`
-            DO $$
-            BEGIN
-                IF to_regclass('public.sale_installments') IS NOT NULL THEN
-                    ALTER TABLE sale_installments
-                        ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id) ON DELETE SET NULL;
-                END IF;
-                IF to_regclass('public.customer_orders') IS NOT NULL THEN
-                    ALTER TABLE customer_orders
-                        ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id) ON DELETE SET NULL;
-                END IF;
-                IF to_regclass('public.customer_order_installments') IS NOT NULL THEN
-                    ALTER TABLE customer_order_installments
-                        ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id) ON DELETE SET NULL;
-                END IF;
-                IF to_regclass('public.lease_applications') IS NOT NULL THEN
-                    ALTER TABLE lease_applications
-                        ADD COLUMN IF NOT EXISTS dealer_id UUID REFERENCES dealers(id) ON DELETE SET NULL;
-                END IF;
-            END $$;
-        `);
-
-        await client.query(`
-            ALTER TABLE product_catalog
-                ADD COLUMN IF NOT EXISTS cash_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
-                ADD COLUMN IF NOT EXISTS cash_markup_value NUMERIC(12, 2) NOT NULL DEFAULT 0,
-                ADD COLUMN IF NOT EXISTS installment_markup_percent NUMERIC(8, 2) NOT NULL DEFAULT 0,
-                ADD COLUMN IF NOT EXISTS installment_months INTEGER NOT NULL DEFAULT 12
-        `);
-
         for (const roleName of ROLE_NAMES) {
             await ensureRole(client, roleName);
         }
@@ -1295,6 +1253,11 @@ exports.syncAccessCatalogDefaults = async () => {
         await ensureDefaultRolePermissions(client, roleIdByName.AGENT, AGENT_FEATURES);
 
         await client.query('COMMIT');
+
+        return {
+            rolesEnsured: ROLE_NAMES.length,
+            featuresEnsured: FEATURE_DEFINITIONS.length,
+        };
     } catch (error) {
         await client.query('ROLLBACK');
         throw error;
