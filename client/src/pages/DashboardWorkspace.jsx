@@ -1948,16 +1948,26 @@ const Dashboard = ({ pageKey, PageComponent }) => {
 
         return customer.created_by_name || customer.dealer_name || customer.created_by_email || 'Not set';
     };
+    const hasCurrentRoleFeatureKey = (featureKey) => {
+        if (!featureKey) return false;
+        const currentRoleId = user?.role_id;
+        const assignedFeatureIds = roleAssignments[currentRoleId];
+        const featureId = (dashboardData.features || []).find((feature) => feature.feature_key === featureKey)?.id;
+        if (featureId && Array.isArray(assignedFeatureIds)) {
+            return assignedFeatureIds.includes(Number(featureId));
+        }
+        return hasAssignedFeature(user, featureKey);
+    };
     const canViewDashboard = hasAnyFeature(user, ['FEAT_DASHBOARD_VIEW']) || Boolean(user);
     const canViewApplications = hasAnyFeature(user, ['FEAT_APPLICATIONS_VIEW']);
     const canViewWorkflow = hasAnyFeature(user, ['FEAT_WORKFLOW_VIEW']);
-    const canUseOcrFeature = hasAnyFeature(user, ['FEAT_OCR_SCAN']);
-    const canUseBiometric = hasAnyFeature(user, ['FEAT_BIOMETRIC', 'FEAT_CUSTOMER_BIOMETRIC']);
-    const canEditCustomerOcrFieldsFeature = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_FIELDS']);
-    const canProcessCustomerOcrFeature = hasAnyFeature(user, ['FEAT_CUSTOMER_OCR_PROCESS']);
-    const canCreateCustomerBiometric = hasAnyFeature(user, ['FEAT_CUSTOMER_BIOMETRIC', 'FEAT_BIOMETRIC']);
-    const canEditCustomerFingerprintFieldsFeature = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_FIELDS']);
-    const canScanCustomerFingerprintFeature = hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT_SCAN']);
+    const canUseOcrFeature = hasCurrentRoleFeatureKey('FEAT_OCR_SCAN');
+    const canUseBiometric = hasCurrentRoleFeatureKey('FEAT_BIOMETRIC') || hasCurrentRoleFeatureKey('FEAT_CUSTOMER_BIOMETRIC');
+    const canEditCustomerOcrFieldsFeature = hasCurrentRoleFeatureKey('FEAT_CUSTOMER_OCR_FIELDS');
+    const canProcessCustomerOcrFeature = hasCurrentRoleFeatureKey('FEAT_CUSTOMER_OCR_PROCESS');
+    const canCreateCustomerBiometric = hasCurrentRoleFeatureKey('FEAT_CUSTOMER_BIOMETRIC') || hasCurrentRoleFeatureKey('FEAT_BIOMETRIC');
+    const canEditCustomerFingerprintFieldsFeature = hasCurrentRoleFeatureKey('FEAT_CUSTOMER_FINGERPRINT_FIELDS');
+    const canScanCustomerFingerprintFeature = hasCurrentRoleFeatureKey('FEAT_CUSTOMER_FINGERPRINT_SCAN');
     const canManageCustomers = hasAnyFeature(user, ['FEAT_CUSTOMER_MGMT']);
     const canManageProducts = hasAnyFeature(user, ['FEAT_PRODUCT_MGMT', 'FEAT_FLEET_MGMT']);
     const canManageStock = hasAnyFeature(user, ['FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT']);
@@ -2187,7 +2197,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canUseOcr = canOpenCustomers && canUseOcrFeature;
     const canEditCustomerOcrFields = canUseOcr && canEditCustomerOcrFieldsFeature;
     const canProcessCustomerOcr = canUseOcr && canProcessCustomerOcrFeature;
-    const canViewCustomerFingerprint = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_FINGERPRINT']) && canUseBiometric;
+    const canViewCustomerFingerprint = canOpenCustomers && hasCurrentRoleFeatureKey('FEAT_CUSTOMER_FINGERPRINT') && canUseBiometric;
     const canEditCustomerFingerprintFields = canViewCustomerFingerprint && canEditCustomerFingerprintFieldsFeature;
     const canScanCustomerFingerprint = canViewCustomerFingerprint && canScanCustomerFingerprintFeature;
     const canEditCustomerRecord = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_RECORD_EDIT']);
@@ -2197,16 +2207,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     // Show the intake form if the role explicitly has it, or if they can edit customer records (edit button uses the form).
     const canViewCustomerForm = canOpenCustomers && (hasAnyFeature(user, ['FEAT_CUSTOMER_FORM']) || canEditCustomerRecord);
     const canUnlockCustomerOwnership = canOpenCustomers && hasAnyFeature(user, ['FEAT_CUSTOMER_OWNERSHIP_UNLOCK']);
-    const hasCurrentRoleFeature = (featureKey) => {
-        if (!featureKey) return false;
-        const featureId = featureByKey[featureKey]?.id;
-        const currentRoleId = user?.role_id;
-        const assignedFeatureIds = roleAssignments[currentRoleId];
-        if (featureId && Array.isArray(assignedFeatureIds)) {
-            return assignedFeatureIds.includes(Number(featureId));
-        }
-        return hasAssignedFeature(user, featureKey);
-    };
+    const hasCurrentRoleFeature = (featureKey) => hasCurrentRoleFeatureKey(featureKey);
     const canEditCustomerField = (label) => canViewCustomerForm && hasCurrentRoleFeature(CUSTOMER_FIELD_FEATURE_MAP[label]);
     const canEditSalesField = (label) => canViewSalesAgreementForm && hasCurrentRoleFeature(SALES_FIELD_FEATURE_MAP[label]);
     const canViewEmployeeForm = canManageEmployees && hasAnyFeature(user, ['FEAT_EMPLOYEE_FORM']);
