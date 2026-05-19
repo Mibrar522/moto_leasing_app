@@ -108,7 +108,7 @@ export default function Dealers({
             <div><span className="meta-label">Selected Theme</span><p className="meta-value">{dashboardThemes.find((theme) => theme.key === dealerForm.theme_key)?.label || 'Sandstone Pro'}</p></div>
             <div><span className="meta-label">New Dealer State</span><p className="meta-value">Fresh Start</p></div>
             <div><span className="meta-label">Data Baseline</span><p className="meta-value">0 customers, 0 employees, 0 products, 0 sales</p></div>
-            <div><span className="meta-label">Provisioned Login</span><p className="meta-value">Application Admin</p></div>
+            <div><span className="meta-label">Provisioned Login</span><p className="meta-value">{dealerAdminRoles.find((role) => String(role.id) === String(dealerForm.admin_role_id))?.role_name || 'Application Admin'}</p></div>
             <div><span className="meta-label">Clone Setup</span><p className="meta-value">DB backup label + clone profile</p></div>
             <div><span className="meta-label">Backup Directory</span><p className="meta-value">{dealerForm.backup_directory.trim() || 'Server default backup folder'}</p></div>
           </div>
@@ -144,6 +144,7 @@ export default function Dealers({
                     <th>Theme</th>
                     <th>Application</th>
                     <th>App Status</th>
+                    <th>Admin Role</th>
                     <th>Created By</th>
                     <th>Actions</th>
                 </tr>
@@ -180,6 +181,7 @@ export default function Dealers({
                       {dealer.provisioning_status || dealer.app_status || 'FRESH_START'}
                     </span>
                     </td>
+                    <td>{dealer.admin_role_name || 'No role'}</td>
                     <td>{dealer.created_by_name || 'System'}</td>
                     <td>
                         <div className="table-actions">
