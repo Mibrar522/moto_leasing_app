@@ -915,9 +915,21 @@
 
 .content-area {
     grid-column: 2 / 3;
+    position: relative;
     padding: 28px;
     overflow-y: auto;
     overflow-x: hidden;
+}
+
+.content-area-inner {
+    min-height: 100%;
+    transition: filter 0.18s ease, opacity 0.18s ease;
+}
+
+.content-area.is-query-loading .content-area-inner {
+    filter: blur(3px);
+    opacity: 0.58;
+    pointer-events: none;
 }
 
 .page-heading {
@@ -2825,31 +2837,40 @@
 }
 
 
-.query-loading-pill {
-    position: sticky;
-    top: 12px;
-    z-index: 20;
-    width: fit-content;
-    margin: 0 0 14px auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    border: 1px solid rgba(116, 132, 156, 0.24);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.92);
-    color: #24324a;
-    font-size: 0.86rem;
-    font-weight: 700;
-    box-shadow: 0 12px 28px rgba(31, 45, 61, 0.12);
-    backdrop-filter: blur(8px);
-}
-
-.dashboard-loading-card {
+.content-loading-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    padding: 28px;
+    background: rgba(248, 250, 252, 0.34);
+    backdrop-filter: blur(1.5px);
+    pointer-events: all;
+}
+
+.content-loading-overlay-static {
+    min-height: calc(100vh - 96px);
+    background: transparent;
+    backdrop-filter: none;
+}
+
+.query-loading-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-width: 240px;
+    padding: 14px 18px;
+    border: 1px solid rgba(116, 132, 156, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.94);
+    color: #24324a;
+    font-size: 0.92rem;
+    font-weight: 800;
+    box-shadow: 0 18px 42px rgba(31, 45, 61, 0.16);
+    backdrop-filter: blur(10px);
 }
 
 .query-loading-spinner {

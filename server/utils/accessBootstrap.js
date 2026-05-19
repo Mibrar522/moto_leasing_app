@@ -807,7 +807,8 @@ exports.syncAccessControlDefaults = async () => {
                 REGEXP_REPLACE(UPPER(COALESCE(color, '')), '[^A-Z0-9]+', '', 'g'),
                 REGEXP_REPLACE(UPPER(COALESCE(model, '')), '[^A-Z0-9]+', '', 'g'),
                 REGEXP_REPLACE(UPPER(COALESCE(chassis_number, '')), '[^A-Z0-9]+', '', 'g'),
-                REGEXP_REPLACE(UPPER(COALESCE(engine_number, '')), '[^A-Z0-9]+', '', 'g')
+                REGEXP_REPLACE(UPPER(COALESCE(engine_number, '')), '[^A-Z0-9]+', '', 'g'),
+                REGEXP_REPLACE(UPPER(id::text), '[^A-Z0-9]+', '', 'g')
             )
             WHERE COALESCE(TRIM(serial_number), '') = ''
         `);
@@ -839,7 +840,8 @@ exports.syncAccessControlDefaults = async () => {
                     REGEXP_REPLACE(UPPER(COALESCE(color, '')), '[^A-Z0-9]+', '', 'g'),
                     REGEXP_REPLACE(UPPER(COALESCE(model, '')), '[^A-Z0-9]+', '', 'g'),
                     REGEXP_REPLACE(UPPER(COALESCE(chassis_number, '')), '[^A-Z0-9]+', '', 'g'),
-                    REGEXP_REPLACE(UPPER(COALESCE(engine_number, '')), '[^A-Z0-9]+', '', 'g')
+                    REGEXP_REPLACE(UPPER(COALESCE(engine_number, '')), '[^A-Z0-9]+', '', 'g'),
+                    REGEXP_REPLACE(UPPER(id::text), '[^A-Z0-9]+', '', 'g')
                 ),
                 UPPER(COALESCE(vehicle_type, '')),
                 color,

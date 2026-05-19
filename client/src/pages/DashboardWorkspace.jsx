@@ -9097,19 +9097,32 @@ const selectedCustomer = useMemo(
                 </div>
             </header>
 
-            <main className="content-area">
-                {queryLoading && !loading ? (
-                    <div className="query-loading-pill" role="status" aria-live="polite">
-                        <span className="query-loading-spinner" aria-hidden="true" />
-                        Loading latest data...
-                    </div>
-                ) : null}
+            <main className={`content-area ${queryLoading && !loading ? 'is-query-loading' : ''}`}>
                 {loading ? (
-                    <div className="feedback-card dashboard-loading-card"><span className="query-loading-spinner" aria-hidden="true" /> Loading dashboard data...</div>
-                ) : error ? (
-                    <div className="feedback-card error">{error}</div>
+                    <div className="content-loading-overlay content-loading-overlay-static" role="status" aria-live="polite">
+                        <div className="query-loading-pill">
+                            <span className="query-loading-spinner" aria-hidden="true" />
+                            Loading dashboard data...
+                        </div>
+                    </div>
                 ) : (
-                    renderContent()
+                    <>
+                        <div className="content-area-inner">
+                            {error ? (
+                                <div className="feedback-card error">{error}</div>
+                            ) : (
+                                renderContent()
+                            )}
+                        </div>
+                        {queryLoading ? (
+                            <div className="content-loading-overlay" role="status" aria-live="polite">
+                                <div className="query-loading-pill">
+                                    <span className="query-loading-spinner" aria-hidden="true" />
+                                    Loading latest data...
+                                </div>
+                            </div>
+                        ) : null}
+                    </>
                 )}
             </main>
 
