@@ -27,71 +27,72 @@ exports.protect = async (req, res, next) => {
             real_role_id: decoded?.real_role_id != null ? Number(decoded.real_role_id) : decoded?.real_role_id,
         };
 
-        if (!isSuperAdminSession(req.user)) {
-            // Refresh scope + features from DB so permission flips are immediate (JWT can be stale for up to 1h).
-            const access = await pool.query(
-                `
-                WITH ctx AS (
-                    SELECT
-                        u.id,
-                        u.role_id,
-                        r.role_name,
-                        ${getResolvedDealerSql()} AS dealer_id,
-                        e.id AS employee_id
-                    FROM users u
-                    LEFT JOIN roles r ON r.id = u.role_id
-                    LEFT JOIN employees e ON e.user_id = u.id
-                    LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u.id
-                    LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u.email)
-                    WHERE u.id = $1
-                    LIMIT 1
-                ),
-                allowed AS (
-                    SELECT f.feature_key
-                    FROM ctx
-                    JOIN role_permissions rp ON rp.role_id = ctx.role_id
-                    JOIN features f ON f.id = rp.feature_id
-                    UNION
-                    SELECT f.feature_key
-                    FROM ctx
-                    JOIN employee_features efm ON efm.employee_id = ctx.employee_id
-                    JOIN features f ON f.id = efm.feature_id
-                ),
-                denied AS (
-                    SELECT f.feature_key
-                    FROM ctx
-                    JOIN employee_feature_overrides efo ON efo.employee_id = ctx.employee_id AND efo.access_mode = 'DENY'
-                    JOIN features f ON f.id = efo.feature_id
-                )
+        // Refresh scope + features from DB on every request so stale JWT role ids cannot bypass permission changes.
+        const access = await pool.query(
+            `
+            WITH ctx AS (
                 SELECT
-                    ctx.role_id,
-                    ctx.role_name,
-                    ctx.dealer_id,
-                    COALESCE(
-                        ARRAY_AGG(DISTINCT allowed.feature_key) FILTER (
-                            WHERE allowed.feature_key IS NOT NULL
-                              AND allowed.feature_key NOT IN (SELECT feature_key FROM denied)
-                        ),
-                        '{}'::text[]
-                    ) AS feature_keys
+                    u.id,
+                    u.role_id,
+                    r.role_name,
+                    ${getResolvedDealerSql()} AS dealer_id,
+                    e.id AS employee_id
+                FROM users u
+                LEFT JOIN roles r ON r.id = u.role_id
+                LEFT JOIN employees e ON e.user_id = u.id
+                LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u.id
+                LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u.email)
+                WHERE u.id = $1
+                LIMIT 1
+            ),
+            allowed AS (
+                SELECT f.feature_key
                 FROM ctx
-                LEFT JOIN allowed ON true
-                GROUP BY ctx.role_id, ctx.role_name, ctx.dealer_id
-                `,
-                [req.user.id]
-            );
+                JOIN role_permissions rp ON rp.role_id = ctx.role_id
+                JOIN features f ON f.id = rp.feature_id
+                UNION
+                SELECT f.feature_key
+                FROM ctx
+                JOIN employee_features efm ON efm.employee_id = ctx.employee_id
+                JOIN features f ON f.id = efm.feature_id
+            ),
+            denied AS (
+                SELECT f.feature_key
+                FROM ctx
+                JOIN employee_feature_overrides efo ON efo.employee_id = ctx.employee_id AND efo.access_mode = 'DENY'
+                JOIN features f ON f.id = efo.feature_id
+            )
+            SELECT
+                ctx.role_id,
+                ctx.role_name,
+                ctx.dealer_id,
+                COALESCE(
+                    ARRAY_AGG(DISTINCT allowed.feature_key) FILTER (
+                        WHERE allowed.feature_key IS NOT NULL
+                          AND allowed.feature_key NOT IN (SELECT feature_key FROM denied)
+                    ),
+                    '{}'::text[]
+                ) AS feature_keys
+            FROM ctx
+            LEFT JOIN allowed ON true
+            GROUP BY ctx.role_id, ctx.role_name, ctx.dealer_id
+            `,
+            [req.user.id]
+        );
 
-            const row = access.rows[0] || {};
-            // JWTs can be stale after dealer fixes in the DB. For dealer-scoped
-            // users, trust PostgreSQL on every request so stock/product filters
-            // use the current dealer instead of an old token value.
-            req.user.dealer_id = row.dealer_id || null;
-            req.user.effective_dealer_id = row.dealer_id || null;
-            req.user.base_dealer_id = row.dealer_id || null;
-            // Refresh role/feature gates for this request.
-            req.user.role_id = row.role_id != null ? Number(row.role_id) : req.user.role_id;
-            req.user.role_name = row.role_name || req.user.role_name;
-            req.user.feature_keys = Array.isArray(row.feature_keys) ? row.feature_keys : (req.user.feature_keys || []);
+        const row = access.rows[0] || {};
+        req.user.dealer_id = row.dealer_id || null;
+        req.user.effective_dealer_id = row.dealer_id || null;
+        req.user.base_dealer_id = row.dealer_id || null;
+        req.user.role_id = row.role_id != null ? Number(row.role_id) : req.user.role_id;
+        req.user.role_name = row.role_name || req.user.role_name;
+        req.user.feature_keys = Array.isArray(row.feature_keys) ? row.feature_keys : (req.user.feature_keys || []);
+
+        if (!req.user.switched_profile) {
+            req.user.real_role_id = req.user.role_id;
+            req.user.real_role_name = req.user.role_name;
+            req.user.real_feature_keys = req.user.feature_keys;
+            req.user.real_dealer_id = row.dealer_id || null;
         }
 
         next();

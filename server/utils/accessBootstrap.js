@@ -544,7 +544,38 @@ const ensureDefaultRolePermissions = async (client, roleId, featureKeys = []) =>
         await ensureRolePermission(client, roleId, featureKey);
     }
 };
+const repairExistingUserRoleAssignments = async (client, roleIdByName = {}) => {
+    const superAdminRoleId = roleIdByName.SUPER_ADMIN;
+    const applicationAdminRoleId = roleIdByName.APPLICATION_ADMIN;
 
+    await client.query(`
+        UPDATE users u
+        SET role_id = e.role_id
+        FROM employees e
+        WHERE e.user_id = u.id
+          AND e.role_id IS NOT NULL
+          AND u.role_id IS DISTINCT FROM e.role_id
+    `);
+
+    if (!superAdminRoleId || !applicationAdminRoleId || superAdminRoleId === applicationAdminRoleId) {
+        return;
+    }
+
+    await client.query(
+        `
+        UPDATE users u
+        SET role_id = $2
+        WHERE u.role_id = $1
+          AND (
+              u.dealer_id IS NOT NULL
+              OR EXISTS (SELECT 1 FROM dealers d WHERE d.admin_user_id = u.id)
+              OR EXISTS (SELECT 1 FROM dealers d WHERE LOWER(d.contact_email) = LOWER(u.email))
+          )
+          AND NOT EXISTS (SELECT 1 FROM employees e WHERE e.user_id = u.id)
+        `,
+        [superAdminRoleId, applicationAdminRoleId]
+    );
+};
 const getVehicleTypesIdDataType = async (client) => {
     const result = await client.query(`
         SELECT data_type
@@ -1212,6 +1243,7 @@ exports.syncAccessControlDefaults = async () => {
         await ensureDefaultRolePermissions(client, roleIdByName.APPLICATION_ADMIN, APPLICATION_ADMIN_FEATURES);
         await ensureDefaultRolePermissions(client, roleIdByName.MANAGER, MANAGER_FEATURES);
         await ensureDefaultRolePermissions(client, roleIdByName.AGENT, AGENT_FEATURES);
+        await repairExistingUserRoleAssignments(client, roleIdByName);
 
         await client.query('COMMIT');
         return {
@@ -1251,6 +1283,7 @@ exports.syncAccessCatalogDefaults = async () => {
         await ensureDefaultRolePermissions(client, roleIdByName.APPLICATION_ADMIN, APPLICATION_ADMIN_FEATURES);
         await ensureDefaultRolePermissions(client, roleIdByName.MANAGER, MANAGER_FEATURES);
         await ensureDefaultRolePermissions(client, roleIdByName.AGENT, AGENT_FEATURES);
+        await repairExistingUserRoleAssignments(client, roleIdByName);
 
         await client.query('COMMIT');
 
