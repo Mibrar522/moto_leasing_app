@@ -1950,13 +1950,14 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     };
     const hasCurrentRoleFeatureKey = (featureKey) => {
         if (!featureKey) return false;
+        if (user?.role_name === 'SUPER_ADMIN') return true;
         const currentRoleId = user?.role_id;
         const assignedFeatureIds = roleAssignments[currentRoleId];
         const featureId = (dashboardData.features || []).find((feature) => feature.feature_key === featureKey)?.id;
-        if (featureId && Array.isArray(assignedFeatureIds)) {
-            return assignedFeatureIds.includes(Number(featureId));
+        if (Array.isArray(assignedFeatureIds)) {
+            return Boolean(featureId) && assignedFeatureIds.includes(Number(featureId));
         }
-        return hasAssignedFeature(user, featureKey);
+        return false;
     };
     const canViewDashboard = hasAnyFeature(user, ['FEAT_DASHBOARD_VIEW']) || Boolean(user);
     const canViewApplications = hasAnyFeature(user, ['FEAT_APPLICATIONS_VIEW']);

@@ -165,7 +165,7 @@ if (!canOpenCustomers) {
                                         <span>CNIC Front Upload</span>
                                         <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_url', 'CNIC front', 'CNIC_FRONT')} disabled={!canUseOcr || uploadingCustomerAsset} />
                                     </label>
-                                    <div className="field full-span">
+                                    <div className="field full-span" hidden={!canUseOcr || !canEditCustomerField('CNIC Front Upload')}>
                                         <span className="meta-label">CNIC Front Preview</span>
                                         <div className="employee-document-preview">
                                             {customerForm.identity_doc_url ? (
@@ -195,7 +195,7 @@ if (!canOpenCustomers) {
                                         <span>CNIC Back Upload</span>
                                         <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_back_url', 'CNIC back', 'CNIC_BACK')} disabled={!canUseOcr || uploadingCustomerAsset} />
                                     </label>
-                                    <div className="field full-span">
+                                    <div className="field full-span" hidden={!canUseOcr || !canEditCustomerField('CNIC Back Upload')}>
                                         <span className="meta-label">CNIC Back Preview</span>
                                         <div className="employee-document-preview">
                                             {customerForm.identity_doc_back_url ? (
@@ -294,7 +294,7 @@ if (!canOpenCustomers) {
                                         <span>Thumb Upload</span>
                                             <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'fingerprint_thumb_url', 'Thumb image', 'THUMB')} disabled={!canEditCustomerFingerprintFields || uploadingCustomerAsset} />
                                         </label>
-                                        <div className="field full-span">
+                                        <div className="field full-span" hidden={!canEditCustomerFingerprintFields || !canEditCustomerField('Thumb Upload')}>
                                             <span className="meta-label">Thumb Preview</span>
                                             <div className="employee-document-preview">
                                                 {customerForm.fingerprint_thumb_url ? (
@@ -312,7 +312,7 @@ if (!canOpenCustomers) {
                                         <span>Signature Upload</span>
                                             <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'signature_image_url', 'Signature', 'SIGNATURE')} disabled={!canViewCustomerForm || uploadingCustomerAsset} />
                                         </label>
-                                        <div className="field full-span">
+                                        <div className="field full-span" hidden={!canEditCustomerField('Signature Upload')}>
                                             <span className="meta-label">Signature Preview</span>
                                             <div className="employee-document-preview">
                                                 {customerForm.signature_image_url ? (
