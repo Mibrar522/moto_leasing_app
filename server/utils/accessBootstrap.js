@@ -45,7 +45,6 @@ const SALES_FIELD_ACCESS = [
     ['FEAT_SALES_FIELD_MARGIN_VALUE', 'Sales Field: Margin Value'],
     ['FEAT_SALES_FIELD_MARKUP_PERCENTAGE', 'Sales Field: Markup Percentage'],
     ['FEAT_SALES_FIELD_DOWN_PAYMENT', 'Sales Field: Down Payment'],
-    ['FEAT_SALES_FIELD_INSTALLMENT_METHOD', 'Sales Field: Installment Method'],
     ['FEAT_SALES_FIELD_MONTHLY_INSTALLMENT', 'Sales Field: Monthly Installment'],
     ['FEAT_SALES_FIELD_WITNESS_NAME', 'Sales Field: Witness Name'],
     ['FEAT_SALES_FIELD_WITNESS_CNIC', 'Sales Field: Witness CNIC'],

@@ -200,11 +200,11 @@ if (!canCreateSales) {
                                                 <input type="text" value={`${installmentMarkupPreview}%`} readOnly />
                                             </label>
                                             <label className="field" hidden={!canEditSalesField('Down Payment')}><span>Down Payment</span><input type="number" min="0" step="0.01" name="down_payment" value={saleForm.down_payment || ''} onChange={handleSaleChange} /></label>
-                                            <label className="field" hidden={!canEditSalesField('Installment Method')}>
-                                                <span>Installment Method</span>
+                                            <label className="field" hidden={!canEditSalesField('Monthly Installment')}>
+                                                <span>Installment Method (Dropdown)</span>
                                                 <select name="installment_calculation_method" value={saleForm.installment_calculation_method || 'MONTHS'} onChange={handleSaleChange}>
-                                                    <option value="MONTHS">By months (current)</option>
-                                                    <option value="MONTHLY_AMOUNT">By monthly amount</option>
+                                                    <option value="MONTHS">Auto</option>
+                                                    <option value="MONTHLY_AMOUNT">Manual</option>
                                                 </select>
                                             </label>
                                             <label className="field" hidden={!canEditSalesField('Monthly Installment')}><span>Monthly Installment</span><input type="number" min="0" step="0.01" name="monthly_installment" value={saleForm.monthly_installment || ''} onChange={handleSaleChange} readOnly={(saleForm.installment_calculation_method || 'MONTHS') !== 'MONTHLY_AMOUNT'} /></label>
