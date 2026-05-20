@@ -53,8 +53,6 @@ const SALES_FIELD_ACCESS = [
     ['FEAT_SALES_FIELD_AGREEMENT_PDF', 'Sales Field: Agreement PDF'],
     ['FEAT_SALES_FIELD_DEALER_SIGNATURE_UPLOAD', 'Sales Field: Dealer Signature Upload'],
     ['FEAT_SALES_FIELD_AUTHORIZED_SIGNATURE_UPLOAD', 'Sales Field: Authorized Signature Upload'],
-    ['FEAT_SALES_FIELD_CUSTOMER_CNIC_FRONT_UPLOAD', 'Sales Field: Customer CNIC Front Upload'],
-    ['FEAT_SALES_FIELD_CUSTOMER_CNIC_BACK_UPLOAD', 'Sales Field: Customer CNIC Back Upload'],
     ['FEAT_SALES_FIELD_BANK_CHECK_UPLOAD', 'Sales Field: Bank Check Upload'],
     ['FEAT_SALES_FIELD_MISC_DOCUMENT_UPLOAD', 'Sales Field: Misc Document Upload'],
     ['FEAT_SALES_FIELD_REMARKS', 'Sales Field: Remarks'],

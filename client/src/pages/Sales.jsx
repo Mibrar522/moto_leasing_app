@@ -26,7 +26,6 @@ export default function Sales({ ctx }) {
     handleSaleChange,
     handleSaleDealerSignatureUpload,
     handleSaleDocumentUpload,
-    handleSaleCnicUpload,
     handleSaleSubmit,
     handleViewSale,
     installmentMarkupPreview,
@@ -60,8 +59,6 @@ export default function Sales({ ctx }) {
     transactionActionState,
     uploadingAgreement,
     uploadingSaleAuthorizedSignature,
-    uploadingSaleCnicFront,
-    uploadingSaleCnicBack,
     uploadingSaleBankCheck,
     uploadingSaleMiscDocument,
     user,
@@ -187,6 +184,17 @@ if (!canCreateSales) {
                                                 <span>Total Price</span>
                                                 <input type="number" min="0" step="0.01" name="vehicle_price" value={saleForm.vehicle_price || ''} onChange={handleSaleChange} />
                                             </label>
+                                            <label className="field" hidden={!canEditSalesField('Down Payment')}><span>Down Payment</span><input type="number" min="0" step="0.01" name="down_payment" value={saleForm.down_payment || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field" hidden={!canEditSalesField('Monthly Installment')}>
+                                                <span>Installment Method (Dropdown)</span>
+                                                <select name="installment_calculation_method" value={saleForm.installment_calculation_method || 'MONTHLY_AMOUNT'} onChange={handleSaleChange}>
+                                                    <option value="MONTHS">Auto</option>
+                                                    <option value="MONTHLY_AMOUNT">Manual</option>
+                                                </select>
+                                            </label>
+                                            <label className="field" hidden={!canEditSalesField('Monthly Installment')}><span>Monthly Installment</span><input type="number" min="0" step="0.01" name="monthly_installment" value={saleForm.monthly_installment || ''} onChange={handleSaleChange} readOnly={(saleForm.installment_calculation_method || 'MONTHLY_AMOUNT') !== 'MONTHLY_AMOUNT'} /></label>
+                                            <label className="field" hidden={!canEditSalesField('Installment Months')}><span>Installment Months</span><input type="number" min="1" name="installment_months" value={saleForm.installment_months || ''} onChange={handleSaleChange} readOnly={(saleForm.installment_calculation_method || 'MONTHLY_AMOUNT') === 'MONTHLY_AMOUNT'} /></label>
+                                            <label className="field" hidden={!canEditSalesField('Financed Amount')}><span>Financed Amount</span><input type="number" min="0" step="0.01" name="financed_amount" value={saleForm.financed_amount || ''} readOnly /></label>
                                             <label className="field" hidden={!canEditSalesField('Margin %')}>
                                                 <span>Margin %</span>
                                                 <input type="number" min="0" step="0.01" name="installment_margin_percent" value={saleForm.installment_margin_percent || ''} onChange={handleSaleChange} />
@@ -199,26 +207,21 @@ if (!canCreateSales) {
                                                 <span>Markup Percentage</span>
                                                 <input type="text" value={`${installmentMarkupPreview}%`} readOnly />
                                             </label>
-                                            <label className="field" hidden={!canEditSalesField('Down Payment')}><span>Down Payment</span><input type="number" min="0" step="0.01" name="down_payment" value={saleForm.down_payment || ''} onChange={handleSaleChange} /></label>
-                                            <label className="field" hidden={!canEditSalesField('Monthly Installment')}>
-                                                <span>Installment Method (Dropdown)</span>
-                                                <select name="installment_calculation_method" value={saleForm.installment_calculation_method || 'MONTHS'} onChange={handleSaleChange}>
-                                                    <option value="MONTHS">Auto</option>
-                                                    <option value="MONTHLY_AMOUNT">Manual</option>
-                                                </select>
-                                            </label>
-                                            <label className="field" hidden={!canEditSalesField('Monthly Installment')}><span>Monthly Installment</span><input type="number" min="0" step="0.01" name="monthly_installment" value={saleForm.monthly_installment || ''} onChange={handleSaleChange} readOnly={(saleForm.installment_calculation_method || 'MONTHS') !== 'MONTHLY_AMOUNT'} /></label>
                                         </>
                                     )}
                                     <label className="field" hidden={!canEditSalesField('Witness Name')}><span>Witness Name</span><input name="witness_name" value={saleForm.witness_name || ''} onChange={handleSaleChange} /></label>
+                                    <label className="field" hidden={!canEditSalesField('Witness Name')}><span>Witness Father Name</span><input name="witness_father_name" value={saleForm.witness_father_name || ''} onChange={handleSaleChange} /></label>
+                                    <label className="field" hidden={!canEditSalesField('Witness Name')}><span>Witness Mobile Number</span><input name="witness_mobile_number" value={saleForm.witness_mobile_number || ''} onChange={handleSaleChange} /></label>
                                     <label className="field" hidden={!canEditSalesField('Witness CNIC')}><span>Witness CNIC</span><input name="witness_cnic" value={saleForm.witness_cnic || ''} onChange={handleSaleChange} /></label>
+                                    <label className="field full-span" hidden={!canEditSalesField('Witness Name')}><span>Witness Address</span><textarea rows="2" name="witness_address" value={saleForm.witness_address || ''} onChange={handleSaleChange} /></label>
                                     <label className="field" hidden={!canEditSalesField('Witness 2 Name')}><span>Witness 2 Name</span><input name="witness_two_name" value={saleForm.witness_two_name || ''} onChange={handleSaleChange} /></label>
+                                    <label className="field" hidden={!canEditSalesField('Witness 2 Name')}><span>Witness 2 Father Name</span><input name="witness_two_father_name" value={saleForm.witness_two_father_name || ''} onChange={handleSaleChange} /></label>
+                                    <label className="field" hidden={!canEditSalesField('Witness 2 Name')}><span>Witness 2 Mobile Number</span><input name="witness_two_mobile_number" value={saleForm.witness_two_mobile_number || ''} onChange={handleSaleChange} /></label>
                                     <label className="field" hidden={!canEditSalesField('Witness 2 CNIC')}><span>Witness 2 CNIC</span><input name="witness_two_cnic" value={saleForm.witness_two_cnic || ''} onChange={handleSaleChange} /></label>
+                                    <label className="field full-span" hidden={!canEditSalesField('Witness 2 Name')}><span>Witness 2 Address</span><textarea rows="2" name="witness_two_address" value={saleForm.witness_two_address || ''} onChange={handleSaleChange} /></label>
                                     <label className="field full-span" hidden={!canEditSalesField('Agreement PDF')}><span>Agreement PDF</span><input type="file" accept="application/pdf" onChange={handleAgreementUpload} /></label>
                                     <label className="field full-span" hidden={!canEditSalesField('Dealer Signature Upload')}><span>Dealer Signature Upload</span><input type="file" accept="image/*" onChange={handleSaleDealerSignatureUpload} disabled={saleFormReadOnly || savingSale} /></label>
                                     <label className="field full-span" hidden={!canEditSalesField('Authorized Signature Upload')}><span>Authorized Signature Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleDocumentUpload(event, 'authorized_signature_url', 'Authorized signature', setUploadingSaleAuthorizedSignature)} disabled={saleFormReadOnly || savingSale} /></label>
-                                    <label className="field full-span" hidden={!canEditSalesField('Customer CNIC Front Upload')}><span>Customer CNIC Front Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleCnicUpload(event, 'customer_cnic_front_url', 'Customer CNIC front', 'front')} disabled={saleFormReadOnly || savingSale || uploadingSaleCnicFront} /></label>
-                                    <label className="field full-span" hidden={!canEditSalesField('Customer CNIC Back Upload')}><span>Customer CNIC Back Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleCnicUpload(event, 'customer_cnic_back_url', 'Customer CNIC back', 'back')} disabled={saleFormReadOnly || savingSale || uploadingSaleCnicBack} /></label>
                                     <label className="field full-span" hidden={!canEditSalesField('Bank Check Upload')}><span>Bank Check Upload</span><input type="file" accept="*/*" onChange={(event) => handleSaleDocumentUpload(event, 'bank_check_url', 'Bank check', setUploadingSaleBankCheck)} /></label>
                                     <label className="field full-span" hidden={!canEditSalesField('Misc Document Upload')}><span>Misc Document Upload</span><input type="file" accept="*/*" onChange={(event) => handleSaleDocumentUpload(event, 'misc_document_url', 'Misc document', setUploadingSaleMiscDocument)} /></label>
                                     <label className="field full-span" hidden={!canEditSalesField('Remarks')}><span>Remarks</span><textarea rows="4" name="remarks" value={saleForm.remarks || ''} onChange={handleSaleChange} /></label>
@@ -231,8 +234,6 @@ if (!canCreateSales) {
                                             <span className="section-caption">Customer, vehicle, and purchase data stay visible while you build the installment plan.</span>
                                         </div>
                                         <div className="form-grid">
-                                            <label className="field" hidden={!canEditSalesField('Financed Amount')}><span>Financed Amount</span><input type="number" min="0" step="0.01" name="financed_amount" value={saleForm.financed_amount || ''} readOnly /></label>
-                                            <label className="field" hidden={!canEditSalesField('Installment Months')}><span>Installment Months</span><input type="number" min="1" name="installment_months" value={saleForm.installment_months || ''} onChange={handleSaleChange} readOnly={(saleForm.installment_calculation_method || 'MONTHS') === 'MONTHLY_AMOUNT'} /></label>
                                             <label className="field" hidden={!canEditSalesField('First Due Date')}><span>First Due Date</span><input type="date" name="first_due_date" value={saleForm.first_due_date || ''} onChange={handleSaleChange} /></label>
                                         </div>
                                     </div>
@@ -263,8 +264,10 @@ if (!canCreateSales) {
                                             <div><span className="meta-label">Monthly Installment</span><p className="meta-value">{formatCurrency(saleForm.monthly_installment)}</p></div>
                                         </>
                                     ) : null}
-                                    <div><span className="meta-label">Witness 1</span><p className="meta-value">{saleForm.witness_name || 'Not set'}{saleForm.witness_cnic ? ` / ${saleForm.witness_cnic}` : ''}</p></div>
-                                    <div><span className="meta-label">Witness 2</span><p className="meta-value">{saleForm.witness_two_name || 'Not set'}{saleForm.witness_two_cnic ? ` / ${saleForm.witness_two_cnic}` : ''}</p></div>
+                                    <div><span className="meta-label">Witness 1</span><p className="meta-value">{[saleForm.witness_name, saleForm.witness_father_name, saleForm.witness_mobile_number, saleForm.witness_cnic].filter(Boolean).join(' / ') || 'Not set'}</p></div>
+                                    <div><span className="meta-label">Witness 1 Address</span><p className="meta-value">{saleForm.witness_address || 'Not set'}</p></div>
+                                    <div><span className="meta-label">Witness 2</span><p className="meta-value">{[saleForm.witness_two_name, saleForm.witness_two_father_name, saleForm.witness_two_mobile_number, saleForm.witness_two_cnic].filter(Boolean).join(' / ') || 'Not set'}</p></div>
+                                    <div><span className="meta-label">Witness 2 Address</span><p className="meta-value">{saleForm.witness_two_address || 'Not set'}</p></div>
                                 </div>
                                 <div className="detail-grid sale-document-grid">
                                     <div>
@@ -412,9 +415,9 @@ if (!canCreateSales) {
                                                             {sale.agreement_pdf_url || 'No PDF uploaded'}
                                                         </td>
                                                         <td>
-                                                            {sale.witness_name || 'No witness'} / {sale.witness_cnic || 'No CNIC'}
+                                                            {[sale.witness_name, sale.witness_father_name, sale.witness_mobile_number, sale.witness_cnic].filter(Boolean).join(' / ') || 'No witness'}
                                                             <br />
-                                                            {sale.witness_two_name || 'No second witness'} / {sale.witness_two_cnic || 'No second CNIC'}
+                                                            {[sale.witness_two_name, sale.witness_two_father_name, sale.witness_two_mobile_number, sale.witness_two_cnic].filter(Boolean).join(' / ') || 'No second witness'}
                                                         </td>
                                                         <td><span className={getStatusClass(sale.status)}>{sale.status}</span></td>
                                                         <td className="sales-installment-cell">

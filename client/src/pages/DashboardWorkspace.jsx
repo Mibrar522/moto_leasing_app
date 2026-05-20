@@ -160,13 +160,19 @@ const emptySaleForm = {
     installment_months: '',
     installment_margin_percent: '',
     installment_margin_value: '',
-    installment_calculation_method: 'MONTHS',
+    installment_calculation_method: 'MONTHLY_AMOUNT',
     print_actual_price: false,
     first_due_date: '',
     witness_name: '',
+    witness_father_name: '',
+    witness_mobile_number: '',
     witness_cnic: '',
+    witness_address: '',
     witness_two_name: '',
+    witness_two_father_name: '',
+    witness_two_mobile_number: '',
     witness_two_cnic: '',
+    witness_two_address: '',
     remarks: '',
 };
 
@@ -302,8 +308,6 @@ const SALES_FIELD_ACCESS = [
     ['FEAT_SALES_FIELD_AGREEMENT_PDF', 'Agreement PDF'],
     ['FEAT_SALES_FIELD_DEALER_SIGNATURE_UPLOAD', 'Dealer Signature Upload'],
     ['FEAT_SALES_FIELD_AUTHORIZED_SIGNATURE_UPLOAD', 'Authorized Signature Upload'],
-    ['FEAT_SALES_FIELD_CUSTOMER_CNIC_FRONT_UPLOAD', 'Customer CNIC Front Upload'],
-    ['FEAT_SALES_FIELD_CUSTOMER_CNIC_BACK_UPLOAD', 'Customer CNIC Back Upload'],
     ['FEAT_SALES_FIELD_BANK_CHECK_UPLOAD', 'Bank Check Upload'],
     ['FEAT_SALES_FIELD_MISC_DOCUMENT_UPLOAD', 'Misc Document Upload'],
     ['FEAT_SALES_FIELD_REMARKS', 'Remarks'],
@@ -5089,8 +5093,8 @@ const selectedCustomer = useMemo(
                     down_payment: value === 'CASH' ? '' : current.down_payment,
                     financed_amount: value === 'CASH' ? '' : current.financed_amount,
                     monthly_installment: value === 'CASH' ? '' : current.monthly_installment,
-                    installment_months: value === 'CASH' ? '' : (current.installment_months || '12'),
-                    installment_calculation_method: value === 'CASH' ? 'MONTHS' : normalizeInstallmentMethod(current.installment_calculation_method),
+                    installment_months: value === 'CASH' ? '' : current.installment_months,
+                    installment_calculation_method: value === 'CASH' ? 'MONTHS' : normalizeInstallmentMethod(current.installment_calculation_method || 'MONTHLY_AMOUNT'),
                     installment_margin_percent: value === 'CASH' ? '' : (current.installment_margin_percent || ''),
                     installment_margin_value: value === 'CASH' ? '' : (current.installment_margin_value || ''),
                     first_due_date: value === 'CASH' ? '' : current.first_due_date,
@@ -5153,8 +5157,8 @@ const selectedCustomer = useMemo(
                 return {
                     ...current,
                     installment_calculation_method: normalizedMethod,
-                    installment_months: normalizedMethod === 'MONTHS' ? (current.installment_months || '12') : '',
-                    monthly_installment: normalizedMethod === 'MONTHLY_AMOUNT' ? '' : current.monthly_installment,
+                    installment_months: normalizedMethod === 'MONTHS' ? (current.installment_months || '12') : current.installment_months,
+                    monthly_installment: current.monthly_installment,
                 };
             }
 
@@ -5574,9 +5578,15 @@ const selectedCustomer = useMemo(
             print_actual_price: Boolean(sale.print_actual_price),
             first_due_date: sale.first_due_date ? String(sale.first_due_date).slice(0, 10) : '',
             witness_name: sale.witness_name || '',
+            witness_father_name: sale.witness_father_name || '',
+            witness_mobile_number: sale.witness_mobile_number || '',
             witness_cnic: sale.witness_cnic || '',
+            witness_address: sale.witness_address || '',
             witness_two_name: sale.witness_two_name || '',
+            witness_two_father_name: sale.witness_two_father_name || '',
+            witness_two_mobile_number: sale.witness_two_mobile_number || '',
             witness_two_cnic: sale.witness_two_cnic || '',
+            witness_two_address: sale.witness_two_address || '',
             remarks: sale.remarks || '',
         });
         setEditingSaleVehicle({
@@ -5642,9 +5652,15 @@ const selectedCustomer = useMemo(
             print_actual_price: Boolean(sale.print_actual_price),
             first_due_date: sale.first_due_date ? String(sale.first_due_date).slice(0, 10) : '',
             witness_name: sale.witness_name || '',
+            witness_father_name: sale.witness_father_name || '',
+            witness_mobile_number: sale.witness_mobile_number || '',
             witness_cnic: sale.witness_cnic || '',
+            witness_address: sale.witness_address || '',
             witness_two_name: sale.witness_two_name || '',
+            witness_two_father_name: sale.witness_two_father_name || '',
+            witness_two_mobile_number: sale.witness_two_mobile_number || '',
             witness_two_cnic: sale.witness_two_cnic || '',
+            witness_two_address: sale.witness_two_address || '',
             remarks: sale.remarks || '',
         });
         setEditingSaleVehicle({
@@ -6814,6 +6830,11 @@ const selectedCustomer = useMemo(
 
         if (!saleCustomerCnicFrontUrl) {
             showSalePopupMessage('Customer CNIC front is required on the customer profile before creating a sale.');
+            return;
+        }
+
+        if (!String(saleForm.witness_name || '').trim() || !String(saleForm.witness_father_name || '').trim() || !String(saleForm.witness_mobile_number || '').trim() || !String(saleForm.witness_cnic || '').trim() || !String(saleForm.witness_address || '').trim()) {
+            showSalePopupMessage('First witness name, father name, mobile number, CNIC, and address are required.');
             return;
         }
 

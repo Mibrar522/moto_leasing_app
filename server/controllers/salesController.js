@@ -32,6 +32,12 @@ const ensureSalesDealerColumns = async (client) => {
     await client.query('ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS dealer_id UUID');
     await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS dealer_id UUID');
     await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS print_actual_price BOOLEAN NOT NULL DEFAULT FALSE');
+    await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_father_name VARCHAR(160)');
+    await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_mobile_number VARCHAR(40)');
+    await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_address TEXT');
+    await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_two_father_name VARCHAR(160)');
+    await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_two_mobile_number VARCHAR(40)');
+    await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_two_address TEXT');
     await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS dealer_id UUID');
     await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS received_amount NUMERIC(12, 2) NOT NULL DEFAULT 0');
     await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS carry_forward_amount NUMERIC(12, 2) NOT NULL DEFAULT 0');
@@ -112,7 +118,9 @@ const getCustomerDealerId = async (client, customerId) => {
         `
         SELECT
             c.id,
-            COALESCE(c.dealer_id, creator.dealer_id) AS dealer_id
+            COALESCE(c.dealer_id, creator.dealer_id) AS dealer_id,
+            c.identity_doc_url,
+            c.ocr_details
         FROM customers c
         LEFT JOIN users creator ON creator.id = c.created_by_agent
         WHERE c.id = $1
@@ -326,9 +334,15 @@ exports.createSale = async (req, res) => {
             first_due_date,
             print_actual_price,
             witness_name,
+            witness_father_name,
+            witness_mobile_number,
             witness_cnic,
+            witness_address,
             witness_two_name,
+            witness_two_father_name,
+            witness_two_mobile_number,
             witness_two_cnic,
+            witness_two_address,
             remarks,
         } = req.body;
 
@@ -347,6 +361,10 @@ exports.createSale = async (req, res) => {
 
         if (!normalizedAgreementDate || !normalizedPurchaseDate) {
             return res.status(400).json({ message: 'Agreement date and purchase date are required.' });
+        }
+
+        if (!normalizeTextInput(witness_name) || !normalizeTextInput(witness_father_name) || !normalizeTextInput(witness_mobile_number) || !normalizeTextInput(witness_cnic) || !normalizeTextInput(witness_address)) {
+            return res.status(400).json({ message: 'First witness name, father name, mobile number, CNIC, and address are required.' });
         }
 
         if (normalizedSaleMode === 'INSTALLMENT') {
@@ -373,6 +391,13 @@ exports.createSale = async (req, res) => {
         if (!isScopedDealerMatch(scope, customerRecord.dealer_id)) {
             await client.query('ROLLBACK');
             return res.status(403).json({ message: 'You can only create sales for customers in your dealer records.' });
+        }
+
+        const resolvedCustomerCnicFrontUrl = normalizeTextInput(customerRecord.identity_doc_url);
+        const resolvedCustomerCnicBackUrl = normalizeTextInput(getCustomerBackCnicUrl(customerRecord));
+        if (!resolvedCustomerCnicFrontUrl) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Selected customer must have CNIC front uploaded in the customer profile before creating a sale.' });
         }
 
         const vehicleResult = await client.query(
@@ -428,9 +453,11 @@ exports.createSale = async (req, res) => {
                 agreement_date, agreement_pdf_url, dealer_signature_url, authorized_signature_url, customer_cnic_front_url, customer_cnic_back_url,
                 bank_check_url, misc_document_url, purchase_date, vehicle_price,
                 down_payment, financed_amount, monthly_installment, installment_months,
-                first_due_date, print_actual_price, witness_name, witness_cnic, witness_two_name, witness_two_cnic, remarks, status
+                first_due_date, print_actual_price, witness_name, witness_father_name, witness_mobile_number, witness_cnic,
+                witness_address, witness_two_name, witness_two_father_name, witness_two_mobile_number,
+                witness_two_cnic, witness_two_address, remarks, status
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
             RETURNING *
             `,
             [
@@ -444,8 +471,8 @@ exports.createSale = async (req, res) => {
                 normalizeTextInput(agreement_pdf_url),
                 normalizeTextInput(dealer_signature_url),
                 normalizeTextInput(authorized_signature_url),
-                customer_cnic_front_url || null,
-                customer_cnic_back_url || null,
+                resolvedCustomerCnicFrontUrl || null,
+                resolvedCustomerCnicBackUrl || null,
                 normalizeTextInput(bank_check_url),
                 normalizeTextInput(misc_document_url),
                 normalizedPurchaseDate,
@@ -457,9 +484,15 @@ exports.createSale = async (req, res) => {
                 normalizedFirstDueDate,
                 Boolean(print_actual_price),
                 normalizeTextInput(witness_name),
+                normalizeTextInput(witness_father_name),
+                normalizeTextInput(witness_mobile_number),
                 normalizeTextInput(witness_cnic),
+                normalizeTextInput(witness_address),
                 normalizeTextInput(witness_two_name),
+                normalizeTextInput(witness_two_father_name),
+                normalizeTextInput(witness_two_mobile_number),
                 normalizeTextInput(witness_two_cnic),
+                normalizeTextInput(witness_two_address),
                 normalizeTextInput(remarks),
                 requiresWorkflow ? 'UNDER_REVIEW' : normalizedSaleMode === 'CASH' ? 'RECEIVED' : 'PENDING',
             ]
@@ -575,9 +608,15 @@ exports.updateSale = async (req, res) => {
             first_due_date,
             print_actual_price,
             witness_name,
+            witness_father_name,
+            witness_mobile_number,
             witness_cnic,
+            witness_address,
             witness_two_name,
+            witness_two_father_name,
+            witness_two_mobile_number,
             witness_two_cnic,
+            witness_two_address,
             remarks,
         } = req.body;
 
@@ -618,6 +657,18 @@ exports.updateSale = async (req, res) => {
         if (!isScopedDealerMatch(scope, customerRecord.dealer_id)) {
             await client.query('ROLLBACK');
             return res.status(403).json({ message: 'You can only assign customers from your dealer records.' });
+        }
+
+        const resolvedCustomerCnicFrontUrl = normalizeTextInput(customerRecord.identity_doc_url);
+        const resolvedCustomerCnicBackUrl = normalizeTextInput(getCustomerBackCnicUrl(customerRecord));
+        if (!resolvedCustomerCnicFrontUrl) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Selected customer must have CNIC front uploaded in the customer profile before updating a sale.' });
+        }
+
+        if (!normalizeTextInput(witness_name) || !normalizeTextInput(witness_father_name) || !normalizeTextInput(witness_mobile_number) || !normalizeTextInput(witness_cnic) || !normalizeTextInput(witness_address)) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'First witness name, father name, mobile number, CNIC, and address are required.' });
         }
 
         const pendingWorkflowApproval = String(currentSale.approval_status || '').toUpperCase() !== 'APPROVED';
@@ -702,11 +753,17 @@ exports.updateSale = async (req, res) => {
                 first_due_date = $21,
                 print_actual_price = $22,
                 witness_name = $23,
-                witness_cnic = $24,
-                witness_two_name = $25,
-                witness_two_cnic = $26,
-                remarks = $27,
-                status = $28
+                witness_father_name = $24,
+                witness_mobile_number = $25,
+                witness_cnic = $26,
+                witness_address = $27,
+                witness_two_name = $28,
+                witness_two_father_name = $29,
+                witness_two_mobile_number = $30,
+                witness_two_cnic = $31,
+                witness_two_address = $32,
+                remarks = $33,
+                status = $34
             WHERE id = $1
             `,
             [
@@ -720,8 +777,8 @@ exports.updateSale = async (req, res) => {
                 dealer_signature_url || null,
                 authorized_signature_url || null,
                 resolvedSaleDealerId,
-                customer_cnic_front_url || null,
-                customer_cnic_back_url || null,
+                resolvedCustomerCnicFrontUrl || null,
+                resolvedCustomerCnicBackUrl || null,
                 bank_check_url || null,
                 misc_document_url || null,
                 purchase_date,
@@ -733,9 +790,15 @@ exports.updateSale = async (req, res) => {
                 first_due_date || null,
                 Boolean(print_actual_price),
                 witness_name || null,
+                witness_father_name || null,
+                witness_mobile_number || null,
                 witness_cnic || null,
+                witness_address || null,
                 witness_two_name || null,
+                witness_two_father_name || null,
+                witness_two_mobile_number || null,
                 witness_two_cnic || null,
+                witness_two_address || null,
                 remarks || null,
                 pendingWorkflowApproval ? 'UNDER_REVIEW' : sale_mode === 'CASH' ? 'RECEIVED' : 'PENDING',
             ]

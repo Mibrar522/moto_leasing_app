@@ -83,6 +83,12 @@ const ensureDashboardDealerScopeColumns = async (wantsProducts, wantsCompanies, 
         }
         if (wantsSalesTransactions) {
             await pool.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS print_actual_price BOOLEAN NOT NULL DEFAULT FALSE');
+            await pool.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_father_name VARCHAR(160)');
+            await pool.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_mobile_number VARCHAR(40)');
+            await pool.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_address TEXT');
+            await pool.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_two_father_name VARCHAR(160)');
+            await pool.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_two_mobile_number VARCHAR(40)');
+            await pool.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS witness_two_address TEXT');
         }
         if (wantsStockOrders || wantsProducts || wantsCompanies) {
             await pool.query(`
@@ -399,7 +405,7 @@ exports.getDashboardData = async (req, res) => {
             wantsGroup('products'),
             wantsGroup('companies'),
             wantsGroup('stockOrders') || wantsGroup('inventory'),
-            wantsGroup('salesTransactions')
+            wantsGroup('salesTransactions') || wantsGroup('workflowTasks')
         );
         if (wantsGroup('products') || wantsGroup('companies') || wantsGroup('stockOrders') || wantsGroup('inventory')) {
             await syncDealerOwnershipForRequest();
@@ -995,9 +1001,15 @@ exports.getDashboardData = async (req, res) => {
                     st.installment_months,
                     st.first_due_date,
                     st.witness_name,
+                    st.witness_father_name,
+                    st.witness_mobile_number,
                     st.witness_cnic,
+                    st.witness_address,
                     st.witness_two_name,
+                    st.witness_two_father_name,
+                    st.witness_two_mobile_number,
                     st.witness_two_cnic,
+                    st.witness_two_address,
                     st.remarks,
                     st.rejection_reason,
                     c.full_name AS customer_name,
@@ -1281,9 +1293,15 @@ exports.getDashboardData = async (req, res) => {
                     st.installment_months,
                     st.first_due_date,
                     st.witness_name,
+                    st.witness_father_name,
+                    st.witness_mobile_number,
                     st.witness_cnic,
+                    st.witness_address,
                     st.witness_two_name,
+                    st.witness_two_father_name,
+                    st.witness_two_mobile_number,
                     st.witness_two_cnic,
+                    st.witness_two_address,
                     st.remarks,
                     st.status,
                     st.created_at,
@@ -1354,9 +1372,15 @@ exports.getDashboardData = async (req, res) => {
                     st.installment_months,
                     st.first_due_date,
                     st.witness_name,
+                    st.witness_father_name,
+                    st.witness_mobile_number,
                     st.witness_cnic,
+                    st.witness_address,
                     st.witness_two_name,
+                    st.witness_two_father_name,
+                    st.witness_two_mobile_number,
                     st.witness_two_cnic,
+                    st.witness_two_address,
                     st.remarks,
                     st.status,
                     st.created_at,
