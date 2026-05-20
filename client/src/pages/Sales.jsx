@@ -200,7 +200,14 @@ if (!canCreateSales) {
                                                 <input type="text" value={`${installmentMarkupPreview}%`} readOnly />
                                             </label>
                                             <label className="field" hidden={!canEditSalesField('Down Payment')}><span>Down Payment</span><input type="number" min="0" step="0.01" name="down_payment" value={saleForm.down_payment || ''} onChange={handleSaleChange} /></label>
-                                            <label className="field" hidden={!canEditSalesField('Monthly Installment')}><span>Monthly Installment</span><input type="number" min="0" step="0.01" name="monthly_installment" value={saleForm.monthly_installment || ''} readOnly /></label>
+                                            <label className="field" hidden={!canEditSalesField('Installment Method')}>
+                                                <span>Installment Method</span>
+                                                <select name="installment_calculation_method" value={saleForm.installment_calculation_method || 'MONTHS'} onChange={handleSaleChange}>
+                                                    <option value="MONTHS">By months (current)</option>
+                                                    <option value="MONTHLY_AMOUNT">By monthly amount</option>
+                                                </select>
+                                            </label>
+                                            <label className="field" hidden={!canEditSalesField('Monthly Installment')}><span>Monthly Installment</span><input type="number" min="0" step="0.01" name="monthly_installment" value={saleForm.monthly_installment || ''} onChange={handleSaleChange} readOnly={(saleForm.installment_calculation_method || 'MONTHS') !== 'MONTHLY_AMOUNT'} /></label>
                                         </>
                                     )}
                                     <label className="field" hidden={!canEditSalesField('Witness Name')}><span>Witness Name</span><input name="witness_name" value={saleForm.witness_name || ''} onChange={handleSaleChange} /></label>
@@ -225,7 +232,7 @@ if (!canCreateSales) {
                                         </div>
                                         <div className="form-grid">
                                             <label className="field" hidden={!canEditSalesField('Financed Amount')}><span>Financed Amount</span><input type="number" min="0" step="0.01" name="financed_amount" value={saleForm.financed_amount || ''} readOnly /></label>
-                                            <label className="field" hidden={!canEditSalesField('Installment Months')}><span>Installment Months</span><input type="number" min="1" name="installment_months" value={saleForm.installment_months || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field" hidden={!canEditSalesField('Installment Months')}><span>Installment Months</span><input type="number" min="1" name="installment_months" value={saleForm.installment_months || ''} onChange={handleSaleChange} readOnly={(saleForm.installment_calculation_method || 'MONTHS') === 'MONTHLY_AMOUNT'} /></label>
                                             <label className="field" hidden={!canEditSalesField('First Due Date')}><span>First Due Date</span><input type="date" name="first_due_date" value={saleForm.first_due_date || ''} onChange={handleSaleChange} /></label>
                                         </div>
                                     </div>

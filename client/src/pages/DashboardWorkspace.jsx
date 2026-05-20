@@ -160,6 +160,7 @@ const emptySaleForm = {
     installment_months: '',
     installment_margin_percent: '',
     installment_margin_value: '',
+    installment_calculation_method: 'MONTHS',
     print_actual_price: false,
     first_due_date: '',
     witness_name: '',
@@ -293,6 +294,7 @@ const SALES_FIELD_ACCESS = [
     ['FEAT_SALES_FIELD_MARGIN_VALUE', 'Margin Value'],
     ['FEAT_SALES_FIELD_MARKUP_PERCENTAGE', 'Markup Percentage'],
     ['FEAT_SALES_FIELD_DOWN_PAYMENT', 'Down Payment'],
+    ['FEAT_SALES_FIELD_INSTALLMENT_METHOD', 'Installment Method'],
     ['FEAT_SALES_FIELD_MONTHLY_INSTALLMENT', 'Monthly Installment'],
     ['FEAT_SALES_FIELD_WITNESS_NAME', 'Witness Name'],
     ['FEAT_SALES_FIELD_WITNESS_CNIC', 'Witness CNIC'],
@@ -768,6 +770,38 @@ const hasAssignedFeature = (user, featureKey) => {
     return (user?.features || []).some((feature) => feature.key === featureKey);
 };
 const roundCurrencyValue = (value) => Math.round(Number(value || 0) * 100) / 100;
+const normalizeInstallmentMethod = (value) => (
+    String(value || '').toUpperCase() === 'MONTHLY_AMOUNT' ? 'MONTHLY_AMOUNT' : 'MONTHS'
+);
+const calculateInstallmentPlan = ({ totalPrice, downPayment, months, monthlyInstallment, method }) => {
+    const normalizedTotalPrice = Math.max(Number(totalPrice || 0), 0);
+    const normalizedDownPayment = Math.min(Number(downPayment || 0), normalizedTotalPrice);
+    const financedAmount = Math.max(roundCurrencyValue(normalizedTotalPrice - normalizedDownPayment), 0);
+    const normalizedMethod = normalizeInstallmentMethod(method);
+    let installmentMonths = Math.max(Number(months || 0), 0);
+    let calculatedMonthly = Math.max(Number(monthlyInstallment || 0), 0);
+
+    if (financedAmount <= 0) {
+        return { financedAmount: 0, installmentMonths: installmentMonths || 1, monthlyInstallment: 0 };
+    }
+
+    if (normalizedMethod === 'MONTHLY_AMOUNT') {
+        calculatedMonthly = roundCurrencyValue(calculatedMonthly);
+        installmentMonths = calculatedMonthly > 0 ? Math.ceil(financedAmount / calculatedMonthly) : 0;
+    } else {
+        installmentMonths = Math.max(installmentMonths || 12, 1);
+        calculatedMonthly = roundCurrencyValue(financedAmount / installmentMonths);
+    }
+
+    return { financedAmount, installmentMonths, monthlyInstallment: calculatedMonthly };
+};
+const getInstallmentPreviewAmount = ({ financedAmount, monthlyInstallment, installmentMonths, installmentNumber }) => {
+    const remainingBefore = roundCurrencyValue(Number(financedAmount || 0) - (Number(monthlyInstallment || 0) * (installmentNumber - 1)));
+    if (installmentNumber >= Number(installmentMonths || 0)) {
+        return Math.max(remainingBefore, 0);
+    }
+    return Math.max(Math.min(Number(monthlyInstallment || 0), remainingBefore), 0);
+};
 const normalizeTextValue = (value) => String(value || '').trim().toUpperCase();
 const formatDateKeyPart = (value) => String(value || '').padStart(2, '0');
 const toLocalDateKey = (value) => {
@@ -4546,6 +4580,10 @@ const selectedCustomer = useMemo(
                     current.sale_mode === 'INSTALLMENT'
                         ? current.installment_months || '12'
                         : current.installment_months,
+                installment_calculation_method:
+                    current.sale_mode === 'INSTALLMENT'
+                        ? normalizeInstallmentMethod(current.installment_calculation_method)
+                        : current.installment_calculation_method,
                 installment_margin_percent:
                     current.sale_mode === 'INSTALLMENT'
                         ? current.installment_margin_percent || ''
@@ -4625,35 +4663,38 @@ const selectedCustomer = useMemo(
     useEffect(() => {
         if (saleForm.sale_mode !== 'INSTALLMENT') return;
 
-        const totalInstallmentPrice = Math.max(Number(saleForm.vehicle_price || 0), 0);
-        const downPayment = Math.min(Number(saleForm.down_payment || 0), totalInstallmentPrice);
-        const financedAmount = Math.max(roundCurrencyValue(totalInstallmentPrice - downPayment), 0);
-        const installmentMonths = Math.max(Number(saleForm.installment_months || 12), 1);
-        const monthlyInstallment = financedAmount > 0
-            ? roundCurrencyValue(financedAmount / installmentMonths)
-            : 0;
+        const plan = calculateInstallmentPlan({
+            totalPrice: saleForm.vehicle_price,
+            downPayment: saleForm.down_payment,
+            months: saleForm.installment_months,
+            monthlyInstallment: saleForm.monthly_installment,
+            method: saleForm.installment_calculation_method,
+        });
 
         setSaleForm((current) => {
-            const nextFinancedAmount = financedAmount ? String(financedAmount) : '0';
-            const nextMonthlyInstallment = monthlyInstallment ? String(monthlyInstallment) : '0';
-            const nextInstallmentMonths = current.installment_months || '12';
+            const normalizedMethod = normalizeInstallmentMethod(current.installment_calculation_method);
+            const nextFinancedAmount = String(plan.financedAmount || 0);
+            const nextMonthlyInstallment = String(plan.monthlyInstallment || 0);
+            const nextInstallmentMonths = String(plan.installmentMonths || (normalizedMethod === 'MONTHS' ? 12 : ''));
 
             if (
                 current.financed_amount === nextFinancedAmount &&
                 current.monthly_installment === nextMonthlyInstallment &&
-                current.installment_months === nextInstallmentMonths
+                current.installment_months === nextInstallmentMonths &&
+                current.installment_calculation_method === normalizedMethod
             ) {
                 return current;
             }
 
             return {
                 ...current,
+                installment_calculation_method: normalizedMethod,
                 financed_amount: nextFinancedAmount,
                 monthly_installment: nextMonthlyInstallment,
                 installment_months: nextInstallmentMonths,
             };
         });
-    }, [saleForm.down_payment, saleForm.installment_months, saleForm.sale_mode, saleForm.vehicle_price]);
+    }, [saleForm.down_payment, saleForm.installment_calculation_method, saleForm.installment_months, saleForm.monthly_installment, saleForm.sale_mode, saleForm.vehicle_price]);
 
     useEffect(() => {
         const themeExists = dashboardThemes.some((theme) => theme.key === dashboardTheme);
@@ -4746,16 +4787,20 @@ const selectedCustomer = useMemo(
             return [];
         }
 
-        return Array.from({ length: Number(saleForm.installment_months) || 0 }, (_, index) => {
+        const financedAmount = Number(saleForm.financed_amount || 0);
+        const installmentMonths = Number(saleForm.installment_months) || 0;
+        const monthlyInstallment = Number(saleForm.monthly_installment || 0);
+
+        return Array.from({ length: installmentMonths }, (_, index) => {
             const dueDate = new Date(saleForm.first_due_date);
             dueDate.setMonth(dueDate.getMonth() + index);
             return {
                 installment_number: index + 1,
                 due_date: dueDate.toISOString().slice(0, 10),
-                amount: saleForm.monthly_installment,
+                amount: getInstallmentPreviewAmount({ financedAmount, monthlyInstallment, installmentMonths, installmentNumber: index + 1 }),
             };
         });
-    }, [saleForm.first_due_date, saleForm.installment_months, saleForm.monthly_installment, saleForm.sale_mode]);
+    }, [saleForm.financed_amount, saleForm.first_due_date, saleForm.installment_months, saleForm.monthly_installment, saleForm.sale_mode]);
 
     const resetCustomerForm = ({ preserveSelection = false } = {}) => {
         const defaultDealerId = currentProfileDealerId || user?.dealer_id || '';
@@ -5046,6 +5091,7 @@ const selectedCustomer = useMemo(
                     financed_amount: value === 'CASH' ? '' : current.financed_amount,
                     monthly_installment: value === 'CASH' ? '' : current.monthly_installment,
                     installment_months: value === 'CASH' ? '' : (current.installment_months || '12'),
+                    installment_calculation_method: value === 'CASH' ? 'MONTHS' : normalizeInstallmentMethod(current.installment_calculation_method),
                     installment_margin_percent: value === 'CASH' ? '' : (current.installment_margin_percent || ''),
                     installment_margin_value: value === 'CASH' ? '' : (current.installment_margin_value || ''),
                     first_due_date: value === 'CASH' ? '' : current.first_due_date,
@@ -5103,7 +5149,17 @@ const selectedCustomer = useMemo(
                 };
             }
 
-            if (name === 'installment_months' || name === 'first_due_date') {
+            if (name === 'installment_calculation_method') {
+                const normalizedMethod = normalizeInstallmentMethod(value);
+                return {
+                    ...current,
+                    installment_calculation_method: normalizedMethod,
+                    installment_months: normalizedMethod === 'MONTHS' ? (current.installment_months || '12') : '',
+                    monthly_installment: normalizedMethod === 'MONTHLY_AMOUNT' ? '' : current.monthly_installment,
+                };
+            }
+
+            if (name === 'installment_months' || name === 'monthly_installment' || name === 'first_due_date') {
                 return {
                     ...current,
                     [name]: value,
@@ -5485,6 +5541,13 @@ const selectedCustomer = useMemo(
         const saleTotalPrice = Number(sale.vehicle_price || 0);
         const saleMarginValue = Math.max(roundCurrencyValue(saleTotalPrice - saleActualPrice), 0);
         const saleMarginPercent = saleActualPrice > 0 ? roundCurrencyValue((saleMarginValue / saleActualPrice) * 100) : 0;
+        const saleInstallmentMethod = sale.sale_mode === 'INSTALLMENT'
+            && Number(sale.monthly_installment || 0) > 0
+            && Number(sale.installment_months || 0) > 0
+            && Number(sale.financed_amount || 0) > 0
+            && roundCurrencyValue((Number(sale.monthly_installment || 0) * Number(sale.installment_months || 0)) - Number(sale.financed_amount || 0)) > 1
+            ? 'MONTHLY_AMOUNT'
+            : 'MONTHS';
 
         setSaleForm({
             id: sale.id,
@@ -5508,6 +5571,7 @@ const selectedCustomer = useMemo(
             installment_months: String(sale.installment_months || ''),
             installment_margin_percent: sale.sale_mode === 'INSTALLMENT' && saleMarginPercent ? String(saleMarginPercent) : '',
             installment_margin_value: sale.sale_mode === 'INSTALLMENT' && saleMarginValue ? String(saleMarginValue) : '',
+            installment_calculation_method: saleInstallmentMethod,
             print_actual_price: Boolean(sale.print_actual_price),
             first_due_date: sale.first_due_date ? String(sale.first_due_date).slice(0, 10) : '',
             witness_name: sale.witness_name || '',
@@ -5545,6 +5609,13 @@ const selectedCustomer = useMemo(
         const saleTotalPrice = Number(sale.vehicle_price || 0);
         const saleMarginValue = Math.max(roundCurrencyValue(saleTotalPrice - saleActualPrice), 0);
         const saleMarginPercent = saleActualPrice > 0 ? roundCurrencyValue((saleMarginValue / saleActualPrice) * 100) : 0;
+        const saleInstallmentMethod = sale.sale_mode === 'INSTALLMENT'
+            && Number(sale.monthly_installment || 0) > 0
+            && Number(sale.installment_months || 0) > 0
+            && Number(sale.financed_amount || 0) > 0
+            && roundCurrencyValue((Number(sale.monthly_installment || 0) * Number(sale.installment_months || 0)) - Number(sale.financed_amount || 0)) > 1
+            ? 'MONTHLY_AMOUNT'
+            : 'MONTHS';
 
         setSaleForm({
             id: sale.id,
@@ -5568,6 +5639,7 @@ const selectedCustomer = useMemo(
             installment_months: String(sale.installment_months || ''),
             installment_margin_percent: sale.sale_mode === 'INSTALLMENT' && saleMarginPercent ? String(saleMarginPercent) : '',
             installment_margin_value: sale.sale_mode === 'INSTALLMENT' && saleMarginValue ? String(saleMarginValue) : '',
+            installment_calculation_method: saleInstallmentMethod,
             print_actual_price: Boolean(sale.print_actual_price),
             first_due_date: sale.first_due_date ? String(sale.first_due_date).slice(0, 10) : '',
             witness_name: sale.witness_name || '',
@@ -6765,6 +6837,7 @@ const selectedCustomer = useMemo(
                 financed_amount: Number(saleForm.financed_amount || 0),
                 monthly_installment: Number(saleForm.monthly_installment || 0),
                 installment_months: Number(saleForm.installment_months || 0),
+                installment_calculation_method: normalizeInstallmentMethod(saleForm.installment_calculation_method),
                 print_actual_price: Boolean(saleForm.print_actual_price),
             };
             if (saleForm.id) {

@@ -70,6 +70,34 @@ const resolveSaleDealerId = (scope, reqUser, customerDealerId = null, vehicleDea
 
 const formatCurrencyAmount = (value) => `Rs ${Number(value || 0).toFixed(2)}`;
 const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100;
+const buildInstallmentAmounts = ({ financedAmount, monthlyInstallment, installmentMonths }) => {
+    const total = Math.max(roundMoney(financedAmount), 0);
+    const monthly = Math.max(roundMoney(monthlyInstallment), 0);
+    const months = Math.max(Number(installmentMonths || 0), 0);
+
+    return Array.from({ length: months }, (_, index) => {
+        const remainingBefore = roundMoney(total - (monthly * index));
+        if (index === months - 1) {
+            return Math.max(remainingBefore, 0);
+        }
+        return Math.max(Math.min(monthly, remainingBefore), 0);
+    });
+};
+const validateInstallmentPlan = ({ financedAmount, monthlyInstallment, installmentMonths, firstDueDate }) => {
+    const total = Math.max(roundMoney(financedAmount), 0);
+    const monthly = Math.max(roundMoney(monthlyInstallment), 0);
+    const months = Math.max(Number(installmentMonths || 0), 0);
+
+    if (!months || months <= 0 || !firstDueDate || !monthly || monthly <= 0) {
+        return 'Installment months, first due date, and monthly installment are required for installment sales.';
+    }
+
+    if (total > 0 && roundMoney(monthly * months) + 0.01 < total) {
+        return 'Monthly installment and month count do not cover the financed amount.';
+    }
+
+    return '';
+};
 
 const isScopedDealerMatch = (scope, dealerId) => {
     if (!scope.isDealerScopedView) {
@@ -322,10 +350,14 @@ exports.createSale = async (req, res) => {
         }
 
         if (normalizedSaleMode === 'INSTALLMENT') {
-            const months = Number(installment_months || 0);
-            const monthly = Number(monthly_installment || 0);
-            if (!months || months <= 0 || !normalizedFirstDueDate || !monthly || monthly <= 0) {
-                return res.status(400).json({ message: 'Installment months, first due date, and monthly installment are required for installment sales.' });
+            const validationMessage = validateInstallmentPlan({
+                financedAmount: financed_amount || Math.max(Number(vehicle_price || 0) - Number(down_payment || 0), 0),
+                monthlyInstallment: monthly_installment,
+                installmentMonths: installment_months,
+                firstDueDate: normalizedFirstDueDate,
+            });
+            if (validationMessage) {
+                return res.status(400).json({ message: validationMessage });
             }
         }
 
@@ -434,7 +466,12 @@ exports.createSale = async (req, res) => {
         );
 
         if (!requiresWorkflow && normalizedSaleMode === 'INSTALLMENT' && Number(installment_months) > 0 && normalizedFirstDueDate) {
-            for (let index = 0; index < Number(installment_months); index += 1) {
+            const installmentAmounts = buildInstallmentAmounts({
+                financedAmount: financed_amount || Math.max(Number(vehicle_price || 0) - Number(down_payment || 0), 0),
+                monthlyInstallment: monthly_installment,
+                installmentMonths: installment_months,
+            });
+            for (let index = 0; index < installmentAmounts.length; index += 1) {
                 await client.query(
                     `
                     INSERT INTO sale_installments (
@@ -447,7 +484,7 @@ exports.createSale = async (req, res) => {
                         resolvedSaleDealerId,
                         index + 1,
                         addMonths(normalizedFirstDueDate, index),
-                        monthly_installment || 0,
+                        installmentAmounts[index] || 0,
                         'PENDING',
                     ]
                 );
@@ -707,7 +744,12 @@ exports.updateSale = async (req, res) => {
         await client.query('DELETE FROM sale_installments WHERE sale_id = $1', [req.params.id]);
 
         if (!pendingWorkflowApproval && sale_mode === 'INSTALLMENT' && Number(installment_months) > 0 && first_due_date) {
-            for (let index = 0; index < Number(installment_months); index += 1) {
+            const installmentAmounts = buildInstallmentAmounts({
+                financedAmount: financed_amount || Math.max(Number(vehicle_price || 0) - Number(down_payment || 0), 0),
+                monthlyInstallment: monthly_installment,
+                installmentMonths: installment_months,
+            });
+            for (let index = 0; index < installmentAmounts.length; index += 1) {
                 await client.query(
                     `
                     INSERT INTO sale_installments (
@@ -720,7 +762,7 @@ exports.updateSale = async (req, res) => {
                         resolvedSaleDealerId,
                         index + 1,
                         addMonths(first_due_date, index),
-                        monthly_installment || 0,
+                        installmentAmounts[index] || 0,
                         'PENDING',
                     ]
                 );
