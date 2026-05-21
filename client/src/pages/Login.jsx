@@ -20,8 +20,6 @@ const Login = () => {
   const [loginTheme] = useState(() => localStorage.getItem(DASHBOARD_THEME_STORAGE_KEY) || 'sandstone');
   const navigate = useNavigate();
 
-  const apiBaseUrl = String(API.defaults.baseURL || '');
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -117,7 +115,7 @@ const Login = () => {
               {loading ? 'Authenticating...' : 'Enter dashboard'}
             </button>
           </form>
-          //<p className="auth-api-hint">Backend API: {apiBaseUrl || 'not //configured'}</p>
+
 
           <div className="auth-support">
             <div className="auth-support-card">
