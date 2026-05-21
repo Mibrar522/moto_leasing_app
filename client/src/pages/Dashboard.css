@@ -2722,7 +2722,23 @@
 }
 
 .access-permission-modal {
+    position: relative;
     width: min(760px, 100%);
+}
+
+.access-query-overlay {
+    position: sticky;
+    bottom: 12px;
+    z-index: 3;
+    display: flex;
+    justify-content: center;
+    margin: 12px 0;
+    pointer-events: none;
+}
+
+.access-permission-modal.is-access-saving .access-feature-sections {
+    opacity: 0.58;
+    pointer-events: none;
 }
 
 .workflow-task-modal {

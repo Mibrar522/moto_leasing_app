@@ -1681,14 +1681,21 @@ const mapEmployeeFromApi = (employee) => ({
     denied_feature_ids: (employee.denied_features || []).map((feature) => Number(feature.id)),
 });
 
+const DASHBOARD_DATE_FROM_STORAGE_KEY = 'motolease.dashboardDateFrom';
+
 const Dashboard = ({ pageKey, PageComponent }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const getTodayDateKey = () => new Date().toISOString().slice(0, 10);
+    const getTodayDateKey = () => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    };
     const getMonthStartDateKey = () => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
     };
+    const normalizeDashboardDateFrom = (value) => (/^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? value : getMonthStartDateKey());
+    const getStoredDashboardDateFrom = () => normalizeDashboardDateFrom(localStorage.getItem(DASHBOARD_DATE_FROM_STORAGE_KEY));
     const createDefaultReportFilters = () => {
         const today = getTodayDateKey();
         return {
@@ -1788,7 +1795,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [reportsMenuOpen, setReportsMenuOpen] = useState(false);
     const [reportDateFrom, setReportDateFrom] = useState(() => getTodayDateKey());
     const [reportDateTo, setReportDateTo] = useState(() => getTodayDateKey());
-    const [dashboardDateFrom, setDashboardDateFrom] = useState(() => getMonthStartDateKey());
+    const [dashboardDateFrom, setDashboardDateFrom] = useState(() => getStoredDashboardDateFrom());
     const [dashboardDateTo, setDashboardDateTo] = useState(() => getTodayDateKey());
     const [reportBranchName, setReportBranchName] = useState('ALL');
     const [reportAgentName, setReportAgentName] = useState('ALL');
@@ -1804,6 +1811,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [savingAdvance, setSavingAdvance] = useState(false);
     const [savingPayroll, setSavingPayroll] = useState(false);
     const [savingAccess, setSavingAccess] = useState(false);
+    const [savingAccessRoleId, setSavingAccessRoleId] = useState(null);
     const [savingProduct, setSavingProduct] = useState(false);
     const [savingCompany, setSavingCompany] = useState(false);
     const [savingSale, setSavingSale] = useState(false);
@@ -5500,11 +5508,12 @@ const selectedCustomer = useMemo(
     const handleSaveRolePermissions = async (roleId) => {
         if (!canManageAccess) {
             setAccessMessage('Only the super admin can assign roles and features.');
-            return;
+            return false;
         }
 
         try {
             setSavingAccess(true);
+            setSavingAccessRoleId(roleId);
             const { data } = await API.put(`/admin/access/roles/${roleId}`, {
                 feature_ids: roleAssignments[roleId] || [],
             });
@@ -5514,10 +5523,13 @@ const selectedCustomer = useMemo(
                 rolePermissions: data.rolePermissions,
             }));
             setAccessMessage('Role permissions updated successfully.');
+            return true;
         } catch (err) {
             setAccessMessage(err.response?.data?.message || 'Unable to update role permissions.');
+            return false;
         } finally {
             setSavingAccess(false);
+            setSavingAccessRoleId(null);
         }
     };
     const openAccessPopup = (roleId, pageKey) => {
@@ -8243,11 +8255,23 @@ const selectedCustomer = useMemo(
         );
     };
 
+    const handleDashboardDateFromChange = (event) => {
+        const nextDateFrom = normalizeDashboardDateFrom(event.target.value);
+        setDashboardDateFrom(nextDateFrom);
+        localStorage.setItem(DASHBOARD_DATE_FROM_STORAGE_KEY, nextDateFrom);
+    };
+
     const handleRefreshDashboardMetrics = () => {
+        const currentDateTo = getTodayDateKey();
+        const committedDateFrom = normalizeDashboardDateFrom(dashboardDateFrom);
+
+        setDashboardDateFrom(committedDateFrom);
+        setDashboardDateTo(currentDateTo);
+        localStorage.setItem(DASHBOARD_DATE_FROM_STORAGE_KEY, committedDateFrom);
         loadDashboard({
             page: 'dashboard',
-            dashboardDateFrom,
-            dashboardDateTo,
+            dashboardDateFrom: committedDateFrom,
+            dashboardDateTo: currentDateTo,
         });
     };
 
@@ -9200,6 +9224,7 @@ const selectedCustomer = useMemo(
                     accessMessage={accessMessage}
                     dashboardData={dashboardData}
                     savingAccess={savingAccess}
+                    savingAccessRoleId={savingAccessRoleId}
                     handleSaveRolePermissions={handleSaveRolePermissions}
                     ACCESS_PAGE_GROUPS={ACCESS_PAGE_GROUPS}
                     getUniqueFeatures={getUniqueFeatures}
@@ -9256,7 +9281,7 @@ const selectedCustomer = useMemo(
                             <div className="dashboard-filter-controls">
                                 <label className="dashboard-date-field">
                                     <span>From</span>
-                                    <input type="date" value={dashboardDateFrom} onChange={(event) => setDashboardDateFrom(event.target.value)} />
+                                    <input type="date" value={dashboardDateFrom} onChange={handleDashboardDateFromChange} />
                                 </label>
                                 <label className="dashboard-date-field">
                                     <span>To</span>
@@ -9890,8 +9915,8 @@ const selectedCustomer = useMemo(
             ) : null}
 
             {activeAccessPopup && accessPopupRole && accessPopupGroup ? (
-            <div className="receive-modal-backdrop" onClick={closeAccessPopup}>
-                    <div className="receive-modal access-permission-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="receive-modal-backdrop" onClick={() => { if (!(savingAccess && savingAccessRoleId === accessPopupRole.id)) closeAccessPopup(); }}>
+                    <div className={`receive-modal access-permission-modal ${savingAccess && savingAccessRoleId === accessPopupRole.id ? 'is-access-saving' : ''}`} onClick={(event) => event.stopPropagation()}>
                         <div className="section-header">
                             <div>
                                 <h3>{accessPopupGroup.label} Roles and Features</h3>
@@ -9899,7 +9924,7 @@ const selectedCustomer = useMemo(
                                     Role: {accessPopupRole.role_name}. Enable or disable the available role features for this page.
                                 </p>
                             </div>
-                            <button type="button" className="view-btn" onClick={closeAccessPopup}>
+                            <button type="button" className="view-btn" onClick={closeAccessPopup} disabled={savingAccess && savingAccessRoleId === accessPopupRole.id}>
                                 Close
                             </button>
                         </div>
@@ -9919,7 +9944,7 @@ const selectedCustomer = useMemo(
                                                     type="checkbox"
                                                     checked={(roleAssignments[accessPopupRole.id] || []).includes(Number(feature.id))}
                                                     onChange={() => handleRoleFeatureToggle(accessPopupRole.id, Number(feature.id))}
-                                                    disabled={!canManageAccess}
+                                                    disabled={!canManageAccess || savingAccess}
                                                 />
                                                 <span>{getAccessFeatureLabel(feature)}</span>
                                             </label>
@@ -9929,8 +9954,17 @@ const selectedCustomer = useMemo(
                             )) : <div className="feedback-card">No functions are mapped to this page yet.</div>}
                         </div>
 
+                        {savingAccess && savingAccessRoleId === accessPopupRole.id ? (
+                            <div className="access-query-overlay" role="status" aria-live="polite">
+                                <div className="query-loading-pill">
+                                    <span className="query-loading-spinner" aria-hidden="true" />
+                                    Updating role features...
+                                </div>
+                            </div>
+                        ) : null}
+
                         <div className="receive-modal-actions">
-                            <button type="button" className="view-btn" onClick={closeAccessPopup}>
+                            <button type="button" className="view-btn" onClick={closeAccessPopup} disabled={savingAccess && savingAccessRoleId === accessPopupRole.id}>
                                 Cancel
                             </button>
                             <button
@@ -9938,11 +9972,13 @@ const selectedCustomer = useMemo(
                                 className="primary-btn"
                                 disabled={!canManageAccess || savingAccess}
                                 onClick={async () => {
-                                    await handleSaveRolePermissions(accessPopupRole.id);
-                                    closeAccessPopup();
+                                    const saved = await handleSaveRolePermissions(accessPopupRole.id);
+                                    if (saved) {
+                                        closeAccessPopup();
+                                    }
                                 }}
                             >
-                                {savingAccess ? 'Saving...' : 'Save Role Features'}
+                                {savingAccess && savingAccessRoleId === accessPopupRole.id ? (<><span className="btn-spinner" aria-hidden="true" />Saving...</>) : 'Save Role Features'}
                             </button>
                         </div>
                     </div>
