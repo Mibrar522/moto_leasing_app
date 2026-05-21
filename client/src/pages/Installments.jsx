@@ -17,7 +17,6 @@ export default function Installments({ ctx }) {
     installmentSales,
     installmentSummary,
     receivingInstallmentId,
-    renderAssetPreview,
     renderEmptyState,
     saleMessage,
     selectedInstallmentAuthorizedSignaturePath,
@@ -59,32 +58,35 @@ if (!canManageInstallments) {
                                     )}
                                 </div>
                                 <div className="installment-hero-content">
-                                    <div className="section-header">
+                                    <div className="section-header installment-profile-header">
                                         <h3>{selectedInstallmentSale.brand} {selectedInstallmentSale.model}</h3>
-                                        <div className="inline-actions">
-                                            <select
-                                                value={selectedInstallmentSale.id}
-                                                onChange={(event) => setSelectedInstallmentSaleId(event.target.value)}
-                                                className="installment-sale-picker no-print"
-                                            >
-                                                {installmentSales.map((sale) => (
-                                                    <option key={sale.id} value={sale.id}>
-                                                        {sale.customer_name} - {sale.brand} {sale.model} - {sale.dealer_name || 'No dealer'}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <button type="button" className="primary-btn no-print" onClick={handlePrintInvoice}>
-                                                Print Invoice
-                                            </button>
+                                        <div className="installment-header-tools">
+                                            <div className="installment-customer-photo-card" aria-label="Customer Photo">
+                                                {selectedInstallmentCustomerPhotoUrl ? (
+                                                    <img src={selectedInstallmentCustomerPhotoUrl} alt="Customer" />
+                                                ) : (
+                                                    <span>No photo</span>
+                                                )}
+                                            </div>
+                                            <div className="inline-actions">
+                                                <select
+                                                    value={selectedInstallmentSale.id}
+                                                    onChange={(event) => setSelectedInstallmentSaleId(event.target.value)}
+                                                    className="installment-sale-picker no-print"
+                                                >
+                                                    {installmentSales.map((sale) => (
+                                                        <option key={sale.id} value={sale.id}>
+                                                            {sale.customer_name} - {sale.brand} {sale.model} - {sale.dealer_name || 'No dealer'}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <button type="button" className="primary-btn no-print" onClick={handlePrintInvoice}>
+                                                    Print Invoice
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="detail-grid">
-                                        <div className="full-span">
-                                            <span className="meta-label">Customer Photo</span>
-                                            <div className="employee-document-preview">
-                                                {renderAssetPreview(selectedInstallmentCustomerPhotoUrl, 'Customer photo not available.', 'Customer Photo')}
-                                            </div>
-                                        </div>
                                         <div><span className="meta-label">Customer</span><p className="meta-value">{selectedInstallmentSale.customer_name}</p></div>
                                         <div><span className="meta-label">CNIC</span><p className="meta-value">{selectedInstallmentSale.cnic_passport_number}</p></div>
                                         <div><span className="meta-label">Dealer</span><p className="meta-value">{formatSaleDealerIdentity(selectedInstallmentSale)}</p></div>

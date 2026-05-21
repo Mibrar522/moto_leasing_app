@@ -7181,6 +7181,11 @@ const selectedCustomer = useMemo(
                     .brand-block { display: flex; justify-content: space-between; gap: 18px; align-items: center; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #dbe2ea; }
                     .print-brand-logo { width: 72px; height: 72px; object-fit: cover; border-radius: 16px; border: 1px solid #dbe2ea; background: #fff; }
                     .header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 2px solid #dbeafe; padding-bottom: 18px; margin-bottom: 20px; }
+                    .header-meta { display: flex; align-items: flex-start; justify-content: flex-end; gap: 12px; min-width: 56mm; }
+                    .header-meta-main { min-width: 30mm; }
+                    .print-customer-photo { width: 27mm; height: 33mm; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #dbe2ea; border-radius: 12px; background: #f8fafc; }
+                    .print-customer-photo img { width: 100%; height: 100%; object-fit: cover; }
+                    .print-customer-photo .empty { color: #64748b; font-size: 10px; font-weight: 700; text-align: center; padding: 5px; }
                     .kicker { color: #2563eb; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; margin: 0 0 6px; }
                     h1, h2, h3, p { margin: 0; }
                     .subtitle { color: #64748b; margin-top: 6px; }
@@ -7254,17 +7259,22 @@ const selectedCustomer = useMemo(
                         <h1>Installment Transaction Statement</h1>
                         <p class="subtitle">Customer, vehicle, and full transaction details.</p>
                     </div>
-                    <div>
-                        <span class="label">Agreement No.</span>
-                        <div class="value">${escapeHtml(selectedInstallmentSale.agreement_number || 'Not set')}</div>
-                        <span class="label" style="margin-top:10px;">Printed On</span>
-                        <div class="value">${escapeHtml(new Date().toLocaleDateString('en-PK'))}</div>
+                    <div class="header-meta">
+                        <div class="header-meta-main">
+                            <span class="label">Agreement No.</span>
+                            <div class="value">${escapeHtml(selectedInstallmentSale.agreement_number || 'Not set')}</div>
+                            <span class="label" style="margin-top:10px;">Printed On</span>
+                            <div class="value">${escapeHtml(new Date().toLocaleDateString('en-PK'))}</div>
+                        </div>
+                        <div class="print-customer-photo">
+                            ${selectedInstallmentCustomerPhotoPath ? `<img src="${escapeHtml(selectedInstallmentCustomerPhotoUrl)}" alt="Customer photo" />` : `<div class="empty">No customer photo</div>`}
+                        </div>
                     </div>
                 </div>
                 <div class="hero">
                     ${selectedInstallmentImageUrl ? `<img src="${escapeHtml(selectedInstallmentImageUrl)}" alt="Vehicle" />` : `<div class="fallback">No vehicle image</div>`}
                     <div class="grid">
-                        <div><span class="label">Customer Photo</span>${selectedInstallmentCustomerPhotoPath ? `<div class="signature-box"><img src="${escapeHtml(selectedInstallmentCustomerPhotoUrl)}" alt="Customer photo" /></div>` : `<div class="signature-box"><div class="empty">Customer photo not attached</div></div>`}</div>
+
                         <div><span class="label">Customer</span><div class="value">${escapeHtml(selectedInstallmentSale.customer_name)}</div></div>
                         <div><span class="label">Customer CNIC</span><div class="value">${escapeHtml(selectedInstallmentSale.cnic_passport_number)}</div></div>
                         <div><span class="label">Dealer</span><div class="value">${escapeHtml(formatSaleDealerIdentity(selectedInstallmentSale))}</div></div>
@@ -7287,10 +7297,6 @@ const selectedCustomer = useMemo(
                     <div class="stat"><span class="label">Total Remaining</span><strong>${escapeHtml(formatCurrency(installmentSummary.totalRemainingAmount))}</strong></div>
                 </div>
                 <div class="approval-strip">
-                    <div class="approval-card">
-                        <span class="label">Customer Photo</span>
-                        ${selectedInstallmentCustomerPhotoPath ? `<img src="${escapeHtml(selectedInstallmentCustomerPhotoUrl)}" alt="Customer photo" />` : `<div class="empty">Customer photo not attached</div>`}
-                    </div>
                     <div class="approval-card">
                         <span class="label">Biometric Thumb</span>
                         ${selectedInstallmentThumbUrl ? `<img src="${escapeHtml(selectedInstallmentThumbUrl)}" alt="Biometric thumb" />` : `<div class="empty">Thumb not attached</div>`}
@@ -7364,11 +7370,16 @@ const selectedCustomer = useMemo(
                         <h1>${isInstallment ? 'Installment Transaction Statement' : 'Cash Transaction Receipt'}</h1>
                         <p class="subtitle">Customer, vehicle, and payment details.</p>
                     </div>
-                    <div>
-                        <span class="label">Agreement No.</span>
-                        <div class="value">${escapeHtml(sale.agreement_number || 'Not set')}</div>
-                        <span class="label" style="margin-top:10px;">Printed On</span>
-                        <div class="value">${escapeHtml(new Date().toLocaleDateString('en-PK'))}</div>
+                    <div class="header-meta">
+                        <div class="header-meta-main">
+                            <span class="label">Agreement No.</span>
+                            <div class="value">${escapeHtml(sale.agreement_number || 'Not set')}</div>
+                            <span class="label" style="margin-top:10px;">Printed On</span>
+                            <div class="value">${escapeHtml(new Date().toLocaleDateString('en-PK'))}</div>
+                        </div>
+                        <div class="print-customer-photo">
+                            ${printContext.customerPhotoUrl ? `<img src="${escapeHtml(printContext.customerPhotoUrl)}" alt="Customer photo" />` : `<div class="empty">No customer photo</div>`}
+                        </div>
                     </div>
                 </div>
                 <div class="hero">
@@ -7399,10 +7410,6 @@ const selectedCustomer = useMemo(
                     <div class="stat"><span class="label">Total Remaining</span><strong>${escapeHtml(formatCurrency(isInstallment ? summary.totalRemainingAmount : 0))}</strong></div>
                 </div>
                 <div class="approval-strip">
-                    <div class="approval-card">
-                        <span class="label">Customer Photo</span>
-                        ${printContext.customerPhotoUrl ? `<img src="${escapeHtml(printContext.customerPhotoUrl)}" alt="Customer photo" />` : `<div class="empty">Customer photo not attached</div>`}
-                    </div>
                     <div class="approval-card">
                         <span class="label">Biometric Thumb</span>
                         ${printContext.thumbUrl ? `<img src="${escapeHtml(printContext.thumbUrl)}" alt="Biometric thumb" />` : `<div class="empty">Thumb not attached</div>`}
@@ -8047,21 +8054,26 @@ const selectedCustomer = useMemo(
                         <h1>Installment Payment Invoice</h1>
                         <p class="subtitle">Single transaction receipt showing this month's balance, carry forward, and total remaining.</p>
                     </div>
-                    <div>
-                        <span class="label">Agreement No.</span>
-                        <div class="value">${escapeHtml(selectedInstallmentSale.agreement_number || 'Not set')}</div>
-                        <span class="label" style="margin-top:10px;">Transaction Date</span>
-                        <div class="value">${escapeHtml(row.paid_date || row.due_date)}</div>
-                        <span class="label" style="margin-top:10px;">Installment Month</span>
-                        <div class="value">${escapeHtml(context.installmentMonthLabel)}</div>
-                        <span class="label" style="margin-top:10px;">Status</span>
-                        <div class="value">${escapeHtml(context.currentStatus)}</div>
+                    <div class="header-meta">
+                        <div class="header-meta-main">
+                            <span class="label">Agreement No.</span>
+                            <div class="value">${escapeHtml(selectedInstallmentSale.agreement_number || 'Not set')}</div>
+                            <span class="label" style="margin-top:10px;">Transaction Date</span>
+                            <div class="value">${escapeHtml(row.paid_date || row.due_date)}</div>
+                            <span class="label" style="margin-top:10px;">Installment Month</span>
+                            <div class="value">${escapeHtml(context.installmentMonthLabel)}</div>
+                            <span class="label" style="margin-top:10px;">Status</span>
+                            <div class="value">${escapeHtml(context.currentStatus)}</div>
+                        </div>
+                        <div class="print-customer-photo">
+                            ${selectedInstallmentCustomerPhotoPath ? `<img src="${escapeHtml(selectedInstallmentCustomerPhotoUrl)}" alt="Customer photo" />` : `<div class="empty">No customer photo</div>`}
+                        </div>
                     </div>
                 </div>
                 <div class="hero">
                     ${selectedInstallmentImageUrl ? `<img src="${escapeHtml(selectedInstallmentImageUrl)}" alt="Vehicle" />` : `<div class="fallback">No vehicle image</div>`}
                     <div class="grid">
-                        <div><span class="label">Customer Photo</span>${selectedInstallmentCustomerPhotoPath ? `<div class="signature-box"><img src="${escapeHtml(selectedInstallmentCustomerPhotoUrl)}" alt="Customer photo" /></div>` : `<div class="signature-box"><div class="empty">Customer photo not attached</div></div>`}</div>
+
                         <div><span class="label">Customer</span><div class="value">${escapeHtml(selectedInstallmentSale.customer_name)}</div></div>
                         <div><span class="label">Customer CNIC</span><div class="value">${escapeHtml(selectedInstallmentSale.cnic_passport_number)}</div></div>
                         <div><span class="label">Dealer</span><div class="value">${escapeHtml(formatSaleDealerIdentity(selectedInstallmentSale))}</div></div>
@@ -8109,10 +8121,6 @@ const selectedCustomer = useMemo(
                     </tbody>
                 </table>
                 <div class="approval-strip">
-                    <div class="approval-card">
-                        <span class="label">Customer Photo</span>
-                        ${selectedInstallmentCustomerPhotoPath ? `<img src="${escapeHtml(selectedInstallmentCustomerPhotoUrl)}" alt="Customer photo" />` : `<div class="empty">Customer photo not attached</div>`}
-                    </div>
                     <div class="approval-card">
                         <span class="label">Biometric Thumb</span>
                         ${selectedInstallmentThumbUrl ? `<img src="${escapeHtml(selectedInstallmentThumbUrl)}" alt="Biometric thumb" />` : `<div class="empty">Thumb not attached</div>`}

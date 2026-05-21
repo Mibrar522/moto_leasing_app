@@ -1660,6 +1660,53 @@
     margin-bottom: 18px;
 }
 
+.installment-profile-header {
+    align-items: flex-start;
+}
+
+.installment-header-tools {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.installment-customer-photo-card {
+    width: 82px;
+    height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 1px solid rgba(129, 150, 176, 0.28);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.94));
+    box-shadow: 0 14px 26px rgba(20, 31, 52, 0.08);
+    color: var(--dash-text-soft);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-align: center;
+}
+
+.installment-customer-photo-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+@media (max-width: 640px) {
+    .installment-header-tools {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .installment-customer-photo-card {
+        width: 72px;
+        height: 84px;
+    }
+}
+
 .report-filter-actions {
     display: flex;
     align-items: center;
