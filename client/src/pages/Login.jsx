@@ -9,7 +9,13 @@ const DASHBOARD_THEME_STORAGE_KEY = 'dashboard_theme';
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() => {
+    const sessionMessage = sessionStorage.getItem('sessionExpiredMessage');
+    if (sessionMessage) {
+      sessionStorage.removeItem('sessionExpiredMessage');
+    }
+    return sessionMessage || '';
+  });
   const [loading, setLoading] = useState(false);
   const [loginTheme] = useState(() => localStorage.getItem(DASHBOARD_THEME_STORAGE_KEY) || 'sandstone');
   const navigate = useNavigate();
