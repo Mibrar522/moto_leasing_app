@@ -303,10 +303,17 @@ const SALES_FIELD_ACCESS = [
     ['FEAT_SALES_FIELD_MARKUP_PERCENTAGE', 'Markup Percentage'],
     ['FEAT_SALES_FIELD_DOWN_PAYMENT', 'Down Payment'],
     ['FEAT_SALES_FIELD_MONTHLY_INSTALLMENT', 'Monthly Installment'],
+    ['FEAT_SALES_FIELD_INSTALLMENT_METHOD', 'Installment Method (Dropdown)'],
     ['FEAT_SALES_FIELD_WITNESS_NAME', 'Witness Name'],
+    ['FEAT_SALES_FIELD_WITNESS_FATHER_NAME', 'Witness Father Name'],
+    ['FEAT_SALES_FIELD_WITNESS_MOBILE_NUMBER', 'Witness Mobile Number'],
     ['FEAT_SALES_FIELD_WITNESS_CNIC', 'Witness CNIC'],
+    ['FEAT_SALES_FIELD_WITNESS_ADDRESS', 'Witness Address'],
     ['FEAT_SALES_FIELD_WITNESS_2_NAME', 'Witness 2 Name'],
+    ['FEAT_SALES_FIELD_WITNESS_2_FATHER_NAME', 'Witness 2 Father Name'],
+    ['FEAT_SALES_FIELD_WITNESS_2_MOBILE_NUMBER', 'Witness 2 Mobile Number'],
     ['FEAT_SALES_FIELD_WITNESS_2_CNIC', 'Witness 2 CNIC'],
+    ['FEAT_SALES_FIELD_WITNESS_2_ADDRESS', 'Witness 2 Address'],
     ['FEAT_SALES_FIELD_AGREEMENT_PDF', 'Agreement PDF'],
     ['FEAT_SALES_FIELD_DEALER_SIGNATURE_UPLOAD', 'Dealer Signature Upload'],
     ['FEAT_SALES_FIELD_AUTHORIZED_SIGNATURE_UPLOAD', 'Authorized Signature Upload'],
@@ -327,6 +334,7 @@ const ACCESS_PAGE_GROUPS = [
         description: 'Main dashboard access and overview widgets.',
         featureKeys: [
             'FEAT_DASHBOARD_ACCESS_PROFILE',
+            'FEAT_DASHBOARD_TRANSACTION_DATE_FILTER',
             'FEAT_DASHBOARD_CARD_ACTIVE_LEASES',
             'FEAT_DASHBOARD_CARD_PENDING_LEASES',
             'FEAT_DASHBOARD_CARD_PENDING_TASKS',
@@ -1029,6 +1037,43 @@ const getUniqueFeatures = (features = []) => {
 };
 
 const FEATURE_ACCESS_LABELS = {
+    FEAT_DASHBOARD_VIEW: 'Open Dashboard Page',
+    FEAT_THEME_MGMT: 'Theme Controls',
+    FEAT_ADS_MGMT: 'Advertisement Controls',
+    FEAT_APPLICATIONS_VIEW: 'Open Applications Page',
+    FEAT_PRODUCT_MGMT: 'Open Products Page',
+    FEAT_FLEET_MGMT: 'Fleet Inventory Access',
+    FEAT_STOCK_MGMT: 'Open Stock Page',
+    FEAT_SALES_CREATE: 'Create Sale Button',
+    FEAT_SALES_MGMT: 'Sales Management Access',
+    FEAT_INSTALLMENT_MGMT: 'Open Installments Page',
+    FEAT_INSTALLMENT_COMMISSION: 'Installment Receipt Commission',
+    FEAT_USER_MGMT: 'Open Employees Page',
+    FEAT_ACCESS_CONTROL: 'Open Access Control Page',
+    FEAT_DASHBOARD_ACCESS_PROFILE: 'Access Profile',
+    FEAT_DASHBOARD_TRANSACTION_DATE_FILTER: 'Dashboard Transaction Date Filter',
+    FEAT_DASHBOARD_CARD_ACTIVE_LEASES: 'Total Settled Leases',
+    FEAT_DASHBOARD_CARD_PENDING_LEASES: 'Total Customer Pending Lease',
+    FEAT_DASHBOARD_CARD_PENDING_TASKS: 'Total Pending Tasks',
+    FEAT_DASHBOARD_CARD_TOTAL_REVENUE: 'Total Revenue',
+    FEAT_DASHBOARD_CARD_EMPLOYEE_COMMISSIONS: 'Total Employee Commissions',
+    FEAT_DASHBOARD_CARD_TOTAL_VEHICLES: 'Total Vehicles',
+    FEAT_DASHBOARD_CARD_TOTAL_CUSTOMERS: 'Total Customers',
+    FEAT_DASHBOARD_CARD_TOTAL_EMPLOYEES: 'Total Employees',
+    FEAT_DASHBOARD_CARD_ACTIVE_EMPLOYEES: 'Total Active Employees',
+    FEAT_DASHBOARD_CARD_TOTAL_DEALERS: 'Total Dealers',
+    FEAT_DASHBOARD_CARD_ACTIVE_DEALERS: 'Total Active Dealers',
+    FEAT_DASHBOARD_CARD_SCANNED_DOCUMENTS: 'Total Scanned Documents',
+    FEAT_DASHBOARD_CARD_ENROLLED_BIOMETRICS: 'Total Enrolled Biometrics',
+    FEAT_DASHBOARD_CARD_TOTAL_APPLICATIONS: 'Total Customer Leasing Applications',
+    FEAT_DASHBOARD_CARD_CASH_TRANSACTIONS: 'Total Cash Transactions',
+    FEAT_DASHBOARD_CARD_INSTALLMENT_TRANSACTIONS: 'Total Installment Transactions',
+    FEAT_DASHBOARD_CARD_RECEIVED_INSTALLMENTS: 'Total Received Installments',
+    FEAT_DASHBOARD_SALES_PERFORMANCE: 'Sales Composition',
+    FEAT_DASHBOARD_PROFIT_TRANSACTIONS: 'Recent Profit Transactions',
+    FEAT_DASHBOARD_COMPANY_PROFITABILITY: 'Company Business Profitability',
+    FEAT_DASHBOARD_RECENT_APPLICATIONS: 'Recent Applications',
+    FEAT_DASHBOARD_RECENT_EMPLOYEES: 'Recent Employees',
     FEAT_APPLICATIONS_LIST: 'Applications List',
     FEAT_WORKFLOW_VIEW: 'Workflow Access',
     FEAT_WORKFLOW_TASKS: 'User Tasks',
@@ -1648,6 +1693,10 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const getTodayDateKey = () => new Date().toISOString().slice(0, 10);
+    const getMonthStartDateKey = () => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    };
     const createDefaultReportFilters = () => {
         const today = getTodayDateKey();
         return {
@@ -1747,6 +1796,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [reportsMenuOpen, setReportsMenuOpen] = useState(false);
     const [reportDateFrom, setReportDateFrom] = useState(() => getTodayDateKey());
     const [reportDateTo, setReportDateTo] = useState(() => getTodayDateKey());
+    const [dashboardDateFrom, setDashboardDateFrom] = useState(() => getMonthStartDateKey());
+    const [dashboardDateTo, setDashboardDateTo] = useState(() => getTodayDateKey());
     const [reportBranchName, setReportBranchName] = useState('ALL');
     const [reportAgentName, setReportAgentName] = useState('ALL');
     const [reportSaleMode, setReportSaleMode] = useState('ALL');
@@ -1825,6 +1876,10 @@ const Dashboard = ({ pageKey, PageComponent }) => {
             const requestParams = { page: requestedDashboardPage };
             if (options.previewReport) {
                 requestParams.preview = '1';
+            }
+            if (requestedDashboardPage === 'dashboard') {
+                requestParams.dashboardDateFrom = options.dashboardDateFrom ?? dashboardDateFrom;
+                requestParams.dashboardDateTo = options.dashboardDateTo ?? dashboardDateTo;
             }
             const { data } = await API.get('/admin/dashboard', {
                 params: requestParams,
@@ -2194,6 +2249,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         'FEAT_CUSTOMER_FINGERPRINT_SCAN',
     ]) || canManageEmployees;
     const canViewDashboardAccessProfile = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_ACCESS_PROFILE']);
+    const canViewDashboardTransactionDateFilter = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_TRANSACTION_DATE_FILTER']);
     const canViewDashboardSalesPerformance = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_SALES_PERFORMANCE']);
     const canViewDashboardProfitTransactions = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_PROFIT_TRANSACTIONS']);
     const canViewDashboardCompanyProfitability = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_COMPANY_PROFITABILITY']);
@@ -8195,6 +8251,14 @@ const selectedCustomer = useMemo(
         );
     };
 
+    const handleRefreshDashboardMetrics = () => {
+        loadDashboard({
+            page: 'dashboard',
+            dashboardDateFrom,
+            dashboardDateTo,
+        });
+    };
+
     const renderMetricCard = (label, value, options = {}) => {
         const { valueClassName = '', iconKey = 'applications' } = options;
 
@@ -9191,13 +9255,35 @@ const selectedCustomer = useMemo(
                             </p>
                         </div>
 
-                        <div className="metrics-grid">
+                        {canViewDashboardTransactionDateFilter ? (
+                        <div className="dashboard-filter-card">
+                            <div>
+                                <span className="meta-label">Dashboard Transaction Date</span>
+                                <p className="section-caption">Cash sales, installment sales, received installments, and sales revenue.</p>
+                            </div>
+                            <div className="dashboard-filter-controls">
+                                <label className="dashboard-date-field">
+                                    <span>From</span>
+                                    <input type="date" value={dashboardDateFrom} onChange={(event) => setDashboardDateFrom(event.target.value)} />
+                                </label>
+                                <label className="dashboard-date-field">
+                                    <span>To</span>
+                                    <input type="date" value={dashboardDateTo} onChange={(event) => setDashboardDateTo(event.target.value)} />
+                                </label>
+                                <button type="button" className="secondary-btn" onClick={handleRefreshDashboardMetrics} disabled={queryLoading}>
+                                    Refresh Cards
+                                </button>
+                            </div>
+                        </div>
+                        ) : null}
+
+                        <div className="metrics-grid dashboard-cards-grid">
                             {user?.role_name === 'AGENT' ? (
                                 <>
-                                    <div className="metric-card"><label>Received Sales</label><div className="value success">{formatCompactCurrency(dashboardData.employeeSales.receivedValue)}</div></div>
-                                    <div className="metric-card"><label>Pending Sales</label><div className="value warning">{formatCompactCurrency(dashboardData.employeeSales.pendingValue)}</div></div>
-                                    <div className="metric-card"><label>Earned Commission</label><div className="value success">{formatCompactCurrency(employeeCurrentMonthCommission)}</div></div>
-                                    <div className="metric-card"><label>Outstanding Advance</label><div className="value warning">{formatCompactCurrency(selectedEmployeeOutstandingAdvance)}</div></div>
+                                    <div className="metric-card"><label>Received Sales</label><div className="value success">{formatCurrency(dashboardData.employeeSales.receivedValue)}</div></div>
+                                    <div className="metric-card"><label>Pending Sales</label><div className="value warning">{formatCurrency(dashboardData.employeeSales.pendingValue)}</div></div>
+                                    <div className="metric-card"><label>Earned Commission</label><div className="value success">{formatCurrency(employeeCurrentMonthCommission)}</div></div>
+                                    <div className="metric-card"><label>Outstanding Advance</label><div className="value warning">{formatCurrency(selectedEmployeeOutstandingAdvance)}</div></div>
                                     <div className="metric-card"><label>Overdue This Month</label><div className="value warning">{dashboardData.employeeSales.overdueFollowups}</div></div>
                                     <div className="metric-card"><label>Received Count</label><div className="value">{dashboardData.employeeSales.receivedCount}</div></div>
                                     <div className="metric-card"><label>Pending Count</label><div className="value">{dashboardData.employeeSales.pendingCount}</div></div>
@@ -9208,8 +9294,8 @@ const selectedCustomer = useMemo(
                                     {canViewDashboardCardActiveLeases ? renderMetricCard('Total Settled Leases', overviewMetrics.settledLeases, { iconKey: 'leases' }) : null}
                                     {canViewDashboardCardPendingLeases ? renderMetricCard('Total Customer Pending Lease', overviewMetrics.pendingLeases, { valueClassName: 'warning', iconKey: 'tasks' }) : null}
                                     {canViewDashboardCardPendingTasks ? renderMetricCard('Total Pending Tasks', overviewMetrics.pendingTasks, { valueClassName: 'warning', iconKey: 'tasks' }) : null}
-                                    {canViewDashboardCardTotalRevenue ? renderMetricCard('Total Revenue', formatCompactCurrency(overviewMetrics.totalRevenue), { valueClassName: 'success', iconKey: 'revenue' }) : null}
-                                    {canViewDashboardCardEmployeeCommissions ? renderMetricCard('Total Employee Commissions', formatCompactCurrency(totalEmployeeCommission), { valueClassName: 'success', iconKey: 'employees' }) : null}
+                                    {canViewDashboardCardTotalRevenue ? renderMetricCard('Total Revenue', formatCurrency(overviewMetrics.totalRevenue), { valueClassName: 'success', iconKey: 'revenue' }) : null}
+                                    {canViewDashboardCardEmployeeCommissions ? renderMetricCard('Total Employee Commissions', formatCurrency(totalEmployeeCommission), { valueClassName: 'success', iconKey: 'employees' }) : null}
                                     {canViewDashboardCardTotalVehicles ? renderMetricCard('Total Vehicles', dashboardData.metrics.totalVehicles, { iconKey: 'vehicles' }) : null}
                                     {canViewDashboardCardTotalCustomers ? renderMetricCard('Total Customers', dashboardData.metrics.totalCustomers, { iconKey: 'customers' }) : null}
                                     {canViewDashboardCardTotalEmployees ? renderMetricCard('Total Employees', dashboardData.metrics.totalEmployees, { iconKey: 'employees' }) : null}

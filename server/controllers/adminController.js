@@ -363,6 +363,12 @@ exports.getDashboardData = async (req, res) => {
 
         const requestedPage = String(req.query.page || 'dashboard').trim().toLowerCase();
         const shouldLoadReportPreview = ['1', 'true', 'yes'].includes(String(req.query.preview || '').trim().toLowerCase());
+        const normalizeDashboardDateFilter = (value) => {
+            const raw = String(value || '').trim();
+            return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
+        };
+        const dashboardDateFrom = normalizeDashboardDateFilter(req.query.dashboardDateFrom);
+        const dashboardDateTo = normalizeDashboardDateFilter(req.query.dashboardDateTo);
         const reportPreviewGroupsByPage = {
             'report-stock-inventory': ['stockOrders', 'inventory', 'salesTransactions', 'dealers'],
             'report-daily-sales': ['salesTransactions', 'dealers', 'employeeFinancials'],
@@ -410,6 +416,68 @@ exports.getDashboardData = async (req, res) => {
         if (wantsGroup('products') || wantsGroup('companies') || wantsGroup('stockOrders') || wantsGroup('inventory')) {
             await syncDealerOwnershipForRequest();
         }
+        const buildDashboardSalesMetricScope = () => {
+            const params = [];
+            const clauses = [];
+
+            if (isEmployeeLogin) {
+                params.push(req.user.id);
+                clauses.push(`st.agent_id = $${params.length}`);
+            } else if (isDealerScopedView) {
+                params.push(effectiveDealerId);
+                clauses.push(`COALESCE(st.dealer_id, su.dealer_id) = $${params.length}`);
+            }
+
+            if (dashboardDateFrom) {
+                params.push(dashboardDateFrom);
+                clauses.push(`st.purchase_date >= $${params.length}::date`);
+            }
+
+            if (dashboardDateTo) {
+                params.push(dashboardDateTo);
+                clauses.push(`st.purchase_date < ($${params.length}::date + INTERVAL '1 day')`);
+            }
+
+            return {
+                params,
+                whereSql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '',
+            };
+        };
+        const buildDashboardSalesCardScope = () => {
+            const params = [];
+            const clauses = [];
+            const saleDateClauses = [];
+            const receivedDateClauses = [];
+
+            if (isEmployeeLogin) {
+                params.push(req.user.id);
+                clauses.push(`st.agent_id = $${params.length}`);
+            } else if (isDealerScopedView) {
+                params.push(effectiveDealerId);
+                clauses.push(`COALESCE(st.dealer_id, su.dealer_id) = $${params.length}`);
+            }
+
+            if (dashboardDateFrom) {
+                params.push(dashboardDateFrom);
+                saleDateClauses.push(`st.purchase_date >= $${params.length}::date`);
+                receivedDateClauses.push(`si.paid_date >= $${params.length}::date`);
+            }
+
+            if (dashboardDateTo) {
+                params.push(dashboardDateTo);
+                saleDateClauses.push(`st.purchase_date < ($${params.length}::date + INTERVAL '1 day')`);
+                receivedDateClauses.push(`si.paid_date < ($${params.length}::date + INTERVAL '1 day')`);
+            }
+
+            return {
+                params,
+                whereSql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '',
+                saleDateSql: saleDateClauses.length ? ` AND ${saleDateClauses.join(' AND ')}` : '',
+                receivedDateSql: receivedDateClauses.length ? ` AND ${receivedDateClauses.join(' AND ')}` : '',
+            };
+        };
+        const dashboardSalesMetricScope = buildDashboardSalesMetricScope();
+        const dashboardSalesCardScope = buildDashboardSalesCardScope();
         const metricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
             SELECT
@@ -483,9 +551,9 @@ exports.getDashboardData = async (req, res) => {
                 COALESCE(SUM(vehicle_price), 0)::numeric AS total_sales_revenue
             FROM sales_transactions st
             LEFT JOIN users su ON su.id = st.agent_id
-            ${isEmployeeLogin ? 'WHERE st.agent_id = $1' : isDealerScopedView ? 'WHERE COALESCE(st.dealer_id, su.dealer_id) = $1' : ''}
+            ${dashboardSalesMetricScope.whereSql}
             `,
-            isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
+            dashboardSalesMetricScope.params
         ) : { rows: [{ total_sales: 0, active_installment_sales: 0, pending_sales: 0, total_sales_revenue: 0 }] };
 
         const dashboardSalesCardMetricsResultPromise = wantsGroup('metrics') ? pool.query(
@@ -493,9 +561,11 @@ exports.getDashboardData = async (req, res) => {
             SELECT
                 COUNT(DISTINCT st.id) FILTER (
                     WHERE UPPER(COALESCE(st.sale_mode, '')) = 'CASH'
+                    ${dashboardSalesCardScope.saleDateSql}
                 )::int AS cash_transactions,
                 COUNT(DISTINCT st.id) FILTER (
                     WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
+                    ${dashboardSalesCardScope.saleDateSql}
                 )::int AS installment_transactions,
                 COUNT(si.id) FILTER (
                     WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
@@ -503,13 +573,14 @@ exports.getDashboardData = async (req, res) => {
                           UPPER(COALESCE(si.status, '')) = 'RECEIVED'
                           OR COALESCE(si.received_amount, 0) > 0
                       )
+                      ${dashboardSalesCardScope.receivedDateSql}
                 )::int AS received_installments
             FROM sales_transactions st
             LEFT JOIN users su ON su.id = st.agent_id
             LEFT JOIN sale_installments si ON si.sale_id = st.id
-            ${isEmployeeLogin ? 'WHERE st.agent_id = $1' : isDealerScopedView ? 'WHERE COALESCE(st.dealer_id, su.dealer_id) = $1' : ''}
+            ${dashboardSalesCardScope.whereSql}
             `,
-            isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
+            dashboardSalesCardScope.params
         ) : { rows: [{ cash_transactions: 0, installment_transactions: 0, received_installments: 0 }] };
 
         const installmentTaskMetricsResultPromise = wantsGroup('metrics') ? pool.query(
