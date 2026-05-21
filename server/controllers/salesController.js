@@ -1008,7 +1008,7 @@ exports.receiveInstallment = async (req, res) => {
 
         const saleBalanceResult = await client.query(
             `
-            SELECT financed_amount, vehicle_price, down_payment
+            SELECT financed_amount, vehicle_price, down_payment, monthly_installment
             FROM sales_transactions
             WHERE id = $1
             FOR UPDATE
@@ -1042,15 +1042,25 @@ exports.receiveInstallment = async (req, res) => {
         });
 
         if (pendingRows.length > 0 && remainingInstallmentBalance > 0) {
-            const remainingCents = Math.round(remainingInstallmentBalance * 100);
-            const baseCents = Math.floor(remainingCents / pendingRows.length);
-            let extraCents = remainingCents % pendingRows.length;
+            let runningRemaining = remainingInstallmentBalance;
+            const plannedMonthlyAmount = Math.max(roundMoney(saleBalanceRow.monthly_installment || 0), 0);
+            const fallbackMonthlyAmount = Math.max(...pendingRows.map((row) => Number(row.amount || 0)), 0);
+            const normalMonthlyAmount = plannedMonthlyAmount || fallbackMonthlyAmount || remainingInstallmentBalance;
 
             for (const row of pendingRows) {
-                const nextAmount = (baseCents + (extraCents > 0 ? 1 : 0)) / 100;
-                if (extraCents > 0) {
-                    extraCents -= 1;
+                if (runningRemaining <= 0) {
+                    await client.query(
+                        `
+                        DELETE FROM sale_installments
+                        WHERE id = $1
+                        `,
+                        [row.id]
+                    );
+                    continue;
                 }
+
+                const nextAmount = roundMoney(Math.min(normalMonthlyAmount, runningRemaining));
+                runningRemaining = roundMoney(runningRemaining - nextAmount);
 
                 await client.query(
                     `
