@@ -2167,6 +2167,40 @@
     grid-column: 1 / -1;
 }
 
+.sales-witness-group {
+    padding: 16px;
+    border: 1px solid rgba(34, 50, 76, 0.1);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.sales-witness-group-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(34, 50, 76, 0.08);
+}
+
+.sales-witness-group-header h4 {
+    margin: 0;
+    color: var(--dash-text);
+    font-size: 0.96rem;
+    font-weight: 800;
+}
+
+.sales-witness-group-header span {
+    color: var(--dash-text-soft);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.sales-witness-grid {
+    gap: 14px;
+}
+
 .notice-banner {
     margin-bottom: 16px;
     padding: 14px 16px;

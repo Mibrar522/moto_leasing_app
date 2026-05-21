@@ -216,16 +216,32 @@ if (!canCreateSales) {
                                             </label>
                                         </>
                                     )}
-                                    <label className="field" hidden={!canEditSalesField('Witness Name')}><span>Witness Name</span><input name="witness_name" value={saleForm.witness_name || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field" hidden={!canEditSalesField('Witness Father Name')}><span>Witness Father Name</span><input name="witness_father_name" value={saleForm.witness_father_name || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field" hidden={!canEditSalesField('Witness Mobile Number')}><span>Witness Mobile Number</span><input name="witness_mobile_number" value={saleForm.witness_mobile_number || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field" hidden={!canEditSalesField('Witness CNIC')}><span>Witness CNIC</span><input name="witness_cnic" value={saleForm.witness_cnic || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field full-span" hidden={!canEditSalesField('Witness Address')}><span>Witness Address</span><textarea rows="2" name="witness_address" value={saleForm.witness_address || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field" hidden={!canEditSalesField('Witness 2 Name')}><span>Witness 2 Name</span><input name="witness_two_name" value={saleForm.witness_two_name || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field" hidden={!canEditSalesField('Witness 2 Father Name')}><span>Witness 2 Father Name</span><input name="witness_two_father_name" value={saleForm.witness_two_father_name || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field" hidden={!canEditSalesField('Witness 2 Mobile Number')}><span>Witness 2 Mobile Number</span><input name="witness_two_mobile_number" value={saleForm.witness_two_mobile_number || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field" hidden={!canEditSalesField('Witness 2 CNIC')}><span>Witness 2 CNIC</span><input name="witness_two_cnic" value={saleForm.witness_two_cnic || ''} onChange={handleSaleChange} /></label>
-                                    <label className="field full-span" hidden={!canEditSalesField('Witness 2 Address')}><span>Witness 2 Address</span><textarea rows="2" name="witness_two_address" value={saleForm.witness_two_address || ''} onChange={handleSaleChange} /></label>
+                                    <div className="sales-witness-group full-span" hidden={!canEditSalesField('Witness 1 Data')}>
+                                        <div className="sales-witness-group-header">
+                                            <h4>Witness 1 Data</h4>
+                                            <span>Required witness details</span>
+                                        </div>
+                                        <div className="form-grid sales-witness-grid">
+                                            <label className="field"><span>Name</span><input name="witness_name" value={saleForm.witness_name || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field"><span>Father Name</span><input name="witness_father_name" value={saleForm.witness_father_name || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field"><span>CNIC</span><input name="witness_cnic" value={saleForm.witness_cnic || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field"><span>Mobile Number</span><input name="witness_mobile_number" value={saleForm.witness_mobile_number || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field full-span"><span>Address</span><textarea rows="2" name="witness_address" value={saleForm.witness_address || ''} onChange={handleSaleChange} /></label>
+                                        </div>
+                                    </div>
+                                    <div className="sales-witness-group full-span" hidden={!canEditSalesField('Witness 2 Data')}>
+                                        <div className="sales-witness-group-header">
+                                            <h4>Witness 2 Data</h4>
+                                            <span>Optional witness details</span>
+                                        </div>
+                                        <div className="form-grid sales-witness-grid">
+                                            <label className="field"><span>Name</span><input name="witness_two_name" value={saleForm.witness_two_name || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field"><span>Father Name</span><input name="witness_two_father_name" value={saleForm.witness_two_father_name || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field"><span>CNIC</span><input name="witness_two_cnic" value={saleForm.witness_two_cnic || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field"><span>Mobile Number</span><input name="witness_two_mobile_number" value={saleForm.witness_two_mobile_number || ''} onChange={handleSaleChange} /></label>
+                                            <label className="field full-span"><span>Address</span><textarea rows="2" name="witness_two_address" value={saleForm.witness_two_address || ''} onChange={handleSaleChange} /></label>
+                                        </div>
+                                    </div>
                                     <label className="field full-span" hidden={!canEditSalesField('Agreement PDF')}><span>Agreement PDF</span><input type="file" accept="application/pdf" onChange={handleAgreementUpload} /></label>
                                     <label className="field full-span" hidden={!canEditSalesField('Dealer Signature Upload')}><span>Dealer Signature Upload</span><input type="file" accept="image/*" onChange={handleSaleDealerSignatureUpload} disabled={saleFormReadOnly || savingSale} /></label>
                                     <label className="field full-span" hidden={!canEditSalesField('Authorized Signature Upload')}><span>Authorized Signature Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleDocumentUpload(event, 'authorized_signature_url', 'Authorized signature', setUploadingSaleAuthorizedSignature)} disabled={saleFormReadOnly || savingSale} /></label>

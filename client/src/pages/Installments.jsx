@@ -48,11 +48,19 @@ if (!canManageInstallments) {
                             <div className="installment-hero">
                                 <div className="installment-hero-image-wrap">
                                     {selectedInstallmentImageUrl ? (
-                                        <img
-                                            src={selectedInstallmentImageUrl}
-                                            alt={`${selectedInstallmentSale.brand} ${selectedInstallmentSale.model}`}
-                                            className="installment-hero-image"
-                                        />
+                                        <>
+                                            <img
+                                                src={selectedInstallmentImageUrl}
+                                                alt={`${selectedInstallmentSale.brand} ${selectedInstallmentSale.model}`}
+                                                className="installment-hero-image"
+                                                onError={(event) => {
+                                                    event.currentTarget.hidden = true;
+                                                    const fallback = event.currentTarget.nextElementSibling;
+                                                    if (fallback) fallback.hidden = false;
+                                                }}
+                                            />
+                                            <div className="installment-hero-image fallback" hidden>Vehicle image not available</div>
+                                        </>
                                     ) : (
                                         <div className="installment-hero-image fallback">No vehicle image</div>
                                     )}

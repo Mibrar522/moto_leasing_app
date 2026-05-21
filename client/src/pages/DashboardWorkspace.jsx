@@ -304,16 +304,8 @@ const SALES_FIELD_ACCESS = [
     ['FEAT_SALES_FIELD_DOWN_PAYMENT', 'Down Payment'],
     ['FEAT_SALES_FIELD_MONTHLY_INSTALLMENT', 'Monthly Installment'],
     ['FEAT_SALES_FIELD_INSTALLMENT_METHOD', 'Installment Method (Dropdown)'],
-    ['FEAT_SALES_FIELD_WITNESS_NAME', 'Witness Name'],
-    ['FEAT_SALES_FIELD_WITNESS_FATHER_NAME', 'Witness Father Name'],
-    ['FEAT_SALES_FIELD_WITNESS_MOBILE_NUMBER', 'Witness Mobile Number'],
-    ['FEAT_SALES_FIELD_WITNESS_CNIC', 'Witness CNIC'],
-    ['FEAT_SALES_FIELD_WITNESS_ADDRESS', 'Witness Address'],
-    ['FEAT_SALES_FIELD_WITNESS_2_NAME', 'Witness 2 Name'],
-    ['FEAT_SALES_FIELD_WITNESS_2_FATHER_NAME', 'Witness 2 Father Name'],
-    ['FEAT_SALES_FIELD_WITNESS_2_MOBILE_NUMBER', 'Witness 2 Mobile Number'],
-    ['FEAT_SALES_FIELD_WITNESS_2_CNIC', 'Witness 2 CNIC'],
-    ['FEAT_SALES_FIELD_WITNESS_2_ADDRESS', 'Witness 2 Address'],
+    ['FEAT_SALES_FIELD_WITNESS_NAME', 'Witness 1 Data'],
+    ['FEAT_SALES_FIELD_WITNESS_2_NAME', 'Witness 2 Data'],
     ['FEAT_SALES_FIELD_AGREEMENT_PDF', 'Agreement PDF'],
     ['FEAT_SALES_FIELD_DEALER_SIGNATURE_UPLOAD', 'Dealer Signature Upload'],
     ['FEAT_SALES_FIELD_AUTHORIZED_SIGNATURE_UPLOAD', 'Authorized Signature Upload'],
@@ -7341,7 +7333,7 @@ const selectedCustomer = useMemo(
                     </div>
                 </div>
                 <div class="hero">
-                    ${selectedInstallmentImageUrl ? `<img src="${escapeHtml(selectedInstallmentImageUrl)}" alt="Vehicle" />` : `<div class="fallback">No vehicle image</div>`}
+                    ${selectedInstallmentImageUrl ? `<img src="${escapeHtml(selectedInstallmentImageUrl)}" alt="Vehicle" onerror="this.replaceWith(Object.assign(document.createElement('div'), { className: 'fallback', textContent: 'Vehicle image not available' }))" />` : `<div class="fallback">No vehicle image</div>`}
                     <div class="grid">
 
                         <div><span class="label">Customer</span><div class="value">${escapeHtml(selectedInstallmentSale.customer_name)}</div></div>
@@ -7452,7 +7444,7 @@ const selectedCustomer = useMemo(
                     </div>
                 </div>
                 <div class="hero">
-                    ${printContext.imageUrl ? `<img src="${escapeHtml(printContext.imageUrl)}" alt="Vehicle" />` : `<div class="fallback">No vehicle image</div>`}
+                    ${printContext.imageUrl ? `<img src="${escapeHtml(printContext.imageUrl)}" alt="Vehicle" onerror="this.replaceWith(Object.assign(document.createElement('div'), { className: 'fallback', textContent: 'Vehicle image not available' }))" />` : `<div class="fallback">No vehicle image</div>`}
                     <div class="grid">
                         <div><span class="label">Customer</span><div class="value">${escapeHtml(sale.customer_name || 'Not set')}</div></div>
                         <div><span class="label">Customer CNIC</span><div class="value">${escapeHtml(sale.cnic_passport_number || 'Not set')}</div></div>
@@ -8140,7 +8132,7 @@ const selectedCustomer = useMemo(
                     </div>
                 </div>
                 <div class="hero">
-                    ${selectedInstallmentImageUrl ? `<img src="${escapeHtml(selectedInstallmentImageUrl)}" alt="Vehicle" />` : `<div class="fallback">No vehicle image</div>`}
+                    ${selectedInstallmentImageUrl ? `<img src="${escapeHtml(selectedInstallmentImageUrl)}" alt="Vehicle" onerror="this.replaceWith(Object.assign(document.createElement('div'), { className: 'fallback', textContent: 'Vehicle image not available' }))" />` : `<div class="fallback">No vehicle image</div>`}
                     <div class="grid">
 
                         <div><span class="label">Customer</span><div class="value">${escapeHtml(selectedInstallmentSale.customer_name)}</div></div>
