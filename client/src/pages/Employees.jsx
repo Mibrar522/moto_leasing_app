@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function Employees({ ctx }) {
   const {
     advanceForm,
@@ -52,6 +54,9 @@ export default function Employees({ ctx }) {
     uploadingEmployeeDocument,
     user,
   } = ctx;
+
+  const [employeeRegisterOpen, setEmployeeRegisterOpen] = useState(false);
+  const employeeRegisterRows = employeeRegisterOpen ? filteredEmployees : filteredEmployees.slice(0, 5);
 
 if (!canManageEmployees) {
                     return <div className="feedback-card error">Only the super admin can manage employee user accounts.</div>;
@@ -298,7 +303,7 @@ if (!canManageEmployees) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filteredEmployees.map((employee) => (
+                                        {employeeRegisterRows.map((employee) => (
                                             <tr key={employee.id}>
                                                 <td>{employee.employee_code}</td>
                                                 <td>

@@ -43,6 +43,9 @@ export default function Products({
   buildAssetUrl,
   handleEditProduct,
 }) {
+  const [productRegisterOpen, setProductRegisterOpen] = useState(false);
+  const productRegisterRows = productRegisterOpen ? filteredInventory : filteredInventory.slice(0, 5);
+
   if (!canManageProducts) {
     return <div className="feedback-card error">Your account does not have product management access.</div>;
   }
@@ -137,7 +140,7 @@ export default function Products({
               </tr>
             </thead>
             <tbody>
-              {filteredInventory.map((vehicle) => (
+              {productRegisterRows.map((vehicle) => (
                 <tr key={vehicle.id}>
                   <td>
                     <ProductImage

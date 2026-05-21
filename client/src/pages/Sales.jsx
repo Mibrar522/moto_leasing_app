@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function Sales({ ctx }) {
   const {
     actualVehiclePrice,
@@ -64,6 +66,9 @@ export default function Sales({ ctx }) {
     uploadingSaleMiscDocument,
     user,
   } = ctx;
+
+  const [salesRegisterOpen, setSalesRegisterOpen] = useState(false);
+  const salesRegisterRows = salesRegisterOpen ? dashboardData.salesTransactions : dashboardData.salesTransactions.slice(0, 5);
 
 if (!canCreateSales) {
                     return <div className="feedback-card error">Your account does not have sales access.</div>;
@@ -423,7 +428,7 @@ if (!canCreateSales) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {dashboardData.salesTransactions.map((sale) => {
+                                            {salesRegisterRows.map((sale) => {
                                                 const summary = summarizeSaleInstallments(sale);
                                                 const isInstallmentSale = String(sale.sale_mode || '').toUpperCase() === 'INSTALLMENT';
                                                 const hasReceivedInstallment = isInstallmentSale && summary.actualReceivedCount > 0;

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function CompanyProfile({
   canManageStock,
   canViewCompanyForm,
@@ -13,6 +15,10 @@ export default function CompanyProfile({
   handleEditCompany,
   handleDeleteCompany,
 }) {
+  const [companyRegisterOpen, setCompanyRegisterOpen] = useState(false);
+  const companyRows = dashboardData.companies || [];
+  const companyRegisterRows = companyRegisterOpen ? companyRows : companyRows.slice(0, 5);
+
   if (!canManageStock) {
     return <div className="feedback-card error">Your account does not have company profile access.</div>;
   }
@@ -53,7 +59,7 @@ export default function CompanyProfile({
             <h3>Company Directory</h3>
             <span className="section-caption">{(dashboardData.companies || []).length} active companies</span>
           </div>
-          {(dashboardData.companies || []).length === 0 ? renderEmptyState('No company profiles created yet.') : (
+          {companyRows.length === 0 ? renderEmptyState('No company profiles created yet.') : (
             <table className="pro-table">
               <thead>
                 <tr>
@@ -64,7 +70,7 @@ export default function CompanyProfile({
                 </tr>
               </thead>
               <tbody>
-                {(dashboardData.companies || []).map((company) => (
+                {companyRegisterRows.map((company) => (
                   <tr key={company.id}>
                     <td>{company.company_name}<br />{company.contact_person || 'No contact person'}</td>
                     <td>{company.company_email || 'No email'}<br />{company.phone || 'No phone'}</td>

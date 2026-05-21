@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function Stock({
   canManageStock,
   canViewStockOrderForm,
@@ -26,6 +28,11 @@ export default function Stock({
   handleDeleteStockOrder,
   resetStockOrderForm,
 }) {
+  const [receivedRegisterOpen, setReceivedRegisterOpen] = useState(false);
+  const [stockRegisterOpen, setStockRegisterOpen] = useState(false);
+  const receivedRegisterRows = receivedRegisterOpen ? receivedStockOrders : receivedStockOrders.slice(0, 5);
+  const stockRegisterRows = stockRegisterOpen ? pendingStockOrders : pendingStockOrders.slice(0, 5);
+
   const getStockEmailStatus = (order) => {
     if (order.email_sent) {
       return 'Sent';
@@ -125,7 +132,7 @@ export default function Stock({
                 </tr>
               </thead>
               <tbody>
-                {receivedStockOrders.map((order) => (
+                {receivedRegisterRows.map((order) => (
                   <tr key={order.id}>
                     <td>{order.company_name}</td>
                     <td>{order.brand} {order.model}<br />{order.vehicle_type}{order.product_color ? ` / ${order.product_color}` : ''}<br />{order.product_description || 'No description'}</td>
@@ -171,7 +178,7 @@ export default function Stock({
               </tr>
             </thead>
             <tbody>
-              {pendingStockOrders.map((order) => (
+              {stockRegisterRows.map((order) => (
                 <tr key={order.id}>
                     <td>{order.company_name}<br />{order.company_email || 'No email'}</td>
                   <td>{order.brand} {order.model}<br />{order.vehicle_type}{order.product_color ? ` / ${order.product_color}` : ''}<br />{order.product_description || 'No description'}</td>

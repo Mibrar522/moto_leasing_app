@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function Customers({ ctx }) {
   const {
     buildAssetUrl,
@@ -42,6 +44,9 @@ export default function Customers({ ctx }) {
     uploadingCustomerAsset,
     user,
   } = ctx;
+
+  const [customerRegisterOpen, setCustomerRegisterOpen] = useState(false);
+  const customerRegisterRows = customerRegisterOpen ? filteredCustomers : filteredCustomers.slice(0, 5);
 
   const getCustomerCreatedByLabel = (customer = {}) => {
     const isCurrentUserCreator =
@@ -411,7 +416,7 @@ if (!canOpenCustomers) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filteredCustomers.map((customer) => {
+                                        {customerRegisterRows.map((customer) => {
                                             const ocrDetails = customer.ocr_details || {};
                                             const fingerprint = ocrDetails.fingerprint || {};
 
