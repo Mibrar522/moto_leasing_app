@@ -406,6 +406,7 @@ exports.getDashboardData = async (req, res) => {
         const requestedGroups = new Set([
             ...(dashboardGroupsByPage[requestedPage] || dashboardGroupsByPage.dashboard),
         ]);
+        const salesTransactionsLimit = shouldLoadReportPreview && requestedPage.startsWith('report-') ? 5000 : 300;
         const wantsGroup = (groupKey) => requestedGroups.has(groupKey);
         const dealerScopeColumnsReady = await ensureDashboardDealerScopeColumns(
             wantsGroup('products'),
@@ -425,7 +426,7 @@ exports.getDashboardData = async (req, res) => {
                 clauses.push(`st.agent_id = $${params.length}`);
             } else if (isDealerScopedView) {
                 params.push(effectiveDealerId);
-                clauses.push(`COALESCE(st.dealer_id, su.dealer_id) = $${params.length}`);
+                clauses.push(`COALESCE(st.dealer_id, c.dealer_id, v.dealer_id, su.dealer_id) = $${params.length}`);
             }
 
             if (dashboardDateFrom) {
@@ -454,7 +455,7 @@ exports.getDashboardData = async (req, res) => {
                 clauses.push(`st.agent_id = $${params.length}`);
             } else if (isDealerScopedView) {
                 params.push(effectiveDealerId);
-                clauses.push(`COALESCE(st.dealer_id, su.dealer_id) = $${params.length}`);
+                clauses.push(`COALESCE(st.dealer_id, c.dealer_id, v.dealer_id, su.dealer_id) = $${params.length}`);
             }
 
             if (dashboardDateFrom) {
@@ -527,10 +528,12 @@ exports.getDashboardData = async (req, res) => {
                     COUNT(*) FILTER (WHERE UPPER(COALESCE(si.status, '')) <> 'RECEIVED')::int AS pending_installment_count
                 FROM sales_transactions st
                 LEFT JOIN users su ON su.id = st.agent_id
+                LEFT JOIN customers c ON c.id = st.customer_id
+                LEFT JOIN vehicles v ON v.id = st.vehicle_id
                 LEFT JOIN sale_installments si ON si.sale_id = st.id
                 WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
                   AND UPPER(COALESCE(st.approval_status, 'APPROVED')) = 'APPROVED'
-                  ${isEmployeeLogin ? 'AND st.agent_id = $1' : isDealerScopedView ? 'AND COALESCE(st.dealer_id, su.dealer_id) = $1' : ''}
+                  ${isEmployeeLogin ? 'AND st.agent_id = $1' : isDealerScopedView ? 'AND COALESCE(st.dealer_id, c.dealer_id, v.dealer_id, su.dealer_id) = $1' : ''}
                 GROUP BY st.id
             ) AS installment_sales
             `,
@@ -551,6 +554,8 @@ exports.getDashboardData = async (req, res) => {
                 COALESCE(SUM(vehicle_price), 0)::numeric AS total_sales_revenue
             FROM sales_transactions st
             LEFT JOIN users su ON su.id = st.agent_id
+            LEFT JOIN customers c ON c.id = st.customer_id
+            LEFT JOIN vehicles v ON v.id = st.vehicle_id
             ${dashboardSalesMetricScope.whereSql}
             `,
             dashboardSalesMetricScope.params
@@ -577,6 +582,8 @@ exports.getDashboardData = async (req, res) => {
                 )::int AS received_installments
             FROM sales_transactions st
             LEFT JOIN users su ON su.id = st.agent_id
+            LEFT JOIN customers c ON c.id = st.customer_id
+            LEFT JOIN vehicles v ON v.id = st.vehicle_id
             LEFT JOIN sale_installments si ON si.sale_id = st.id
             ${dashboardSalesCardScope.whereSql}
             `,
@@ -590,8 +597,10 @@ exports.getDashboardData = async (req, res) => {
             FROM sale_installments si
             JOIN sales_transactions st ON st.id = si.sale_id
             LEFT JOIN users stu ON stu.id = st.agent_id
+            LEFT JOIN customers c ON c.id = st.customer_id
+            LEFT JOIN vehicles v ON v.id = st.vehicle_id
             WHERE UPPER(COALESCE(si.status, '')) <> 'RECEIVED'
-            ${isEmployeeLogin ? 'AND st.agent_id = $1' : isDealerScopedView ? 'AND COALESCE(st.dealer_id, stu.dealer_id) = $1' : ''}
+            ${isEmployeeLogin ? 'AND st.agent_id = $1' : isDealerScopedView ? 'AND COALESCE(st.dealer_id, c.dealer_id, v.dealer_id, stu.dealer_id) = $1' : ''}
             `,
             isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
         ) : { rows: [{ pending_installments: 0 }] };
@@ -1417,9 +1426,9 @@ exports.getDashboardData = async (req, res) => {
                 JOIN customers c ON c.id = st.customer_id
                 JOIN vehicles v ON v.id = st.vehicle_id
                 JOIN users u ON u.id = st.agent_id
-                LEFT JOIN dealers d ON d.id = COALESCE(st.dealer_id, c.dealer_id, u.dealer_id)
+                LEFT JOIN dealers d ON d.id = COALESCE(st.dealer_id, c.dealer_id, v.dealer_id, u.dealer_id)
                 LEFT JOIN sale_installments si ON si.sale_id = st.id
-                ${isEmployeeLogin ? 'WHERE st.agent_id = $1' : isDealerScopedView ? 'WHERE COALESCE(st.dealer_id, c.dealer_id, u.dealer_id) = $1' : ''}
+                ${isEmployeeLogin ? 'WHERE st.agent_id = $1' : isDealerScopedView ? 'WHERE COALESCE(st.dealer_id, c.dealer_id, v.dealer_id, u.dealer_id) = $1' : ''}
                 GROUP BY
                     st.id,
                     st.customer_id,
@@ -1477,7 +1486,7 @@ exports.getDashboardData = async (req, res) => {
                     d.dealer_code,
                     d.dealer_signature_url
                 ORDER BY st.created_at DESC
-                LIMIT 300
+                LIMIT ${salesTransactionsLimit}
                 `,
                 isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
                 ),

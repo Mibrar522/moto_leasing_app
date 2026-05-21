@@ -81,8 +81,10 @@ exports.protect = async (req, res, next) => {
         );
 
         const row = access.rows[0] || {};
-        req.user.dealer_id = row.dealer_id || null;
-        req.user.effective_dealer_id = row.dealer_id || null;
+        const switchedDealerId = req.user.switched_profile ? (req.user.effective_dealer_id || req.user.dealer_id || null) : null;
+        const resolvedDealerId = switchedDealerId || row.dealer_id || null;
+        req.user.dealer_id = resolvedDealerId;
+        req.user.effective_dealer_id = resolvedDealerId;
         req.user.base_dealer_id = row.dealer_id || null;
         req.user.role_id = row.role_id != null ? Number(row.role_id) : req.user.role_id;
         req.user.role_name = row.role_name || req.user.role_name;
