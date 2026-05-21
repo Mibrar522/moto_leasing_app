@@ -1105,8 +1105,17 @@ const getAccessFeatureLabel = (feature) => {
     return FEATURE_ACCESS_LABELS[featureKey] || feature?.display_name || featureKey;
 };
 
-const isPreviewableImage = (value) => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(String(value || ''));
-const isPreviewablePdf = (value) => /\.pdf$/i.test(String(value || ''));
+const getPreviewExtensionSource = (value) => String(value || '').split(/[?#]/)[0];
+const isPreviewableImage = (value) => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(getPreviewExtensionSource(value));
+const isPreviewablePdf = (value) => /\.pdf$/i.test(getPreviewExtensionSource(value));
+const showAssetPreviewFallback = (event) => {
+    const element = event.currentTarget;
+    element.hidden = true;
+    const fallback = element.nextElementSibling;
+    if (fallback) {
+        fallback.hidden = false;
+    }
+};
 const renderAssetPreview = (assetUrl, emptyMessage, label) => {
     const normalizedAssetPath = normalizePreviewAssetPath(assetUrl);
 
@@ -1116,11 +1125,15 @@ const renderAssetPreview = (assetUrl, emptyMessage, label) => {
 
     if (isPreviewableImage(normalizedAssetPath)) {
         return (
-            <img
-                src={buildAssetUrl(normalizedAssetPath)}
-                alt={label}
-                className="employee-document-image"
-            />
+            <>
+                <img
+                    src={buildAssetUrl(normalizedAssetPath)}
+                    alt={label}
+                    className="employee-document-image"
+                    onError={showAssetPreviewFallback}
+                />
+                <div className="employee-document-empty" hidden>{emptyMessage}</div>
+            </>
         );
     }
 
