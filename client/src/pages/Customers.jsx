@@ -245,20 +245,20 @@ if (!canOpenCustomers) {
                                     {showCustomerPassportPhoto ? (
                                     <>
                                     <label className="field">
-                                        <span>Passport Size Photo</span>
+                                        <span>Customer Photo</span>
                                         <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'passport_photo_url', 'Passport size photo', 'PASSPORT_PHOTO')} disabled={uploadingCustomerAsset} />
                                     </label>
                                     <div className="field full-span">
-                                        <span className="meta-label">Passport Photo Preview</span>
+                                        <span className="meta-label">Customer Photo Preview</span>
                                         <div className="employee-document-preview">
                                             {customerForm.passport_photo_url ? (
                                                 <img
                                                     src={buildAssetUrl(customerForm.passport_photo_url)}
-                                                    alt="Customer passport size"
+                                                    alt="Customer photo"
                                                     className="employee-document-image"
                                                 />
                                             ) : (
-                                                <div className="employee-document-empty">No passport photo uploaded</div>
+                                                <div className="employee-document-empty">No customer photo uploaded</div>
                                             )}
                                         </div>
                                     </div>

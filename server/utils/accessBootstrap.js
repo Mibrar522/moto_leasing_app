@@ -27,7 +27,7 @@ const CUSTOMER_FIELD_ACCESS = [
     ['FEAT_CUSTOMER_FIELD_BIOMETRIC_HASH', 'Customers Field: Biometric Hash'],
     ['FEAT_CUSTOMER_FIELD_THUMB_UPLOAD', 'Customers Field: Thumb Upload'],
     ['FEAT_CUSTOMER_FIELD_SIGNATURE_UPLOAD', 'Customers Field: Signature Upload'],
-    ['FEAT_CUSTOMER_FIELD_PASSPORT_PHOTO', 'Customers Field: Passport Size Photo'],
+    ['FEAT_CUSTOMER_FIELD_PASSPORT_PHOTO', 'Customers Field: Customer Photo'],
 ];
 
 const SALES_FIELD_ACCESS = [

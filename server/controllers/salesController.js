@@ -113,6 +113,31 @@ const isScopedDealerMatch = (scope, dealerId) => {
     return String(dealerId || '') === String(scope.effectiveDealerId || '');
 };
 
+const parseJsonObject = (value) => {
+    if (!value || Array.isArray(value)) {
+        return {};
+    }
+
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+        } catch (_) {
+            return {};
+        }
+    }
+
+    return typeof value === 'object' ? value : {};
+};
+
+const getCustomerBackCnicUrl = (customer = {}) => {
+    const ocrDetails = parseJsonObject(customer.ocr_details);
+    return ocrDetails.identity_doc_back_url
+        || ocrDetails.identity_doc_back
+        || ocrDetails.cnic_back_url
+        || customer.identity_doc_back_url
+        || '';
+};
 const getCustomerDealerId = async (client, customerId) => {
     const result = await client.query(
         `

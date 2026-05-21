@@ -283,7 +283,7 @@ const CUSTOMER_FIELD_ACCESS = [
     ['FEAT_CUSTOMER_FIELD_BIOMETRIC_HASH', 'Biometric Hash'],
     ['FEAT_CUSTOMER_FIELD_THUMB_UPLOAD', 'Thumb Upload'],
     ['FEAT_CUSTOMER_FIELD_SIGNATURE_UPLOAD', 'Signature Upload'],
-    ['FEAT_CUSTOMER_FIELD_PASSPORT_PHOTO', 'Passport Size Photo'],
+    ['FEAT_CUSTOMER_FIELD_PASSPORT_PHOTO', 'Customer Photo'],
 ];
 
 const SALES_FIELD_ACCESS = [
@@ -8503,8 +8503,8 @@ const selectedCustomer = useMemo(
                         </div>
                     </div>
                     <div>
-                        <span className="meta-label">Passport Photo</span>
-                        {ocrDetails.passport_photo_url ? <img src={buildAssetUrl(ocrDetails.passport_photo_url)} alt="Customer passport size" className="product-thumb" /> : <p className="meta-value">Not uploaded</p>}
+                        <span className="meta-label">Customer Photo</span>
+                        {ocrDetails.passport_photo_url ? <img src={buildAssetUrl(ocrDetails.passport_photo_url)} alt="Customer photo" className="product-thumb" /> : <p className="meta-value">Not uploaded</p>}
                     </div>
                     <div>
                         <span className="meta-label">Thumb Preview</span>
