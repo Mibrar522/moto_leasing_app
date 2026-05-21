@@ -105,6 +105,12 @@ if (!canCreateSales) {
                                             ))}
                                         </select>
                                     </label>
+                                    <div className="field full-span" hidden={!canEditSalesField('Customer')}>
+                                        <span className="meta-label">Selected Customer Photo</span>
+                                        <div className="employee-document-preview">
+                                            {renderAssetPreview(selectedSaleCustomerPassportPhotoUrl, 'Select a customer with passport size photo.', 'Selected Customer Photo')}
+                                        </div>
+                                    </div>
                                     <label className="field" hidden={!canEditSalesField('Available Stock')}>
                                         <span>Available Stock</span>
                                         <span className="field-hint">

@@ -764,6 +764,7 @@ exports.getDashboardData = async (req, res) => {
                     c.full_name,
                     c.cnic_passport_number,
                     c.ocr_details,
+                    c.ocr_details->>'passport_photo_url' AS passport_photo_url,
                     c.biometric_hash,
                     c.identity_doc_url,
                     c.created_by_agent,
