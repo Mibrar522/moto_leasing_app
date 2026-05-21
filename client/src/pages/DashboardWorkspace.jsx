@@ -6210,7 +6210,7 @@ const selectedCustomer = useMemo(
 
         try {
             setUploadingState(true);
-            const uploadFile = options.cropCnic ? await cropCnicDocumentImage(file, options.cropSide) : file;
+            const uploadFile = options.cropCnic ? await cropCnicDocumentImage(file, options.cropSide, options.cropSettings) : file;
             const formData = new FormData();
             formData.append('document', uploadFile);
 
@@ -6346,7 +6346,7 @@ const selectedCustomer = useMemo(
     };
 
 
-    const cropCnicDocumentImage = async (file, side = 'front') => {
+    const cropCnicDocumentImage = async (file, side = 'front', settings = {}) => {
         if (!String(file?.type || '').startsWith('image/')) {
             return file;
         }
@@ -6361,10 +6361,20 @@ const selectedCustomer = useMemo(
                 img.src = objectUrl;
             });
 
-            const cropWidth = Math.round(image.width * 0.9);
-            const cropHeight = Math.round(image.height * 0.84);
-            const cropX = Math.max(0, Math.round((image.width - cropWidth) / 2));
-            const cropY = Math.max(0, Math.round(image.height * (String(side).toLowerCase().includes('back') ? 0.08 : 0.09)));
+            const zoom = Math.min(Math.max(Number(settings.zoom || 1.05), 1), 2.5);
+            const widthPercent = Math.min(Math.max(Number(settings.width ?? 92), 45), 100) / 100;
+            const heightPercent = Math.min(Math.max(Number(settings.height ?? 86), 35), 100) / 100;
+            const maxCropWidth = Math.max(1, Math.round(image.width * widthPercent));
+            const maxCropHeight = Math.max(1, Math.round(image.height * heightPercent));
+            const cropWidth = Math.max(1, Math.round(maxCropWidth / zoom));
+            const cropHeight = Math.max(1, Math.round(maxCropHeight / zoom));
+            const maxX = Math.max(0, image.width - cropWidth);
+            const maxY = Math.max(0, image.height - cropHeight);
+            const defaultY = String(side).toLowerCase().includes('back') ? 52 : 50;
+            const xPercent = Math.min(Math.max(Number(settings.x ?? 50), 0), 100) / 100;
+            const yPercent = Math.min(Math.max(Number(settings.y ?? defaultY), 0), 100) / 100;
+            const cropX = Math.round(maxX * xPercent);
+            const cropY = Math.round(maxY * yPercent);
 
             const canvas = document.createElement('canvas');
             canvas.width = cropWidth;
@@ -6563,7 +6573,7 @@ const selectedCustomer = useMemo(
             const passportCropEnabled = Boolean(options.cropPassportPhoto) && assetType === 'PASSPORT_PHOTO';
             const uploadFile = passportCropEnabled
                 ? await cropPassportPhotoImage(file, options.cropSettings)
-                : (cropEnabled ? await cropCnicDocumentImage(file, assetType) : file);
+                : (cropEnabled ? await cropCnicDocumentImage(file, assetType, options.cropSettings) : file);
             const uploadAssetType = assetType === 'CNIC_BACK' ? 'CNIC_BACK_ORIGINAL' : assetType;
             const data = await uploadCustomerAssetFile(uploadFile, uploadAssetType);
             let ocrData = data;
@@ -6646,7 +6656,9 @@ const selectedCustomer = useMemo(
                     targetLabel: successLabel,
                     assetType,
                     side: assetType === 'CNIC_BACK' ? 'back' : 'front',
-                    cropSettings: assetType === 'PASSPORT_PHOTO' ? { x: 50, y: 45, zoom: 1.15 } : undefined,
+                    cropSettings: assetType === 'PASSPORT_PHOTO'
+                        ? { x: 50, y: 45, zoom: 1.15 }
+                        : ((assetType === 'CNIC_FRONT' || assetType === 'CNIC_BACK') ? { x: 50, y: assetType === 'CNIC_BACK' ? 52 : 50, zoom: 1.05, width: 92, height: 86 } : undefined),
                 });
                 return;
             }
@@ -6705,13 +6717,13 @@ const selectedCustomer = useMemo(
                     pending.targetField,
                     pending.targetLabel,
                     pending.side === 'back' ? setUploadingSaleCnicBack : setUploadingSaleCnicFront,
-                    { cropCnic: shouldCrop, cropSide: pending.side }
+                    { cropCnic: shouldCrop, cropSide: pending.side, cropSettings: pending.cropSettings }
                 );
             } else if (pending.source === 'employee') {
                 await uploadEmployeeDocumentFile(
                     pending.file,
                     pending.targetField,
-                    { cropCnic: shouldCrop, cropSide: pending.side }
+                    { cropCnic: shouldCrop, cropSide: pending.side, cropSettings: pending.cropSettings }
                 );
             } else {
                 await uploadCustomerAssetFromFile(
@@ -6736,7 +6748,7 @@ const selectedCustomer = useMemo(
 
         try {
             setUploadingEmployeeDocument(true);
-            const uploadFile = options.cropCnic ? await cropCnicDocumentImage(file, options.cropSide) : file;
+            const uploadFile = options.cropCnic ? await cropCnicDocumentImage(file, options.cropSide, options.cropSettings) : file;
             const formData = new FormData();
             formData.append('employeeDocument', uploadFile);
             const { data } = await API.post('/employees/upload-cnic', formData, {
@@ -9522,7 +9534,7 @@ const selectedCustomer = useMemo(
                                 <iframe src={cnicUploadPreview.previewUrl} title="Upload preview" className="cnic-preview-frame" />
                             )}
                         </div>
-                        {cnicUploadPreview.assetType === 'PASSPORT_PHOTO' && cnicUploadPreview.isImage ? (
+                        {['CNIC_FRONT', 'CNIC_BACK', 'PASSPORT_PHOTO'].includes(cnicUploadPreview.assetType) && cnicUploadPreview.isImage ? (
                             <div className="form-grid compact-grid spaced-top">
                                 <label className="field">
                                     <span>Crop Left / Right</span>
@@ -9530,12 +9542,24 @@ const selectedCustomer = useMemo(
                                 </label>
                                 <label className="field">
                                     <span>Crop Up / Down</span>
-                                    <input type="range" min="0" max="100" value={cnicUploadPreview.cropSettings?.y ?? 45} onChange={(event) => updatePassportCropSetting('y', event.target.value)} />
+                                    <input type="range" min="0" max="100" value={cnicUploadPreview.cropSettings?.y ?? (cnicUploadPreview.assetType === 'CNIC_BACK' ? 52 : 50)} onChange={(event) => updatePassportCropSetting('y', event.target.value)} />
                                 </label>
                                 <label className="field">
                                     <span>Crop Zoom</span>
-                                    <input type="range" min="1" max="2.5" step="0.05" value={cnicUploadPreview.cropSettings?.zoom ?? 1.15} onChange={(event) => updatePassportCropSetting('zoom', event.target.value)} />
+                                    <input type="range" min="1" max="2.5" step="0.05" value={cnicUploadPreview.cropSettings?.zoom ?? (cnicUploadPreview.assetType === 'PASSPORT_PHOTO' ? 1.15 : 1.05)} onChange={(event) => updatePassportCropSetting('zoom', event.target.value)} />
                                 </label>
+                                {cnicUploadPreview.assetType === 'CNIC_FRONT' || cnicUploadPreview.assetType === 'CNIC_BACK' ? (
+                                    <>
+                                        <label className="field">
+                                            <span>Crop Width</span>
+                                            <input type="range" min="45" max="100" value={cnicUploadPreview.cropSettings?.width ?? 92} onChange={(event) => updatePassportCropSetting('width', event.target.value)} />
+                                        </label>
+                                        <label className="field">
+                                            <span>Crop Height</span>
+                                            <input type="range" min="35" max="100" value={cnicUploadPreview.cropSettings?.height ?? 86} onChange={(event) => updatePassportCropSetting('height', event.target.value)} />
+                                        </label>
+                                    </>
+                                ) : null}
                             </div>
                         ) : null}
                         <div className="cnic-preview-actions">

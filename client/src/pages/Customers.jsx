@@ -72,7 +72,7 @@ export default function Customers({ ctx }) {
   const showCustomerBiometricHash = canEditCustomerFingerprintFields && canEditCustomerField('Biometric Hash');
   const showCustomerThumbUpload = canEditCustomerFingerprintFields && canEditCustomerField('Thumb Upload');
   const showCustomerSignatureUpload = canEditCustomerField('Signature Upload');
-  const showCustomerPassportPhoto = canEditCustomerField('Passport Size Photo');
+  const showCustomerPassportPhoto = canEditCustomerField('Passport Size Photo') || showCustomerCnicFront || showCustomerCnicBack;
 
 if (!canOpenCustomers) {
                     return <div className="feedback-card error">Your account does not have customer onboarding access.</div>;
