@@ -22,6 +22,7 @@ export default function Installments({ ctx }) {
     saleMessage,
     selectedInstallmentAuthorizedSignaturePath,
     selectedInstallmentCnicFrontPath,
+    selectedInstallmentCustomerPhotoUrl,
     selectedInstallmentImageUrl,
     selectedInstallmentSale,
     selectedInstallmentSignaturePath,
@@ -78,6 +79,12 @@ if (!canManageInstallments) {
                                         </div>
                                     </div>
                                     <div className="detail-grid">
+                                        <div className="full-span">
+                                            <span className="meta-label">Customer Photo</span>
+                                            <div className="employee-document-preview">
+                                                {renderAssetPreview(selectedInstallmentCustomerPhotoUrl, 'Customer photo not available.', 'Customer Photo')}
+                                            </div>
+                                        </div>
                                         <div><span className="meta-label">Customer</span><p className="meta-value">{selectedInstallmentSale.customer_name}</p></div>
                                         <div><span className="meta-label">CNIC</span><p className="meta-value">{selectedInstallmentSale.cnic_passport_number}</p></div>
                                         <div><span className="meta-label">Dealer</span><p className="meta-value">{formatSaleDealerIdentity(selectedInstallmentSale)}</p></div>

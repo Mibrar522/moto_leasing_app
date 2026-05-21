@@ -3089,6 +3089,15 @@ const selectedCustomer = useMemo(
         || normalizePreviewAssetPath(selectedInstallmentPreviewCustomer?.ocr_details?.signature_image_url)
         || normalizePreviewAssetPath(selectedInstallmentOcrDetails?.signature_image_url)
         || '';
+    const selectedInstallmentCustomerPhotoPath = normalizePreviewAssetPath(selectedInstallmentPreviewCustomer?.passport_photo_url)
+        || normalizePreviewAssetPath(selectedInstallmentPreviewCustomer?.ocr_details?.passport_photo_url)
+        || normalizePreviewAssetPath(selectedInstallmentOcrDetails?.passport_photo_url)
+        || normalizePreviewAssetPath(selectedInstallmentSale?.passport_photo_url)
+        || '';
+    const selectedInstallmentCustomerPhotoUrl = useMemo(
+        () => buildAssetUrl(selectedInstallmentCustomerPhotoPath),
+        [selectedInstallmentCustomerPhotoPath]
+    );
     const selectedInstallmentAuthorizedSignaturePath = normalizePreviewAssetPath(selectedInstallmentSale?.authorized_signature_url)
         || normalizePreviewAssetPath(selectedInstallmentSale?.dealer_signature_url)
         || normalizePreviewAssetPath(selectedInstallmentSale?.dealer_profile_signature_url)
@@ -3179,6 +3188,7 @@ const selectedCustomer = useMemo(
             imageUrl: buildAssetUrl(sale?.image_url || saleVehicle?.image_url || ''),
             thumbUrl: buildAssetUrl(saleOcrDetails?.fingerprint?.thumb_image_url || ''),
             signatureUrl: buildAssetUrl(saleCustomer?.signature_image_url || saleCustomer?.ocr_details?.signature_image_url || saleOcrDetails?.signature_image_url || ''),
+            customerPhotoUrl: buildAssetUrl(saleCustomer?.passport_photo_url || saleCustomer?.ocr_details?.passport_photo_url || saleOcrDetails?.passport_photo_url || sale?.passport_photo_url || ''),
             authorizedSignatureUrl: buildAssetUrl(sale?.authorized_signature_url || sale?.dealer_signature_url || sale?.dealer_profile_signature_url || ''),
         };
     };
@@ -7254,6 +7264,7 @@ const selectedCustomer = useMemo(
                 <div class="hero">
                     ${selectedInstallmentImageUrl ? `<img src="${escapeHtml(selectedInstallmentImageUrl)}" alt="Vehicle" />` : `<div class="fallback">No vehicle image</div>`}
                     <div class="grid">
+                        <div><span class="label">Customer Photo</span>${selectedInstallmentCustomerPhotoPath ? `<div class="signature-box"><img src="${escapeHtml(selectedInstallmentCustomerPhotoUrl)}" alt="Customer photo" /></div>` : `<div class="signature-box"><div class="empty">Customer photo not attached</div></div>`}</div>
                         <div><span class="label">Customer</span><div class="value">${escapeHtml(selectedInstallmentSale.customer_name)}</div></div>
                         <div><span class="label">Customer CNIC</span><div class="value">${escapeHtml(selectedInstallmentSale.cnic_passport_number)}</div></div>
                         <div><span class="label">Dealer</span><div class="value">${escapeHtml(formatSaleDealerIdentity(selectedInstallmentSale))}</div></div>
@@ -7276,6 +7287,10 @@ const selectedCustomer = useMemo(
                     <div class="stat"><span class="label">Total Remaining</span><strong>${escapeHtml(formatCurrency(installmentSummary.totalRemainingAmount))}</strong></div>
                 </div>
                 <div class="approval-strip">
+                    <div class="approval-card">
+                        <span class="label">Customer Photo</span>
+                        ${selectedInstallmentCustomerPhotoPath ? `<img src="${escapeHtml(selectedInstallmentCustomerPhotoUrl)}" alt="Customer photo" />` : `<div class="empty">Customer photo not attached</div>`}
+                    </div>
                     <div class="approval-card">
                         <span class="label">Biometric Thumb</span>
                         ${selectedInstallmentThumbUrl ? `<img src="${escapeHtml(selectedInstallmentThumbUrl)}" alt="Biometric thumb" />` : `<div class="empty">Thumb not attached</div>`}
@@ -7384,6 +7399,10 @@ const selectedCustomer = useMemo(
                     <div class="stat"><span class="label">Total Remaining</span><strong>${escapeHtml(formatCurrency(isInstallment ? summary.totalRemainingAmount : 0))}</strong></div>
                 </div>
                 <div class="approval-strip">
+                    <div class="approval-card">
+                        <span class="label">Customer Photo</span>
+                        ${printContext.customerPhotoUrl ? `<img src="${escapeHtml(printContext.customerPhotoUrl)}" alt="Customer photo" />` : `<div class="empty">Customer photo not attached</div>`}
+                    </div>
                     <div class="approval-card">
                         <span class="label">Biometric Thumb</span>
                         ${printContext.thumbUrl ? `<img src="${escapeHtml(printContext.thumbUrl)}" alt="Biometric thumb" />` : `<div class="empty">Thumb not attached</div>`}
@@ -8042,6 +8061,7 @@ const selectedCustomer = useMemo(
                 <div class="hero">
                     ${selectedInstallmentImageUrl ? `<img src="${escapeHtml(selectedInstallmentImageUrl)}" alt="Vehicle" />` : `<div class="fallback">No vehicle image</div>`}
                     <div class="grid">
+                        <div><span class="label">Customer Photo</span>${selectedInstallmentCustomerPhotoPath ? `<div class="signature-box"><img src="${escapeHtml(selectedInstallmentCustomerPhotoUrl)}" alt="Customer photo" /></div>` : `<div class="signature-box"><div class="empty">Customer photo not attached</div></div>`}</div>
                         <div><span class="label">Customer</span><div class="value">${escapeHtml(selectedInstallmentSale.customer_name)}</div></div>
                         <div><span class="label">Customer CNIC</span><div class="value">${escapeHtml(selectedInstallmentSale.cnic_passport_number)}</div></div>
                         <div><span class="label">Dealer</span><div class="value">${escapeHtml(formatSaleDealerIdentity(selectedInstallmentSale))}</div></div>
@@ -8089,6 +8109,10 @@ const selectedCustomer = useMemo(
                     </tbody>
                 </table>
                 <div class="approval-strip">
+                    <div class="approval-card">
+                        <span class="label">Customer Photo</span>
+                        ${selectedInstallmentCustomerPhotoPath ? `<img src="${escapeHtml(selectedInstallmentCustomerPhotoUrl)}" alt="Customer photo" />` : `<div class="empty">Customer photo not attached</div>`}
+                    </div>
                     <div class="approval-card">
                         <span class="label">Biometric Thumb</span>
                         ${selectedInstallmentThumbUrl ? `<img src="${escapeHtml(selectedInstallmentThumbUrl)}" alt="Biometric thumb" />` : `<div class="empty">Thumb not attached</div>`}
@@ -8894,6 +8918,8 @@ const selectedCustomer = useMemo(
         selectedEmployeeId,
         selectedInstallmentAuthorizedSignaturePath,
         selectedInstallmentCnicFrontPath,
+        selectedInstallmentCustomerPhotoPath,
+        selectedInstallmentCustomerPhotoUrl,
         selectedInstallmentImageUrl,
         selectedInstallmentSale,
         selectedInstallmentSignaturePath,
