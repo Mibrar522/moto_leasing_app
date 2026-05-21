@@ -46,6 +46,7 @@ export default function Sales({ ctx }) {
     savingSale,
     selectedSaleCustomer,
     selectedSaleCustomerSignatureUrl,
+    selectedSaleCustomerPassportPhotoUrl,
     selectedSaleVehicle,
     selectedSaleVehicleName,
     selectedSaleVehicleSecondaryLine,
@@ -248,6 +249,7 @@ if (!canCreateSales) {
                                 <div className="detail-grid">
                                     <div><span className="meta-label">Customer</span><p className="meta-value">{selectedSaleCustomer?.full_name || 'Select customer'}</p></div>
                                     <div><span className="meta-label">Customer CNIC</span><p className="meta-value">{selectedSaleCustomer?.cnic_passport_number || 'Select customer'}</p></div>
+                                    <div><span className="meta-label">Customer Photo</span><p className="meta-value">{selectedSaleCustomerPassportPhotoUrl ? 'Ready' : 'Not uploaded'}</p></div>
                                     <div><span className="meta-label">Dealer</span><p className="meta-value">{editingSaleRecord?.dealer_name || user?.dealer_name || 'Not set'}{editingSaleRecord?.dealer_code ? ` / ${editingSaleRecord.dealer_code}` : ''}</p></div>
                                     <div><span className="meta-label">Vehicle</span><p className="meta-value">{selectedSaleVehicle ? `${selectedSaleVehicle.brand} ${selectedSaleVehicle.model}` : 'Select vehicle'}</p></div>
                                     <div><span className="meta-label">Vehicle Type</span><p className="meta-value">{selectedSaleVehicle?.vehicle_type || 'Select vehicle'}</p></div>
@@ -274,6 +276,12 @@ if (!canCreateSales) {
                                         <span className="meta-label">Dealer Signature</span>
                                         <div className="employee-document-preview">
                                             {renderAssetPreview(saleDealerSignatureUrl, 'Dealer signature not available.', 'Dealer Signature')}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span className="meta-label">Customer Photo</span>
+                                        <div className="employee-document-preview">
+                                            {renderAssetPreview(selectedSaleCustomerPassportPhotoUrl, 'Customer photo not available.', 'Customer Photo')}
                                         </div>
                                     </div>
                                     <div>

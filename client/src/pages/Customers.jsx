@@ -72,6 +72,7 @@ export default function Customers({ ctx }) {
   const showCustomerBiometricHash = canEditCustomerFingerprintFields && canEditCustomerField('Biometric Hash');
   const showCustomerThumbUpload = canEditCustomerFingerprintFields && canEditCustomerField('Thumb Upload');
   const showCustomerSignatureUpload = canEditCustomerField('Signature Upload');
+  const showCustomerPassportPhoto = canEditCustomerField('Passport Size Photo');
 
 if (!canOpenCustomers) {
                     return <div className="feedback-card error">Your account does not have customer onboarding access.</div>;
@@ -236,6 +237,28 @@ if (!canOpenCustomers) {
                                                 )
                                             ) : (
                                                 <div className="employee-document-empty">No CNIC back uploaded</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    </>
+                                    ) : null}
+                                    {showCustomerPassportPhoto ? (
+                                    <>
+                                    <label className="field">
+                                        <span>Passport Size Photo</span>
+                                        <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'passport_photo_url', 'Passport size photo', 'PASSPORT_PHOTO')} disabled={uploadingCustomerAsset} />
+                                    </label>
+                                    <div className="field full-span">
+                                        <span className="meta-label">Passport Photo Preview</span>
+                                        <div className="employee-document-preview">
+                                            {customerForm.passport_photo_url ? (
+                                                <img
+                                                    src={buildAssetUrl(customerForm.passport_photo_url)}
+                                                    alt="Customer passport size"
+                                                    className="employee-document-image"
+                                                />
+                                            ) : (
+                                                <div className="employee-document-empty">No passport photo uploaded</div>
                                             )}
                                         </div>
                                     </div>

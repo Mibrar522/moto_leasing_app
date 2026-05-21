@@ -77,6 +77,7 @@ const emptyCustomerForm = {
     fingerprint_device: '',
     fingerprint_thumb_url: '',
     signature_image_url: '',
+    passport_photo_url: '',
 };
 
 const emptyEmployeeForm = {
@@ -282,6 +283,7 @@ const CUSTOMER_FIELD_ACCESS = [
     ['FEAT_CUSTOMER_FIELD_BIOMETRIC_HASH', 'Biometric Hash'],
     ['FEAT_CUSTOMER_FIELD_THUMB_UPLOAD', 'Thumb Upload'],
     ['FEAT_CUSTOMER_FIELD_SIGNATURE_UPLOAD', 'Signature Upload'],
+    ['FEAT_CUSTOMER_FIELD_PASSPORT_PHOTO', 'Passport Size Photo'],
 ];
 
 const SALES_FIELD_ACCESS = [
@@ -995,6 +997,8 @@ const getCustomerPreviewAssetScore = (customer) => {
         normalizePreviewAssetPath(ocrDetails?.identity_doc_front_url),
         normalizePreviewAssetPath(customer?.signature_image_url),
         normalizePreviewAssetPath(ocrDetails?.signature_image_url),
+        normalizePreviewAssetPath(customer?.passport_photo_url),
+        normalizePreviewAssetPath(ocrDetails?.passport_photo_url),
         normalizePreviewAssetPath(customer?.fingerprint_thumb_url),
         normalizePreviewAssetPath(fingerprint?.thumb_image_url),
     ].filter(Boolean).length;
@@ -1590,6 +1594,7 @@ const mapCustomerFromApi = (customer) => {
         fingerprint_device: customer.fingerprint_device || fingerprint.device || '',
         fingerprint_thumb_url: fingerprint.thumb_image_url || '',
         signature_image_url: ocrDetails.signature_image_url || '',
+        passport_photo_url: ocrDetails.passport_photo_url || customer.passport_photo_url || '',
         created_by_name: customer.created_by_name || '',
         created_by_email: customer.created_by_email || '',
     };
@@ -2963,6 +2968,10 @@ const selectedCustomer = useMemo(
     const selectedSaleCustomerSignatureUrl = normalizePreviewAssetPath(selectedSalePreviewCustomer?.signature_image_url)
         || normalizePreviewAssetPath(selectedSalePreviewCustomer?.ocr_details?.signature_image_url)
         || normalizePreviewAssetPath(selectedSaleOcrDetails?.signature_image_url)
+        || '';
+    const selectedSaleCustomerPassportPhotoUrl = normalizePreviewAssetPath(selectedSalePreviewCustomer?.passport_photo_url)
+        || normalizePreviewAssetPath(selectedSalePreviewCustomer?.ocr_details?.passport_photo_url)
+        || normalizePreviewAssetPath(selectedSaleOcrDetails?.passport_photo_url)
         || '';
     const currentSalesDealerSignaturePath = normalizePreviewAssetPath(currentSalesDealerSignatureUrl);
     const saleDealerSignatureUrl = normalizePreviewAssetPath(saleForm.dealer_signature_url)
@@ -5810,6 +5819,7 @@ const selectedCustomer = useMemo(
             fingerprint_device: customerForm.fingerprint_device.trim(),
             fingerprint_thumb_url: customerForm.fingerprint_thumb_url.trim(),
             signature_image_url: customerForm.signature_image_url.trim(),
+            passport_photo_url: customerForm.passport_photo_url.trim(),
         };
 
         try {
@@ -6379,6 +6389,59 @@ const selectedCustomer = useMemo(
             URL.revokeObjectURL(objectUrl);
         }
     };
+    const cropPassportPhotoImage = async (file, settings = {}) => {
+        if (!String(file?.type || '').startsWith('image/')) {
+            return file;
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+
+        try {
+            const image = await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Unable to read passport photo for crop.'));
+                img.src = objectUrl;
+            });
+
+            const zoom = Math.min(Math.max(Number(settings.zoom || 1), 1), 2.5);
+            const outputWidth = 420;
+            const outputHeight = 520;
+            const sourceRatio = outputWidth / outputHeight;
+            const maxSourceWidth = Math.min(image.width, Math.round(image.height * sourceRatio));
+            const maxSourceHeight = Math.min(image.height, Math.round(maxSourceWidth / sourceRatio));
+            const cropWidth = Math.max(1, Math.round(maxSourceWidth / zoom));
+            const cropHeight = Math.max(1, Math.round(cropWidth / sourceRatio));
+            const maxX = Math.max(0, image.width - cropWidth);
+            const maxY = Math.max(0, image.height - cropHeight);
+            const xPercent = Math.min(Math.max(Number(settings.x ?? 50), 0), 100) / 100;
+            const yPercent = Math.min(Math.max(Number(settings.y ?? 45), 0), 100) / 100;
+            const cropX = Math.round(maxX * xPercent);
+            const cropY = Math.round(maxY * yPercent);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = outputWidth;
+            canvas.height = outputHeight;
+
+            const context = canvas.getContext('2d');
+            if (!context) {
+                throw new Error('Unable to prepare passport photo crop.');
+            }
+
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, outputWidth, outputHeight);
+            context.drawImage(image, cropX, cropY, cropWidth, cropHeight, 0, 0, outputWidth, outputHeight);
+
+            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+            if (!blob) {
+                throw new Error('Unable to generate passport photo crop.');
+            }
+
+            return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'passport-photo'}-crop.png`, { type: 'image/png' });
+        } finally {
+            URL.revokeObjectURL(objectUrl);
+        }
+    };
     const extractSignatureCropFromCnic = async (file) => {
         if (!String(file?.type || '').startsWith('image/')) {
             return null;
@@ -6497,7 +6560,10 @@ const selectedCustomer = useMemo(
         try {
             setUploadingCustomerAsset(true);
             const cropEnabled = Boolean(options.cropCnic) && (assetType === 'CNIC_FRONT' || assetType === 'CNIC_BACK');
-            const uploadFile = cropEnabled ? await cropCnicDocumentImage(file, assetType) : file;
+            const passportCropEnabled = Boolean(options.cropPassportPhoto) && assetType === 'PASSPORT_PHOTO';
+            const uploadFile = passportCropEnabled
+                ? await cropPassportPhotoImage(file, options.cropSettings)
+                : (cropEnabled ? await cropCnicDocumentImage(file, assetType) : file);
             const uploadAssetType = assetType === 'CNIC_BACK' ? 'CNIC_BACK_ORIGINAL' : assetType;
             const data = await uploadCustomerAssetFile(uploadFile, uploadAssetType);
             let ocrData = data;
@@ -6572,7 +6638,7 @@ const selectedCustomer = useMemo(
         if (!file) return;
 
         try {
-            if (assetType === 'CNIC_FRONT' || assetType === 'CNIC_BACK') {
+            if (assetType === 'CNIC_FRONT' || assetType === 'CNIC_BACK' || assetType === 'PASSPORT_PHOTO') {
                 openCnicUploadPreview({
                     source: 'customer',
                     file,
@@ -6580,6 +6646,7 @@ const selectedCustomer = useMemo(
                     targetLabel: successLabel,
                     assetType,
                     side: assetType === 'CNIC_BACK' ? 'back' : 'front',
+                    cropSettings: assetType === 'PASSPORT_PHOTO' ? { x: 50, y: 45, zoom: 1.15 } : undefined,
                 });
                 return;
             }
@@ -6615,11 +6682,21 @@ const selectedCustomer = useMemo(
         });
     };
 
+    const updatePassportCropSetting = (name, value) => {
+        setCnicUploadPreview((current) => current ? {
+            ...current,
+            cropSettings: {
+                ...(current.cropSettings || { x: 50, y: 45, zoom: 1.15 }),
+                [name]: Number(value),
+            },
+        } : current);
+    };
     const handleConfirmCnicUpload = async (cropCnic = false) => {
         const pending = cnicUploadPreview;
         if (!pending?.file) return;
 
         const shouldCrop = Boolean(cropCnic && pending.isImage);
+        const shouldCropPassportPhoto = Boolean(shouldCrop && pending.assetType === 'PASSPORT_PHOTO');
 
         try {
             if (pending.source === 'sale') {
@@ -6642,7 +6719,11 @@ const selectedCustomer = useMemo(
                     pending.targetField,
                     pending.targetLabel,
                     pending.assetType,
-                    { cropCnic: shouldCrop }
+                    {
+                        cropCnic: shouldCrop && !shouldCropPassportPhoto,
+                        cropPassportPhoto: shouldCropPassportPhoto,
+                        cropSettings: pending.cropSettings,
+                    }
                 );
             }
         } finally {
@@ -8269,6 +8350,9 @@ const selectedCustomer = useMemo(
             identity_doc_back_url: isEditingSelectedCustomer
                 ? (customerForm.identity_doc_back_url || selectedCustomer.ocr_details?.identity_doc_back_url || '')
                 : (selectedCustomer.ocr_details?.identity_doc_back_url || ''),
+            passport_photo_url: isEditingSelectedCustomer
+                ? (customerForm.passport_photo_url || selectedCustomer.ocr_details?.passport_photo_url || '')
+                : (selectedCustomer.ocr_details?.passport_photo_url || selectedCustomer.passport_photo_url || ''),
         };
         const fingerprint = ocrDetails.fingerprint || {};
         const currentCustomerFrontUrl = isEditingSelectedCustomer
@@ -8338,6 +8422,7 @@ const selectedCustomer = useMemo(
                     <span className="feature-pill">{currentCustomerFrontUrl ? 'Document Linked' : 'No Document URL'}</span>
                     <span className="feature-pill">{fingerprint.thumb_image_url ? 'Thumb Image Ready' : 'No Thumb Image'}</span>
                     <span className="feature-pill">{ocrDetails.signature_image_url ? 'Signature Ready' : 'No Signature'}</span>
+                    <span className="feature-pill">{ocrDetails.passport_photo_url ? 'Photo Ready' : 'No Photo'}</span>
                 </div>
 
                 <div className="scan-preview">
@@ -8404,6 +8489,10 @@ const selectedCustomer = useMemo(
                                 <div className="employee-document-empty">No CNIC back uploaded</div>
                             )}
                         </div>
+                    </div>
+                    <div>
+                        <span className="meta-label">Passport Photo</span>
+                        {ocrDetails.passport_photo_url ? <img src={buildAssetUrl(ocrDetails.passport_photo_url)} alt="Customer passport size" className="product-thumb" /> : <p className="meta-value">Not uploaded</p>}
                     </div>
                     <div>
                         <span className="meta-label">Thumb Preview</span>
@@ -8802,6 +8891,7 @@ const selectedCustomer = useMemo(
         selectedSalaryEmployeeOutstandingAdvance,
         selectedSaleCustomer,
         selectedSaleCustomerSignatureUrl,
+        selectedSaleCustomerPassportPhotoUrl,
         selectedSaleVehicle,
         selectedSaleVehicleName,
         selectedSaleVehicleSecondaryLine,
@@ -9427,11 +9517,27 @@ const selectedCustomer = useMemo(
                         </div>
                         <div className="cnic-preview-stage">
                             {cnicUploadPreview.isImage ? (
-                                <img src={cnicUploadPreview.previewUrl} alt="CNIC upload preview" className="cnic-preview-image" />
+                                <img src={cnicUploadPreview.previewUrl} alt="Upload preview" className="cnic-preview-image" />
                             ) : (
-                                <iframe src={cnicUploadPreview.previewUrl} title="CNIC upload preview" className="cnic-preview-frame" />
+                                <iframe src={cnicUploadPreview.previewUrl} title="Upload preview" className="cnic-preview-frame" />
                             )}
                         </div>
+                        {cnicUploadPreview.assetType === 'PASSPORT_PHOTO' && cnicUploadPreview.isImage ? (
+                            <div className="form-grid compact-grid spaced-top">
+                                <label className="field">
+                                    <span>Crop Left / Right</span>
+                                    <input type="range" min="0" max="100" value={cnicUploadPreview.cropSettings?.x ?? 50} onChange={(event) => updatePassportCropSetting('x', event.target.value)} />
+                                </label>
+                                <label className="field">
+                                    <span>Crop Up / Down</span>
+                                    <input type="range" min="0" max="100" value={cnicUploadPreview.cropSettings?.y ?? 45} onChange={(event) => updatePassportCropSetting('y', event.target.value)} />
+                                </label>
+                                <label className="field">
+                                    <span>Crop Zoom</span>
+                                    <input type="range" min="1" max="2.5" step="0.05" value={cnicUploadPreview.cropSettings?.zoom ?? 1.15} onChange={(event) => updatePassportCropSetting('zoom', event.target.value)} />
+                                </label>
+                            </div>
+                        ) : null}
                         <div className="cnic-preview-actions">
                             <button type="button" className="view-btn" onClick={closeCnicUploadPreview}>
                                 Cancel

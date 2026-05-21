@@ -67,6 +67,7 @@ const mapCustomerRow = (row) => {
         raw_ocr_text: ocrDetails.raw_ocr_text || '',
         identity_doc_back_url: ocrDetails.identity_doc_back_url || '',
         signature_image_url: ocrDetails.signature_image_url || '',
+        passport_photo_url: ocrDetails.passport_photo_url || '',
         fingerprint_status: fingerprint.status || (row.biometric_hash ? 'ENROLLED' : 'NOT_CAPTURED'),
         fingerprint_quality: fingerprint.quality || '',
         fingerprint_device: fingerprint.device || '',
@@ -100,6 +101,7 @@ const buildCustomerPayload = (body, userId, includeCreator = true) => {
         fingerprint_device,
         identity_doc_back_url,
         signature_image_url,
+        passport_photo_url,
         fingerprint_thumb_url,
     } = body;
 
@@ -120,6 +122,7 @@ const buildCustomerPayload = (body, userId, includeCreator = true) => {
         raw_ocr_text: raw_ocr_text || currentOcrDetails.raw_ocr_text || '',
         identity_doc_back_url: identity_doc_back_url || currentOcrDetails.identity_doc_back_url || '',
         signature_image_url: signature_image_url || currentOcrDetails.signature_image_url || '',
+        passport_photo_url: passport_photo_url || currentOcrDetails.passport_photo_url || '',
         fingerprint: {
             ...currentFingerprint,
             status: fingerprint_status || currentFingerprint.status || (biometric_hash ? 'ENROLLED' : 'NOT_CAPTURED'),
