@@ -50,6 +50,44 @@ const resolveUserDealerId = async (userId) => {
 
     return result.rows[0]?.dealer_id || null;
 };
+const buildCustomerHierarchyScope = (user = {}, customerAlias = 'c', params = []) => {
+    if (hasGlobalScope(user)) {
+        return { sql: '', params };
+    }
+
+    const dealerId = getEffectiveDealerId(user);
+    params.push(dealerId);
+    const dealerParam = params.length;
+    const clauses = [`${customerAlias}.dealer_id = $${dealerParam}`];
+    const roleName = String(user.role_name || '').toUpperCase();
+
+    if (roleName === 'AGENT') {
+        params.push(user.id);
+        clauses.push(`${customerAlias}.created_by_agent = $${params.length}`);
+    } else if (roleName === 'MANAGER') {
+        params.push(user.id);
+        const managerParam = params.length;
+        clauses.push(`(
+            ${customerAlias}.created_by_agent = $${managerParam}
+            OR EXISTS (
+                SELECT 1
+                FROM users customer_creator
+                LEFT JOIN employees customer_creator_employee ON customer_creator_employee.user_id = customer_creator.id
+                LEFT JOIN roles customer_creator_user_role ON customer_creator_user_role.id = customer_creator.role_id
+                LEFT JOIN roles customer_creator_employee_role ON customer_creator_employee_role.id = customer_creator_employee.role_id
+                WHERE customer_creator.id = ${customerAlias}.created_by_agent
+                  AND UPPER(COALESCE(customer_creator_employee_role.role_name, customer_creator_user_role.role_name, '')) = 'AGENT'
+            )
+        )`);
+    }
+
+    return { sql: clauses.join(' AND '), params };
+};
+
+const customerScopeClause = (user, customerAlias = 'c', params = []) => {
+    const scoped = buildCustomerHierarchyScope(user, customerAlias, params);
+    return { where: scoped.sql ? `WHERE ${scoped.sql}` : '', and: scoped.sql ? `AND ${scoped.sql}` : '', params: scoped.params };
+};
 const normalizeOcrDetails = (ocrDetails = {}) => {
     if (!ocrDetails || Array.isArray(ocrDetails)) {
         return {};
@@ -281,8 +319,7 @@ const sendCustomerCreatedEmails = async (customer, creatorId) => {
 
 exports.listCustomers = async (req, res) => {
     try {
-        const globalScope = hasGlobalScope(req.user);
-        const dealerId = getEffectiveDealerId(req.user);
+        const scope = customerScopeClause(req.user, 'c');
         const result = await pool.query(
             `
             SELECT
@@ -313,10 +350,10 @@ exports.listCustomers = async (req, res) => {
             LEFT JOIN users creator ON creator.id = c.created_by_agent
             LEFT JOIN dealers d ON d.id = c.dealer_id
             LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
-            ${globalScope ? '' : 'WHERE c.dealer_id = $1'}
+            ${scope.where}
             ORDER BY c.full_name ASC
             `,
-            globalScope ? [] : [dealerId]
+            scope.params
         );
 
         res.status(200).json(result.rows.map(mapCustomerRow));
@@ -327,8 +364,8 @@ exports.listCustomers = async (req, res) => {
 
 exports.getCustomerById = async (req, res) => {
     try {
-        const globalScope = hasGlobalScope(req.user);
-        const dealerId = getEffectiveDealerId(req.user);
+        const params = [req.params.id];
+        const scope = customerScopeClause(req.user, 'c', params);
         const result = await pool.query(
             `
             SELECT
@@ -360,9 +397,9 @@ exports.getCustomerById = async (req, res) => {
             LEFT JOIN dealers d ON d.id = c.dealer_id
             LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
             WHERE c.id = $1
-            ${globalScope ? '' : 'AND c.dealer_id = $2'}
+            ${scope.and}
             `,
-            globalScope ? [req.params.id] : [req.params.id, dealerId]
+            scope.params
         );
 
         if (result.rows.length === 0) {
@@ -535,14 +572,16 @@ exports.updateCustomer = async (req, res) => {
             return res.status(400).json({ message: 'Customer ownership is locked after creation.' });
         }
 
+        const existingParams = [req.params.id];
+        const existingScope = customerScopeClause(req.user, 'c', existingParams);
         const existing = await pool.query(
             `
             SELECT c.*
             FROM customers c
             WHERE c.id = $1
-            ${globalScope ? '' : 'AND c.dealer_id = $2'}
+            ${existingScope.and}
             `,
-            globalScope ? [req.params.id] : [req.params.id, dealerId]
+            existingScope.params
         );
 
         if (existing.rows.length === 0) {
@@ -680,14 +719,16 @@ exports.deleteCustomer = async (req, res) => {
     try {
         const globalScope = hasGlobalScope(req.user);
         const dealerId = getEffectiveDealerId(req.user);
+        const deleteParams = [req.params.id];
+        const deleteScope = customerScopeClause(req.user, 'c', deleteParams);
         const result = await pool.query(
             `
             DELETE FROM customers c
             WHERE c.id = $1
-              ${globalScope ? '' : 'AND c.dealer_id = $2'}
+              ${deleteScope.and}
             RETURNING c.id, c.full_name
             `,
-            globalScope ? [req.params.id] : [req.params.id, dealerId]
+            deleteScope.params
         );
 
         if (result.rows.length === 0) {

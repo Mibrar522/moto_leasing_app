@@ -286,6 +286,35 @@ exports.getDashboardData = async (req, res) => {
 
             return clauses.join(' AND ');
         };
+        const appendCustomerHierarchyScope = (customerAlias, params) => {
+            if (!hasDealerDataScope) return '';
+
+            params.push(effectiveDealerId);
+            const dealerParam = params.length;
+            const clauses = [`${customerAlias}.dealer_id = $${dealerParam}`];
+
+            if (isAgentLogin) {
+                params.push(req.user.id);
+                clauses.push(`${customerAlias}.created_by_agent = $${params.length}`);
+            } else if (isManagerLogin) {
+                params.push(req.user.id);
+                const managerParam = params.length;
+                clauses.push(`(
+                    ${customerAlias}.created_by_agent = $${managerParam}
+                    OR EXISTS (
+                        SELECT 1
+                        FROM users customer_creator
+                        LEFT JOIN employees customer_creator_employee ON customer_creator_employee.user_id = customer_creator.id
+                        LEFT JOIN roles customer_creator_user_role ON customer_creator_user_role.id = customer_creator.role_id
+                        LEFT JOIN roles customer_creator_employee_role ON customer_creator_employee_role.id = customer_creator_employee.role_id
+                        WHERE customer_creator.id = ${customerAlias}.created_by_agent
+                          AND UPPER(COALESCE(customer_creator_employee_role.role_name, customer_creator_user_role.role_name, '')) = 'AGENT'
+                    )
+                )`);
+            }
+
+            return clauses.join(' AND ');
+        };
         const canViewWorkflowWorkspace = hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_VIEW']);
         const canViewWorkflowDefinitions = canViewWorkflowWorkspace && hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_CONFIG']);
         const canViewWorkflowTasks = canViewWorkflowWorkspace && hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_TASKS']);
@@ -508,6 +537,8 @@ exports.getDashboardData = async (req, res) => {
         const installmentTaskScopeSql = appendSalesHierarchyScope('stu', installmentTaskScopeParams);
         const salesResultScopeParams = [];
         const salesResultScopeSql = appendSalesHierarchyScope('u', salesResultScopeParams);
+        const customerScopeParams = [];
+        const customerScopeSql = appendCustomerHierarchyScope('c', customerScopeParams);
         const buildStockOrderScope = () => {
             if (!hasDealerDataScope) return { whereSql: '', params: [] };
 
@@ -720,9 +751,9 @@ exports.getDashboardData = async (req, res) => {
                     WHERE COALESCE(ocr_details->>'document_type', '') IN ('CNIC', 'PASSPORT')
                 )::int AS scanned_documents
             FROM customers c
-            ${isDealerScopedView ? 'WHERE c.dealer_id = $1' : ''}
+            ${customerScopeSql ? `WHERE ${customerScopeSql}` : ''}
             `,
-            isDealerScopedView ? [effectiveDealerId] : []
+            customerScopeParams
         ) : { rows: [{ total_customers: 0, enrolled_biometrics: 0, scanned_documents: 0 }] };
 
         const employeeMetricsResultPromise = wantsGroup('metrics') ? pool.query(
@@ -954,11 +985,11 @@ exports.getDashboardData = async (req, res) => {
                 LEFT JOIN users creator ON creator.id = c.created_by_agent
                 LEFT JOIN dealers d ON d.id = c.dealer_id
                 LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
-                ${isDealerScopedView ? 'WHERE c.dealer_id = $1' : ''}
+                ${customerScopeSql ? `WHERE ${customerScopeSql}` : ''}
                 ORDER BY c.full_name ASC
                 LIMIT 2000
                 `,
-                isDealerScopedView ? [effectiveDealerId] : []
+                customerScopeParams
             ),
             'customers query',
             []
