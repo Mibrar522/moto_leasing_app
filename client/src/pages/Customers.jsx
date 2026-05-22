@@ -391,7 +391,7 @@ if (!canOpenCustomers) {
                         <div className="table-card">
                             <div className="section-header">
                                 <h3>Customer Registry</h3>
-                                <span className="section-caption">{filteredCustomers.length} visible customers</span>
+                                <span className="section-caption">{customerRegisterRows.length} shown of {filteredCustomers.length} customers</span>
                             </div>
 
                             {filteredCustomers.length === 0 ? (

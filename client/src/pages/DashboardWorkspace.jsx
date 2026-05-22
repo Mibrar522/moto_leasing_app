@@ -3637,7 +3637,13 @@ const selectedCustomer = useMemo(
         return true;
     };
     const resolvedBranchName = user?.dealer_name || dashboardData.dealers?.[0]?.dealer_name || 'Main Branch';
-    const getReportBranchValue = (row) => row?.dealer_name || resolvedBranchName;
+    const currentReportDealerId = String(user?.effective_dealer_id || user?.dealer_id || '').trim();
+    const getReportBranchValue = (row) => row?.dealer_name || '';
+    const rowMatchesDealerScope = (row) => {
+        if (realIsSuperAdmin && !user?.effective_dealer_id) return true;
+        if (!currentReportDealerId) return false;
+        return String(row?.dealer_id || '').trim() === currentReportDealerId;
+    };
     const canViewAllReportBranches = realIsSuperAdmin && !user?.effective_dealer_id;
     const reportBranchOptions = useMemo(() => {
         if (!canViewAllReportBranches) {
@@ -3748,7 +3754,12 @@ const selectedCustomer = useMemo(
                 const saleMode = String(sale.sale_mode || '').toUpperCase();
                 const status = String(sale.report_status || sale.status || '').toUpperCase();
 
+                if (!rowMatchesDealerScope(sale)) return false;
+
+
                 if (!isWithinReportRange(sale.purchase_date || sale.agreement_date || sale.created_at)) return false;
+
+
                 if (!matchesReportBranch(getReportBranchValue(sale))) return false;
                 if (!matchesReportAgent(sale.agent_name)) return false;
                 if (activeReportSaleMode !== 'ALL' && saleMode !== activeReportSaleMode) return false;
@@ -3793,7 +3804,12 @@ const selectedCustomer = useMemo(
                 ].filter(Boolean).join(' '));
                 const hasReceived = Number(order.received_quantity || 0) > 0 || status === 'RECEIVED' || status === 'PARTIAL';
 
+                if (!rowMatchesDealerScope(order)) return false;
+
+
                 if (!hasReceived) return false;
+
+
                 if (!isWithinReportRange(order.received_at || order.updated_at || order.created_at)) return false;
                 if (!matchesReportBranch(getReportBranchValue(order))) return false;
                 if (!matchesReportAgent(order.ordered_by_name)) return false;
@@ -3825,6 +3841,9 @@ const selectedCustomer = useMemo(
                     customer.ocr_details?.country,
                     customer.ocr_details?.address,
                 ].filter(Boolean).join(' '));
+
+                if (!rowMatchesDealerScope(customer)) return false;
+
 
                 if (!matchesReportBranch(customer.branch_name)) return false;
                 if (activeReportStatus !== 'ALL' && customer.report_status !== activeReportStatus) return false;
@@ -3882,7 +3901,12 @@ const selectedCustomer = useMemo(
                 const status = String(sale.status || '').toUpperCase();
                 const saleMode = String(sale.sale_mode || '').toUpperCase();
 
+                if (!rowMatchesDealerScope(sale)) return false;
+
+
                 if (!sale.has_report_date_activity) return false;
+
+
                 if (!matchesReportBranch(sale.branch_name)) return false;
                 if (!matchesReportAgent(sale.agent_name)) return false;
                 if (activeReportSaleMode !== 'ALL' && saleMode !== activeReportSaleMode) return false;
@@ -3924,7 +3948,12 @@ const selectedCustomer = useMemo(
                 const status = String(sale.status || '').toUpperCase();
                 const saleMode = String(sale.sale_mode || '').toUpperCase();
 
+                if (!rowMatchesDealerScope(sale)) return false;
+
+
                 if (!isWithinReportRange(sale.purchase_date || sale.agreement_date || sale.created_at)) return false;
+
+
                 if (!matchesReportBranch(sale.branch_name)) return false;
                 if (!matchesReportAgent(sale.agent_name)) return false;
                 if (activeReportSaleMode !== 'ALL' && saleMode !== activeReportSaleMode) return false;
@@ -3970,7 +3999,12 @@ const selectedCustomer = useMemo(
                 const status = String(sale.status || '').toUpperCase();
                 const saleMode = String(sale.sale_mode || '').toUpperCase();
 
+                if (!rowMatchesDealerScope(sale)) return false;
+
+
                 if (!isWithinReportRange(sale.purchase_date || sale.agreement_date || sale.created_at)) return false;
+
+
                 if (!matchesReportBranch(sale.branch_name)) return false;
                 if (!matchesReportAgent(sale.agent_name)) return false;
                 if (activeReportSaleMode !== 'ALL' && saleMode !== activeReportSaleMode) return false;
@@ -10062,4 +10096,3 @@ const selectedCustomer = useMemo(
 };
 
 export default Dashboard;
-
