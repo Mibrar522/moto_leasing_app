@@ -253,24 +253,26 @@ exports.getDashboardData = async (req, res) => {
         }
 
         const hasGlobalScope = isSuperAdmin && !req.user.effective_dealer_id;
-        const isDealerScopedView = Boolean(effectiveDealerId) && !isEmployeeLogin && !hasGlobalScope;
+        const isDealerScopedView = Boolean(effectiveDealerId) && !hasGlobalScope;
         const hasDealerDataScope = Boolean(effectiveDealerId) && !hasGlobalScope;
+        const salesOwnerJoinSql = (userAlias) => `
+            LEFT JOIN employees ${userAlias}_employee ON ${userAlias}_employee.user_id = ${userAlias}.id
+            LEFT JOIN dealers ${userAlias}_admin_dealer ON ${userAlias}_admin_dealer.admin_user_id = ${userAlias}.id
+            LEFT JOIN dealers ${userAlias}_email_dealer ON LOWER(${userAlias}_email_dealer.contact_email) = LOWER(${userAlias}.email)
+        `;
+        const salesDealerOwnerSql = (userAlias) => `COALESCE(c.dealer_id, v.dealer_id, st.dealer_id, ${userAlias}.dealer_id, ${userAlias}_employee.dealer_id, ${userAlias}_admin_dealer.id, ${userAlias}_email_dealer.id)`;
         const canViewWorkflowWorkspace = hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_VIEW']);
         const canViewWorkflowDefinitions = canViewWorkflowWorkspace && hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_CONFIG']);
         const canViewWorkflowTasks = canViewWorkflowWorkspace && hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_TASKS']);
-        const leaseMetricsWhereClause = isEmployeeLogin
-            ? 'WHERE la.agent_id = $2'
-            : isDealerScopedView
-                ? 'WHERE COALESCE(la.dealer_id, u.dealer_id) = $2'
-                : '';
-        const applicationsParams = isEmployeeLogin || isDealerScopedView
-            ? [PENDING_APPLICATION_STATUSES, isEmployeeLogin ? req.user.id : effectiveDealerId]
+        const leaseMetricsWhereClause = hasDealerDataScope
+            ? 'WHERE COALESCE(la.dealer_id, u.dealer_id) = $2'
+            : '';
+        const applicationsParams = hasDealerDataScope
+            ? [PENDING_APPLICATION_STATUSES, effectiveDealerId]
             : [PENDING_APPLICATION_STATUSES];
-        const applicationsListWhereClause = isEmployeeLogin
-            ? 'WHERE la.agent_id = $1'
-            : isDealerScopedView
-                ? 'WHERE COALESCE(la.dealer_id, u.dealer_id) = $1'
-                : '';
+        const applicationsListWhereClause = hasDealerDataScope
+            ? 'WHERE COALESCE(la.dealer_id, u.dealer_id) = $1'
+            : '';
 
         const featureResult = (req.user.feature_keys || []).length > 0
             ? await pool.query(
@@ -421,12 +423,9 @@ exports.getDashboardData = async (req, res) => {
             const params = [];
             const clauses = [];
 
-            if (isEmployeeLogin) {
-                params.push(req.user.id);
-                clauses.push(`st.agent_id = $${params.length}`);
-            } else if (isDealerScopedView) {
+            if (hasDealerDataScope) {
                 params.push(effectiveDealerId);
-                clauses.push(`COALESCE(c.dealer_id, v.dealer_id, st.dealer_id, su.dealer_id) = $${params.length}`);
+                clauses.push(`${salesDealerOwnerSql('su')} = $${params.length}`);
             }
 
             if (dashboardDateFrom) {
@@ -450,12 +449,9 @@ exports.getDashboardData = async (req, res) => {
             const saleDateClauses = [];
             const receivedDateClauses = [];
 
-            if (isEmployeeLogin) {
-                params.push(req.user.id);
-                clauses.push(`st.agent_id = $${params.length}`);
-            } else if (isDealerScopedView) {
+            if (hasDealerDataScope) {
                 params.push(effectiveDealerId);
-                clauses.push(`COALESCE(c.dealer_id, v.dealer_id, st.dealer_id, su.dealer_id) = $${params.length}`);
+                clauses.push(`${salesDealerOwnerSql('su')} = $${params.length}`);
             }
 
             if (dashboardDateFrom) {
@@ -530,16 +526,17 @@ exports.getDashboardData = async (req, res) => {
                     COUNT(*) FILTER (WHERE UPPER(COALESCE(si.status, '')) <> 'RECEIVED')::int AS pending_installment_count
                 FROM sales_transactions st
                 LEFT JOIN users su ON su.id = st.agent_id
+                ${salesOwnerJoinSql('su')}
                 LEFT JOIN customers c ON c.id = st.customer_id
                 LEFT JOIN vehicles v ON v.id = st.vehicle_id
                 LEFT JOIN sale_installments si ON si.sale_id = st.id
                 WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
                   AND UPPER(COALESCE(st.approval_status, 'APPROVED')) = 'APPROVED'
-                  ${isEmployeeLogin ? 'AND st.agent_id = $1' : isDealerScopedView ? 'AND COALESCE(c.dealer_id, v.dealer_id, st.dealer_id, su.dealer_id) = $1' : ''}
+                  ${hasDealerDataScope ? `AND ${salesDealerOwnerSql('su')} = $1` : ''}
                 GROUP BY st.id
             ) AS installment_sales
             `,
-            isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
+            hasDealerDataScope ? [effectiveDealerId] : []
         ) : { rows: [{ settled_leases: 0, pending_leases: 0 }] };
 
         const salesMetricsResultPromise = wantsGroup('metrics') ? pool.query(
@@ -556,6 +553,7 @@ exports.getDashboardData = async (req, res) => {
                 COALESCE(SUM(st.vehicle_price), 0)::numeric AS total_sales_revenue
             FROM sales_transactions st
             LEFT JOIN users su ON su.id = st.agent_id
+            ${salesOwnerJoinSql('su')}
             LEFT JOIN customers c ON c.id = st.customer_id
             LEFT JOIN vehicles v ON v.id = st.vehicle_id
             ${dashboardSalesMetricScope.whereSql}
@@ -576,6 +574,7 @@ exports.getDashboardData = async (req, res) => {
                     st.created_at
                 FROM sales_transactions st
                 LEFT JOIN users su ON su.id = st.agent_id
+                ${salesOwnerJoinSql('su')}
                 LEFT JOIN customers c ON c.id = st.customer_id
                 LEFT JOIN vehicles v ON v.id = st.vehicle_id
                 ${dashboardSalesCardScope.whereSql}
@@ -634,12 +633,13 @@ exports.getDashboardData = async (req, res) => {
             FROM sale_installments si
             JOIN sales_transactions st ON st.id = si.sale_id
             LEFT JOIN users stu ON stu.id = st.agent_id
+            ${salesOwnerJoinSql('stu')}
             LEFT JOIN customers c ON c.id = st.customer_id
             LEFT JOIN vehicles v ON v.id = st.vehicle_id
             WHERE UPPER(COALESCE(si.status, '')) <> 'RECEIVED'
-            ${isEmployeeLogin ? 'AND st.agent_id = $1' : isDealerScopedView ? 'AND COALESCE(c.dealer_id, v.dealer_id, st.dealer_id, stu.dealer_id) = $1' : ''}
+            ${hasDealerDataScope ? `AND ${salesDealerOwnerSql('stu')} = $1` : ''}
             `,
-            isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
+            hasDealerDataScope ? [effectiveDealerId] : []
         ) : { rows: [{ pending_installments: 0 }] };
 
         const employeeSalesResultPromise = wantsGroup('metrics') && isEmployeeLogin
@@ -742,7 +742,7 @@ exports.getDashboardData = async (req, res) => {
             ORDER BY la.created_at DESC
             LIMIT 10
             `,
-            isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
+            hasDealerDataScope ? [effectiveDealerId] : []
         ) : { rows: [] };
 
         const inventoryResult = wantsGroup('inventory') ? await safeDashboardQuery(
@@ -1465,9 +1465,10 @@ exports.getDashboardData = async (req, res) => {
                 JOIN customers c ON c.id = st.customer_id
                 JOIN vehicles v ON v.id = st.vehicle_id
                 JOIN users u ON u.id = st.agent_id
-                LEFT JOIN dealers d ON d.id = COALESCE(c.dealer_id, v.dealer_id, st.dealer_id, u.dealer_id)
+                ${salesOwnerJoinSql('u')}
+                LEFT JOIN dealers d ON d.id = ${salesDealerOwnerSql('u')}
                 LEFT JOIN sale_installments si ON si.sale_id = st.id
-                ${isEmployeeLogin ? 'WHERE st.agent_id = $1' : isDealerScopedView ? 'WHERE COALESCE(c.dealer_id, v.dealer_id, st.dealer_id, u.dealer_id) = $1' : ''}
+                ${hasDealerDataScope ? `WHERE ${salesDealerOwnerSql('u')} = $1` : ''}
                 GROUP BY
                     st.id,
                     st.customer_id,
@@ -1527,7 +1528,7 @@ exports.getDashboardData = async (req, res) => {
                 ORDER BY st.created_at DESC
                 LIMIT ${salesTransactionsLimit}
                 `,
-                isEmployeeLogin || isDealerScopedView ? [isEmployeeLogin ? req.user.id : effectiveDealerId] : []
+                hasDealerDataScope ? [effectiveDealerId] : []
                 ),
                 'sales transactions query',
                 []
