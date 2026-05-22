@@ -431,12 +431,12 @@ exports.getDashboardData = async (req, res) => {
 
             if (dashboardDateFrom) {
                 params.push(dashboardDateFrom);
-                clauses.push(`st.purchase_date >= $${params.length}::date`);
+                clauses.push(`COALESCE(st.purchase_date::date, st.agreement_date::date, st.created_at::date) >= $${params.length}::date`);
             }
 
             if (dashboardDateTo) {
                 params.push(dashboardDateTo);
-                clauses.push(`st.purchase_date < ($${params.length}::date + INTERVAL '1 day')`);
+                clauses.push(`COALESCE(st.purchase_date::date, st.agreement_date::date, st.created_at::date) < ($${params.length}::date + INTERVAL '1 day')`);
             }
 
             return {
@@ -460,13 +460,13 @@ exports.getDashboardData = async (req, res) => {
 
             if (dashboardDateFrom) {
                 params.push(dashboardDateFrom);
-                saleDateClauses.push(`st.purchase_date >= $${params.length}::date`);
+                saleDateClauses.push(`COALESCE(st.purchase_date::date, st.agreement_date::date, st.created_at::date) >= $${params.length}::date`);
                 receivedDateClauses.push(`si.paid_date >= $${params.length}::date`);
             }
 
             if (dashboardDateTo) {
                 params.push(dashboardDateTo);
-                saleDateClauses.push(`st.purchase_date < ($${params.length}::date + INTERVAL '1 day')`);
+                saleDateClauses.push(`COALESCE(st.purchase_date::date, st.agreement_date::date, st.created_at::date) < ($${params.length}::date + INTERVAL '1 day')`);
                 receivedDateClauses.push(`si.paid_date < ($${params.length}::date + INTERVAL '1 day')`);
             }
 
@@ -475,6 +475,8 @@ exports.getDashboardData = async (req, res) => {
                 whereSql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '',
                 saleDateSql: saleDateClauses.length ? ` AND ${saleDateClauses.join(' AND ')}` : '',
                 receivedDateSql: receivedDateClauses.length ? ` AND ${receivedDateClauses.join(' AND ')}` : '',
+                saleDatePredicateSql: saleDateClauses.length ? saleDateClauses.join(' AND ') : 'TRUE',
+                receivedDatePredicateSql: receivedDateClauses.length ? receivedDateClauses.join(' AND ') : 'TRUE',
             };
         };
         const dashboardSalesMetricScope = buildDashboardSalesMetricScope();
@@ -563,32 +565,67 @@ exports.getDashboardData = async (req, res) => {
 
         const dashboardSalesCardMetricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
+            WITH scoped_sales AS (
+                SELECT
+                    st.id,
+                    st.sale_mode,
+                    st.vehicle_price,
+                    st.down_payment,
+                    st.purchase_date,
+                    st.agreement_date,
+                    st.created_at
+                FROM sales_transactions st
+                LEFT JOIN users su ON su.id = st.agent_id
+                LEFT JOIN customers c ON c.id = st.customer_id
+                LEFT JOIN vehicles v ON v.id = st.vehicle_id
+                ${dashboardSalesCardScope.whereSql}
+            ), installment_activity_sales AS (
+                SELECT DISTINCT st.id
+                FROM scoped_sales st
+                LEFT JOIN sale_installments si ON si.sale_id = st.id
+                WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
+                  AND (
+                    ${dashboardSalesCardScope.saleDatePredicateSql}
+                    OR (
+                        (UPPER(COALESCE(si.status, '')) = 'RECEIVED' OR COALESCE(si.received_amount, 0) > 0)
+                        AND ${dashboardSalesCardScope.receivedDatePredicateSql}
+                    )
+                  )
+            ), sale_activity_revenue AS (
+                SELECT COALESCE(SUM(
+                    CASE
+                        WHEN UPPER(COALESCE(st.sale_mode, '')) = 'CASH' THEN COALESCE(st.vehicle_price, 0)
+                        WHEN UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT' THEN COALESCE(st.down_payment, 0)
+                        ELSE 0
+                    END
+                ), 0)::numeric AS amount
+                FROM scoped_sales st
+                WHERE ${dashboardSalesCardScope.saleDatePredicateSql}
+            ), received_installment_activity AS (
+                SELECT
+                    COUNT(si.id)::int AS received_count,
+                    COALESCE(SUM(COALESCE(si.received_amount, 0)), 0)::numeric AS received_amount
+                FROM scoped_sales st
+                JOIN sale_installments si ON si.sale_id = st.id
+                WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
+                  AND (UPPER(COALESCE(si.status, '')) = 'RECEIVED' OR COALESCE(si.received_amount, 0) > 0)
+                  AND ${dashboardSalesCardScope.receivedDatePredicateSql}
+            )
             SELECT
-                COUNT(DISTINCT st.id) FILTER (
+                COUNT(st.id) FILTER (
                     WHERE UPPER(COALESCE(st.sale_mode, '')) = 'CASH'
-                    ${dashboardSalesCardScope.saleDateSql}
+                      AND ${dashboardSalesCardScope.saleDatePredicateSql}
                 )::int AS cash_transactions,
-                COUNT(DISTINCT st.id) FILTER (
-                    WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
-                    ${dashboardSalesCardScope.saleDateSql}
-                )::int AS installment_transactions,
-                COUNT(si.id) FILTER (
-                    WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
-                      AND (
-                          UPPER(COALESCE(si.status, '')) = 'RECEIVED'
-                          OR COALESCE(si.received_amount, 0) > 0
-                      )
-                      ${dashboardSalesCardScope.receivedDateSql}
-                )::int AS received_installments
-            FROM sales_transactions st
-            LEFT JOIN users su ON su.id = st.agent_id
-            LEFT JOIN customers c ON c.id = st.customer_id
-            LEFT JOIN vehicles v ON v.id = st.vehicle_id
-            LEFT JOIN sale_installments si ON si.sale_id = st.id
-            ${dashboardSalesCardScope.whereSql}
+                (SELECT COUNT(*)::int FROM installment_activity_sales) AS installment_transactions,
+                (SELECT received_count FROM received_installment_activity) AS received_installments,
+                (
+                    (SELECT amount FROM sale_activity_revenue)
+                    + (SELECT received_amount FROM received_installment_activity)
+                )::numeric AS total_dashboard_revenue
+            FROM scoped_sales st
             `,
             dashboardSalesCardScope.params
-        ) : { rows: [{ cash_transactions: 0, installment_transactions: 0, received_installments: 0 }] };
+        ) : { rows: [{ cash_transactions: 0, installment_transactions: 0, received_installments: 0, total_dashboard_revenue: 0 }] };
 
         const installmentTaskMetricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
@@ -1501,7 +1538,7 @@ exports.getDashboardData = async (req, res) => {
                 activeLeases: Number(settledLeaseMetricsResult.rows[0].settled_leases || 0),
                 pendingLeases: Number(settledLeaseMetricsResult.rows[0].pending_leases || 0),
                 pendingTasks: Number(leaseMetricsResult.rows[0].pending_applications || 0),
-            totalRevenue: Number(leaseMetricsResult.rows[0].total_revenue || 0) + Number(salesMetricsResult.rows[0].total_sales_revenue || 0),
+            totalRevenue: Number(leaseMetricsResult.rows[0].total_revenue || 0) + Number(dashboardSalesCardMetricsResult.rows[0].total_dashboard_revenue ?? salesMetricsResult.rows[0].total_sales_revenue ?? 0),
             totalVehicles: metricsResult.rows[0].total_vehicles,
             availableVehicles: metricsResult.rows[0].available_vehicles,
             totalApplications: Number(leaseMetricsResult.rows[0].total_applications || 0),
