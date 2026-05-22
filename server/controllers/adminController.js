@@ -545,13 +545,13 @@ exports.getDashboardData = async (req, res) => {
             SELECT
                 COUNT(*)::int AS total_sales,
                 COUNT(*) FILTER (
-                    WHERE UPPER(COALESCE(sale_mode, '')) = 'INSTALLMENT'
-                    AND UPPER(COALESCE(status, '')) <> 'RECEIVED'
+                    WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
+                    AND UPPER(COALESCE(st.status, '')) <> 'RECEIVED'
                 )::int AS active_installment_sales,
                 COUNT(*) FILTER (
-                    WHERE UPPER(COALESCE(status, '')) <> 'RECEIVED'
+                    WHERE UPPER(COALESCE(st.status, '')) <> 'RECEIVED'
                 )::int AS pending_sales,
-                COALESCE(SUM(vehicle_price), 0)::numeric AS total_sales_revenue
+                COALESCE(SUM(st.vehicle_price), 0)::numeric AS total_sales_revenue
             FROM sales_transactions st
             LEFT JOIN users su ON su.id = st.agent_id
             LEFT JOIN customers c ON c.id = st.customer_id
