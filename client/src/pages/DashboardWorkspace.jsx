@@ -3665,7 +3665,10 @@ const selectedCustomer = useMemo(
             }));
         }
     }, [canViewAllReportBranches, reportBranchName, resolvedBranchName]);
-    const matchesReportBranch = (value) => activeReportBranchName === 'ALL' || String(value || '').trim() === activeReportBranchName;
+    const matchesReportBranch = (value) => {
+        if (!canViewAllReportBranches) return true;
+        return activeReportBranchName === 'ALL' || String(value || '').trim() === activeReportBranchName;
+    };
     const reportAgentOptions = useMemo(() => {
         const options = new Set();
 
