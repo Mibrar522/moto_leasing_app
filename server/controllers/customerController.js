@@ -32,6 +32,24 @@ const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffective
 const hasFeature = (user = {}, featureKey) =>
     Array.isArray(user?.feature_keys) && user.feature_keys.includes(featureKey);
 
+const resolveUserDealerId = async (userId) => {
+    if (!userId) return null;
+
+    const result = await pool.query(
+        `
+        SELECT COALESCE(e.dealer_id, u.dealer_id, admin_dealer.id, email_dealer.id) AS dealer_id
+        FROM users u
+        LEFT JOIN employees e ON e.user_id = u.id
+        LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u.id
+        LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u.email)
+        WHERE u.id = $1
+        LIMIT 1
+        `,
+        [userId]
+    );
+
+    return result.rows[0]?.dealer_id || null;
+};
 const normalizeOcrDetails = (ocrDetails = {}) => {
     if (!ocrDetails || Array.isArray(ocrDetails)) {
         return {};
@@ -370,10 +388,13 @@ exports.createCustomer = async (req, res) => {
         if (canUnlockOwnership && req.body.created_by_agent) {
             const ownerCheck = await pool.query(
                 `
-                SELECT u.id, u.dealer_id
+                SELECT u.id, COALESCE(e.dealer_id, u.dealer_id, admin_dealer.id, email_dealer.id) AS dealer_id
                 FROM users u
+                LEFT JOIN employees e ON e.user_id = u.id
+                LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u.id
+                LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u.email)
                 WHERE u.id = $1
-                ${globalScope ? '' : 'AND u.dealer_id = $2'}
+                ${globalScope ? '' : 'AND COALESCE(e.dealer_id, u.dealer_id, admin_dealer.id, email_dealer.id) = $2'}
                 `,
                 globalScope ? [req.body.created_by_agent] : [req.body.created_by_agent, dealerId]
             );
@@ -387,11 +408,7 @@ exports.createCustomer = async (req, res) => {
             return res.status(400).json({ message: 'Customer ownership is locked on new customer creation for this account.' });
         }
 
-        const ownerDealerCheck = await pool.query(
-            'SELECT dealer_id FROM users WHERE id = $1',
-            [effectiveCreatedByAgent]
-        );
-        const effectiveDealerId = ownerDealerCheck.rows[0]?.dealer_id || null;
+        const effectiveDealerId = await resolveUserDealerId(effectiveCreatedByAgent);
 
         if (!effectiveDealerId) {
             return res.status(400).json({ message: 'Customer ownership is locked for this account. Switch into a dealer profile or enable the unlock feature before creating a new customer.' });
@@ -537,10 +554,13 @@ exports.updateCustomer = async (req, res) => {
         if (canUnlockOwnership && req.body.created_by_agent) {
             const ownerCheck = await pool.query(
                 `
-                SELECT u.id, u.dealer_id
+                SELECT u.id, COALESCE(e.dealer_id, u.dealer_id, admin_dealer.id, email_dealer.id) AS dealer_id
                 FROM users u
+                LEFT JOIN employees e ON e.user_id = u.id
+                LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u.id
+                LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u.email)
                 WHERE u.id = $1
-                ${globalScope ? '' : 'AND u.dealer_id = $2'}
+                ${globalScope ? '' : 'AND COALESCE(e.dealer_id, u.dealer_id, admin_dealer.id, email_dealer.id) = $2'}
                 `,
                 globalScope ? [req.body.created_by_agent] : [req.body.created_by_agent, dealerId]
             );

@@ -720,11 +720,7 @@ exports.getDashboardData = async (req, res) => {
                     WHERE COALESCE(ocr_details->>'document_type', '') IN ('CNIC', 'PASSPORT')
                 )::int AS scanned_documents
             FROM customers c
-            LEFT JOIN users creator ON creator.id = c.created_by_agent
-            LEFT JOIN employees creator_employee ON creator_employee.user_id = creator.id
-            LEFT JOIN dealers creator_admin_dealer ON creator_admin_dealer.admin_user_id = creator.id
-            LEFT JOIN dealers creator_email_dealer ON LOWER(creator_email_dealer.contact_email) = LOWER(creator.email)
-            ${isDealerScopedView ? 'WHERE COALESCE(creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id, c.dealer_id) = $1' : ''}
+            ${isDealerScopedView ? 'WHERE c.dealer_id = $1' : ''}
             `,
             isDealerScopedView ? [effectiveDealerId] : []
         ) : { rows: [{ total_customers: 0, enrolled_biometrics: 0, scanned_documents: 0 }] };
@@ -951,17 +947,14 @@ exports.getDashboardData = async (req, res) => {
                         creator.email
                     ) AS created_by_name,
                     creator.email AS created_by_email,
-                    COALESCE(creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id, c.dealer_id) AS dealer_id,
+                    c.dealer_id,
                     d.dealer_name,
                     d.dealer_code
                 FROM customers c
                 LEFT JOIN users creator ON creator.id = c.created_by_agent
-                LEFT JOIN employees creator_employee ON creator_employee.user_id = creator.id
-                LEFT JOIN dealers creator_admin_dealer ON creator_admin_dealer.admin_user_id = creator.id
-                LEFT JOIN dealers creator_email_dealer ON LOWER(creator_email_dealer.contact_email) = LOWER(creator.email)
-                LEFT JOIN dealers d ON d.id = COALESCE(creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id, c.dealer_id)
+                LEFT JOIN dealers d ON d.id = c.dealer_id
                 LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
-                ${isDealerScopedView ? 'WHERE COALESCE(creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id, c.dealer_id) = $1' : ''}
+                ${isDealerScopedView ? 'WHERE c.dealer_id = $1' : ''}
                 ORDER BY c.full_name ASC
                 LIMIT 2000
                 `,
