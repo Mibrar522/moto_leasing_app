@@ -257,10 +257,30 @@ exports.getDashboardData = async (req, res) => {
         const hasDealerDataScope = Boolean(effectiveDealerId) && !hasGlobalScope;
         const salesOwnerJoinSql = (userAlias) => `
             LEFT JOIN employees ${userAlias}_employee ON ${userAlias}_employee.user_id = ${userAlias}.id
+            LEFT JOIN roles ${userAlias}_user_role ON ${userAlias}_user_role.id = ${userAlias}.role_id
+            LEFT JOIN roles ${userAlias}_employee_role ON ${userAlias}_employee_role.id = ${userAlias}_employee.role_id
             LEFT JOIN dealers ${userAlias}_admin_dealer ON ${userAlias}_admin_dealer.admin_user_id = ${userAlias}.id
             LEFT JOIN dealers ${userAlias}_email_dealer ON LOWER(${userAlias}_email_dealer.contact_email) = LOWER(${userAlias}.email)
         `;
         const salesDealerOwnerSql = (userAlias) => `COALESCE(c.dealer_id, v.dealer_id, st.dealer_id, ${userAlias}.dealer_id, ${userAlias}_employee.dealer_id, ${userAlias}_admin_dealer.id, ${userAlias}_email_dealer.id)`;
+        const salesActorRoleSql = (userAlias) => `COALESCE(${userAlias}_employee_role.role_name, ${userAlias}_user_role.role_name)`;
+        const appendSalesHierarchyScope = (userAlias, params) => {
+            if (!hasDealerDataScope) return '';
+
+            params.push(effectiveDealerId);
+            const dealerParam = params.length;
+            const clauses = [`${salesDealerOwnerSql(userAlias)} = $${dealerParam}`];
+
+            if (isAgentLogin) {
+                params.push(req.user.id);
+                clauses.push(`${userAlias}.id = $${params.length}`);
+            } else if (isManagerLogin) {
+                params.push(req.user.id);
+                clauses.push(`(${userAlias}.id = $${params.length} OR UPPER(COALESCE(${salesActorRoleSql(userAlias)}, '')) = 'AGENT')`);
+            }
+
+            return clauses.join(' AND ');
+        };
         const canViewWorkflowWorkspace = hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_VIEW']);
         const canViewWorkflowDefinitions = canViewWorkflowWorkspace && hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_CONFIG']);
         const canViewWorkflowTasks = canViewWorkflowWorkspace && hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_TASKS']);
@@ -423,9 +443,9 @@ exports.getDashboardData = async (req, res) => {
             const params = [];
             const clauses = [];
 
-            if (hasDealerDataScope) {
-                params.push(effectiveDealerId);
-                clauses.push(`${salesDealerOwnerSql('su')} = $${params.length}`);
+            const hierarchyScope = appendSalesHierarchyScope('su', params);
+            if (hierarchyScope) {
+                clauses.push(hierarchyScope);
             }
 
             if (dashboardDateFrom) {
@@ -449,9 +469,9 @@ exports.getDashboardData = async (req, res) => {
             const saleDateClauses = [];
             const receivedDateClauses = [];
 
-            if (hasDealerDataScope) {
-                params.push(effectiveDealerId);
-                clauses.push(`${salesDealerOwnerSql('su')} = $${params.length}`);
+            const hierarchyScope = appendSalesHierarchyScope('su', params);
+            if (hierarchyScope) {
+                clauses.push(hierarchyScope);
             }
 
             if (dashboardDateFrom) {
@@ -477,6 +497,30 @@ exports.getDashboardData = async (req, res) => {
         };
         const dashboardSalesMetricScope = buildDashboardSalesMetricScope();
         const dashboardSalesCardScope = buildDashboardSalesCardScope();
+        const settledSalesScopeParams = [];
+        const settledSalesScopeSql = appendSalesHierarchyScope('su', settledSalesScopeParams);
+        const installmentTaskScopeParams = [];
+        const installmentTaskScopeSql = appendSalesHierarchyScope('stu', installmentTaskScopeParams);
+        const salesResultScopeParams = [];
+        const salesResultScopeSql = appendSalesHierarchyScope('u', salesResultScopeParams);
+        const buildStockOrderScope = () => {
+            if (!hasDealerDataScope) return { whereSql: '', params: [] };
+
+            const params = [effectiveDealerId];
+            const clauses = ['stock_scope.resolved_dealer_id = $1::uuid'];
+            const orderedByRoleSql = "COALESCE(ordered_employee_role.role_name, ordered_user_role.role_name)";
+
+            if (isAgentLogin) {
+                params.push(req.user.id);
+                clauses.push('(so.ordered_by = $2::uuid OR u.id = $2::uuid)');
+            } else if (isManagerLogin) {
+                params.push(req.user.id);
+                clauses.push(`(so.ordered_by = $2::uuid OR u.id = $2::uuid OR UPPER(COALESCE(${orderedByRoleSql}, '')) = 'AGENT')`);
+            }
+
+            return { whereSql: `WHERE ${clauses.join(' AND ')}`, params };
+        };
+        const stockOrderScope = buildStockOrderScope();
         const metricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
             SELECT
@@ -500,8 +544,8 @@ exports.getDashboardData = async (req, res) => {
                 COUNT(*)::int AS total_applications,
                 COALESCE(SUM(total_amount), 0)::numeric AS total_revenue
             FROM lease_applications
-            ${isDealerScopedView ? 'JOIN users lu ON lu.id = lease_applications.agent_id' : ''}
-            ${isEmployeeLogin ? 'WHERE agent_id = $2' : isDealerScopedView ? 'WHERE COALESCE(lease_applications.dealer_id, lu.dealer_id) = $2' : ''}
+            ${hasDealerDataScope ? 'JOIN users lu ON lu.id = lease_applications.agent_id' : ''}
+            ${hasDealerDataScope ? 'WHERE COALESCE(lease_applications.dealer_id, lu.dealer_id) = $2' : ''}
             `,
             applicationsParams
         ) : { rows: [{ pending_applications: 0, total_applications: 0, total_revenue: 0 }] };
@@ -532,11 +576,11 @@ exports.getDashboardData = async (req, res) => {
                 LEFT JOIN sale_installments si ON si.sale_id = st.id
                 WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
                   AND UPPER(COALESCE(st.approval_status, 'APPROVED')) = 'APPROVED'
-                  ${hasDealerDataScope ? `AND ${salesDealerOwnerSql('su')} = $1` : ''}
+                  ${settledSalesScopeSql ? `AND ${settledSalesScopeSql}` : ''}
                 GROUP BY st.id
             ) AS installment_sales
             `,
-            hasDealerDataScope ? [effectiveDealerId] : []
+            settledSalesScopeParams
         ) : { rows: [{ settled_leases: 0, pending_leases: 0 }] };
 
         const salesMetricsResultPromise = wantsGroup('metrics') ? pool.query(
@@ -637,9 +681,9 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN customers c ON c.id = st.customer_id
             LEFT JOIN vehicles v ON v.id = st.vehicle_id
             WHERE UPPER(COALESCE(si.status, '')) <> 'RECEIVED'
-            ${hasDealerDataScope ? `AND ${salesDealerOwnerSql('stu')} = $1` : ''}
+            ${installmentTaskScopeSql ? `AND ${installmentTaskScopeSql}` : ''}
             `,
-            hasDealerDataScope ? [effectiveDealerId] : []
+            installmentTaskScopeParams
         ) : { rows: [{ pending_installments: 0 }] };
 
         const employeeSalesResultPromise = wantsGroup('metrics') && isEmployeeLogin
@@ -918,10 +962,16 @@ exports.getDashboardData = async (req, res) => {
             ? ''
             : isAgentLogin
                 ? 'WHERE e.user_id = $1'
-                : isManagerLogin || isApplicationAdminLogin
-                    ? 'WHERE e.dealer_id = $1'
+                : isManagerLogin
+                    ? "WHERE e.dealer_id = $1 AND (e.user_id = $2 OR UPPER(COALESCE(r.role_name, '')) = 'AGENT')"
                     : 'WHERE e.dealer_id = $1';
-        const employeeScopeParams = hasGlobalScope ? [] : [isAgentLogin ? req.user.id : effectiveDealerId];
+        const employeeScopeParams = hasGlobalScope
+            ? []
+            : isAgentLogin
+                ? [req.user.id]
+                : isManagerLogin
+                    ? [effectiveDealerId, req.user.id]
+                    : [effectiveDealerId];
 
         const employeesResult = wantsGroup('employees') ? await safeDashboardQuery(
             () => pool.query(
@@ -1023,11 +1073,17 @@ exports.getDashboardData = async (req, res) => {
             : isAgentLogin
                 ? 'WHERE (u.id = $1 OR e.user_id = $1)'
                 : isManagerLogin
-                    ? "WHERE COALESCE(u.dealer_id, e.dealer_id) = $1 AND COALESCE(r.role_name, '') <> 'APPLICATION_ADMIN'"
+                    ? "WHERE COALESCE(u.dealer_id, e.dealer_id) = $1 AND (u.id = $2 OR e.user_id = $2 OR UPPER(COALESCE(r.role_name, '')) = 'AGENT')"
                     : isApplicationAdminLogin
                         ? "WHERE COALESCE(u.dealer_id, e.dealer_id) = $1 AND COALESCE(r.role_name, '') <> 'SUPER_ADMIN'"
                         : 'WHERE COALESCE(u.dealer_id, e.dealer_id) = $1';
-        const dealerStaffScopeParams = hasGlobalScope ? [] : [isAgentLogin ? req.user.id : effectiveDealerId];
+        const dealerStaffScopeParams = hasGlobalScope
+            ? []
+            : isAgentLogin
+                ? [req.user.id]
+                : isManagerLogin
+                    ? [effectiveDealerId, req.user.id]
+                    : [effectiveDealerId];
         const dealerStaffResult = wantsGroup('employees') ? await pool.query(
             `
             SELECT
@@ -1318,6 +1374,8 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN product_catalog pc ON pc.id = so.product_id
             LEFT JOIN users u ON u.id = so.ordered_by
             LEFT JOIN employees ordered_employee ON ordered_employee.user_id = u.id
+            LEFT JOIN roles ordered_user_role ON ordered_user_role.id = u.role_id
+            LEFT JOIN roles ordered_employee_role ON ordered_employee_role.id = ordered_employee.role_id
             LEFT JOIN dealers ordered_admin_dealer ON ordered_admin_dealer.admin_user_id = u.id
             LEFT JOIN dealers ordered_email_dealer ON LOWER(ordered_email_dealer.contact_email) = LOWER(u.email)
             LEFT JOIN LATERAL (
@@ -1343,14 +1401,11 @@ exports.getDashboardData = async (req, res) => {
                     END AS ownership_source
             ) stock_scope ON true
             LEFT JOIN dealers d ON d.id = stock_scope.resolved_dealer_id
-            ${hasDealerDataScope ? `WHERE (
-                stock_scope.resolved_dealer_id = $1::uuid
-                OR so.ordered_by = $2::uuid
-            )` : ''}
+            ${stockOrderScope.whereSql}
             ORDER BY so.created_at DESC
             LIMIT 300
             `,
-            hasDealerDataScope ? [effectiveDealerId, req.user.id] : []
+            stockOrderScope.params
             ),
             'stock orders query',
             []
@@ -1468,7 +1523,7 @@ exports.getDashboardData = async (req, res) => {
                 ${salesOwnerJoinSql('u')}
                 LEFT JOIN dealers d ON d.id = ${salesDealerOwnerSql('u')}
                 LEFT JOIN sale_installments si ON si.sale_id = st.id
-                ${hasDealerDataScope ? `WHERE ${salesDealerOwnerSql('u')} = $1` : ''}
+                ${salesResultScopeSql ? `WHERE ${salesResultScopeSql}` : ''}
                 GROUP BY
                     st.id,
                     st.customer_id,
@@ -1528,7 +1583,7 @@ exports.getDashboardData = async (req, res) => {
                 ORDER BY st.created_at DESC
                 LIMIT ${salesTransactionsLimit}
                 `,
-                hasDealerDataScope ? [effectiveDealerId] : []
+                salesResultScopeParams
                 ),
                 'sales transactions query',
                 []
