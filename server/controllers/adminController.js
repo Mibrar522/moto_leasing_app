@@ -262,7 +262,7 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN dealers ${userAlias}_admin_dealer ON ${userAlias}_admin_dealer.admin_user_id = ${userAlias}.id
             LEFT JOIN dealers ${userAlias}_email_dealer ON LOWER(${userAlias}_email_dealer.contact_email) = LOWER(${userAlias}.email)
         `;
-        const salesDealerOwnerSql = (userAlias) => `COALESCE(c.dealer_id, v.dealer_id, st.dealer_id, ${userAlias}.dealer_id, ${userAlias}_employee.dealer_id, ${userAlias}_admin_dealer.id, ${userAlias}_email_dealer.id)`;
+        const salesDealerOwnerSql = (userAlias) => `COALESCE(st.dealer_id, ${userAlias}_employee.dealer_id, ${userAlias}.dealer_id, ${userAlias}_admin_dealer.id, ${userAlias}_email_dealer.id, c.dealer_id, v.dealer_id)`;
         const salesActorRoleSql = (userAlias) => `COALESCE(${userAlias}_employee_role.role_name, ${userAlias}_user_role.role_name)`;
         const appendSalesHierarchyScope = (userAlias, params) => {
             if (!hasDealerDataScope) return '';
@@ -436,7 +436,7 @@ exports.getDashboardData = async (req, res) => {
             wantsGroup('stockOrders') || wantsGroup('inventory'),
             wantsGroup('salesTransactions') || wantsGroup('workflowTasks')
         );
-        if (wantsGroup('products') || wantsGroup('companies') || wantsGroup('stockOrders') || wantsGroup('inventory')) {
+        if (wantsGroup('products') || wantsGroup('companies') || wantsGroup('stockOrders') || wantsGroup('inventory') || wantsGroup('salesTransactions') || wantsGroup('customers')) {
             await syncDealerOwnershipForRequest();
         }
         const buildDashboardSalesMetricScope = () => {
@@ -506,15 +506,13 @@ exports.getDashboardData = async (req, res) => {
         const buildStockOrderScope = () => {
             if (!hasDealerDataScope) return { whereSql: '', params: [] };
 
-            const params = [effectiveDealerId];
+            const params = [effectiveDealerId, req.user.id];
             const clauses = ['stock_scope.resolved_dealer_id = $1::uuid'];
             const orderedByRoleSql = "COALESCE(ordered_employee_role.role_name, ordered_user_role.role_name)";
 
             if (isAgentLogin) {
-                params.push(req.user.id);
                 clauses.push('(so.ordered_by = $2::uuid OR u.id = $2::uuid)');
             } else if (isManagerLogin) {
-                params.push(req.user.id);
                 clauses.push(`(so.ordered_by = $2::uuid OR u.id = $2::uuid OR UPPER(COALESCE(${orderedByRoleSql}, '')) = 'AGENT')`);
             }
 
@@ -713,8 +711,12 @@ exports.getDashboardData = async (req, res) => {
                 COUNT(*) FILTER (
                     WHERE COALESCE(ocr_details->>'document_type', '') IN ('CNIC', 'PASSPORT')
                 )::int AS scanned_documents
-            FROM customers
-            ${isDealerScopedView ? 'WHERE dealer_id = $1' : ''}
+            FROM customers c
+            LEFT JOIN users creator ON creator.id = c.created_by_agent
+            LEFT JOIN employees creator_employee ON creator_employee.user_id = creator.id
+            LEFT JOIN dealers creator_admin_dealer ON creator_admin_dealer.admin_user_id = creator.id
+            LEFT JOIN dealers creator_email_dealer ON LOWER(creator_email_dealer.contact_email) = LOWER(creator.email)
+            ${isDealerScopedView ? 'WHERE COALESCE(c.dealer_id, creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id) = $1' : ''}
             `,
             isDealerScopedView ? [effectiveDealerId] : []
         ) : { rows: [{ total_customers: 0, enrolled_biometrics: 0, scanned_documents: 0 }] };
@@ -941,14 +943,17 @@ exports.getDashboardData = async (req, res) => {
                         creator.email
                     ) AS created_by_name,
                     creator.email AS created_by_email,
-                    COALESCE(c.dealer_id, creator.dealer_id) AS dealer_id,
+                    COALESCE(c.dealer_id, creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id) AS dealer_id,
                     d.dealer_name,
                     d.dealer_code
                 FROM customers c
                 LEFT JOIN users creator ON creator.id = c.created_by_agent
-                LEFT JOIN dealers d ON d.id = COALESCE(c.dealer_id, creator.dealer_id)
+                LEFT JOIN employees creator_employee ON creator_employee.user_id = creator.id
+                LEFT JOIN dealers creator_admin_dealer ON creator_admin_dealer.admin_user_id = creator.id
+                LEFT JOIN dealers creator_email_dealer ON LOWER(creator_email_dealer.contact_email) = LOWER(creator.email)
+                LEFT JOIN dealers d ON d.id = COALESCE(c.dealer_id, creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id)
                 LEFT JOIN roles creator_role ON creator_role.id = creator.role_id
-                ${isDealerScopedView ? 'WHERE COALESCE(c.dealer_id, creator.dealer_id) = $1' : ''}
+                ${isDealerScopedView ? 'WHERE COALESCE(c.dealer_id, creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id) = $1' : ''}
                 ORDER BY c.full_name ASC
                 LIMIT 2000
                 `,
@@ -1387,7 +1392,8 @@ exports.getDashboardData = async (req, res) => {
                         u.dealer_id,
                         ordered_employee.dealer_id,
                         ordered_admin_dealer.id,
-                        ordered_email_dealer.id
+                        ordered_email_dealer.id,
+                        ${hasDealerDataScope ? 'CASE WHEN so.ordered_by = $2::uuid THEN $1::uuid ELSE NULL END' : 'NULL'}
                     ) AS resolved_dealer_id,
                     CASE
                         WHEN so.dealer_id IS NOT NULL THEN 'stock_order'
@@ -1397,6 +1403,7 @@ exports.getDashboardData = async (req, res) => {
                         WHEN ordered_employee.dealer_id IS NOT NULL THEN 'ordered_by_employee'
                         WHEN ordered_admin_dealer.id IS NOT NULL THEN 'ordered_by_admin_dealer'
                         WHEN ordered_email_dealer.id IS NOT NULL THEN 'ordered_by_email_dealer'
+                        ${hasDealerDataScope ? "WHEN so.ordered_by = $2::uuid THEN 'current_user_fallback'" : ''}
                         ELSE 'unmapped'
                     END AS ownership_source
             ) stock_scope ON true

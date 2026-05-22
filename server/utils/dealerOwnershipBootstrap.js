@@ -105,6 +105,11 @@ const syncDealerOwnershipLight = async () => {
     await ensureColumn('company_profiles', 'dealer_id', 'UUID');
     await ensureColumn('company_profiles', 'created_by', 'UUID');
     await ensureColumn('stock_orders', 'dealer_id', 'UUID');
+    await ensureColumn('vehicles', 'dealer_id', 'UUID');
+    await ensureColumn('customers', 'dealer_id', 'UUID');
+    await ensureColumn('customers', 'created_by_agent', 'UUID');
+    await ensureColumn('sales_transactions', 'dealer_id', 'UUID');
+    await ensureColumn('sale_installments', 'dealer_id', 'UUID');
 
     await syncUsersToDealerProfiles();
 
@@ -132,12 +137,23 @@ const syncDealerOwnershipLight = async () => {
         FROM (
             SELECT
                 so2.id,
-                COALESCE(order_user.dealer_id, pc.dealer_id, cp.dealer_id) AS dealer_id
+                COALESCE(
+                    so2.dealer_id,
+                    order_employee.dealer_id,
+                    order_user.dealer_id,
+                    ordered_admin_dealer.id,
+                    ordered_email_dealer.id,
+                    pc.dealer_id,
+                    cp.dealer_id
+                ) AS dealer_id
             FROM stock_orders so2
             LEFT JOIN users order_user ON order_user.id = so2.ordered_by
+            LEFT JOIN employees order_employee ON order_employee.user_id = order_user.id
+            LEFT JOIN dealers ordered_admin_dealer ON ordered_admin_dealer.admin_user_id = order_user.id
+            LEFT JOIN dealers ordered_email_dealer ON LOWER(ordered_email_dealer.contact_email) = LOWER(order_user.email)
             LEFT JOIN product_catalog pc ON pc.id = so2.product_id
             LEFT JOIN company_profiles cp ON cp.id = so2.company_profile_id
-            WHERE COALESCE(order_user.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
+            WHERE COALESCE(so2.dealer_id, order_employee.dealer_id, order_user.dealer_id, ordered_admin_dealer.id, ordered_email_dealer.id, pc.dealer_id, cp.dealer_id) IS NOT NULL
         ) stock_scope
         WHERE stock_scope.id = so.id
           AND so.dealer_id IS NULL
@@ -173,6 +189,75 @@ const syncDealerOwnershipLight = async () => {
         ) stock_owner
         WHERE stock_owner.company_profile_id = cp.id
           AND cp.dealer_id IS NULL
+    `);
+
+    await run(`
+        UPDATE vehicles v
+        SET dealer_id = vehicle_scope.dealer_id
+        FROM (
+            SELECT
+                v2.id,
+                COALESCE(v2.dealer_id, so.dealer_id, order_employee.dealer_id, order_user.dealer_id, ordered_admin_dealer.id, ordered_email_dealer.id, pc.dealer_id, cp.dealer_id) AS dealer_id
+            FROM vehicles v2
+            LEFT JOIN stock_orders so ON so.id = v2.source_stock_order_id
+            LEFT JOIN users order_user ON order_user.id = so.ordered_by
+            LEFT JOIN employees order_employee ON order_employee.user_id = order_user.id
+            LEFT JOIN dealers ordered_admin_dealer ON ordered_admin_dealer.admin_user_id = order_user.id
+            LEFT JOIN dealers ordered_email_dealer ON LOWER(ordered_email_dealer.contact_email) = LOWER(order_user.email)
+            LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
+            WHERE COALESCE(v2.dealer_id, so.dealer_id, order_employee.dealer_id, order_user.dealer_id, ordered_admin_dealer.id, ordered_email_dealer.id, pc.dealer_id, cp.dealer_id) IS NOT NULL
+        ) vehicle_scope
+        WHERE vehicle_scope.id = v.id
+          AND v.dealer_id IS NULL
+    `);
+
+    await run(`
+        UPDATE customers c
+        SET dealer_id = customer_scope.dealer_id
+        FROM (
+            SELECT
+                c2.id,
+                COALESCE(c2.dealer_id, creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id) AS dealer_id
+            FROM customers c2
+            LEFT JOIN users creator ON creator.id = c2.created_by_agent
+            LEFT JOIN employees creator_employee ON creator_employee.user_id = creator.id
+            LEFT JOIN dealers creator_admin_dealer ON creator_admin_dealer.admin_user_id = creator.id
+            LEFT JOIN dealers creator_email_dealer ON LOWER(creator_email_dealer.contact_email) = LOWER(creator.email)
+            WHERE COALESCE(c2.dealer_id, creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id) IS NOT NULL
+        ) customer_scope
+        WHERE customer_scope.id = c.id
+          AND c.dealer_id IS NULL
+    `);
+
+    await run(`
+        UPDATE sales_transactions st
+        SET dealer_id = sale_scope.dealer_id
+        FROM (
+            SELECT
+                st2.id,
+                COALESCE(st2.dealer_id, agent_employee.dealer_id, agent.dealer_id, agent_admin_dealer.id, agent_email_dealer.id, c.dealer_id, v.dealer_id, so.dealer_id) AS dealer_id
+            FROM sales_transactions st2
+            JOIN users agent ON agent.id = st2.agent_id
+            LEFT JOIN employees agent_employee ON agent_employee.user_id = agent.id
+            LEFT JOIN dealers agent_admin_dealer ON agent_admin_dealer.admin_user_id = agent.id
+            LEFT JOIN dealers agent_email_dealer ON LOWER(agent_email_dealer.contact_email) = LOWER(agent.email)
+            LEFT JOIN customers c ON c.id = st2.customer_id
+            LEFT JOIN vehicles v ON v.id = st2.vehicle_id
+            LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
+            WHERE COALESCE(st2.dealer_id, agent_employee.dealer_id, agent.dealer_id, agent_admin_dealer.id, agent_email_dealer.id, c.dealer_id, v.dealer_id, so.dealer_id) IS NOT NULL
+        ) sale_scope
+        WHERE sale_scope.id = st.id
+          AND st.dealer_id IS NULL
+    `);
+
+    await run(`
+        UPDATE sale_installments si
+        SET dealer_id = st.dealer_id
+        FROM sales_transactions st
+        WHERE st.id = si.sale_id
+          AND si.dealer_id IS NULL
+          AND st.dealer_id IS NOT NULL
     `);
 };
 
@@ -232,12 +317,23 @@ const performDealerOwnershipSync = async () => {
         FROM (
             SELECT
                 so2.id,
-                COALESCE(order_user.dealer_id, pc.dealer_id, cp.dealer_id) AS dealer_id
+                COALESCE(
+                    so2.dealer_id,
+                    order_employee.dealer_id,
+                    order_user.dealer_id,
+                    ordered_admin_dealer.id,
+                    ordered_email_dealer.id,
+                    pc.dealer_id,
+                    cp.dealer_id
+                ) AS dealer_id
             FROM stock_orders so2
             LEFT JOIN users order_user ON order_user.id = so2.ordered_by
+            LEFT JOIN employees order_employee ON order_employee.user_id = order_user.id
+            LEFT JOIN dealers ordered_admin_dealer ON ordered_admin_dealer.admin_user_id = order_user.id
+            LEFT JOIN dealers ordered_email_dealer ON LOWER(ordered_email_dealer.contact_email) = LOWER(order_user.email)
             LEFT JOIN product_catalog pc ON pc.id = so2.product_id
             LEFT JOIN company_profiles cp ON cp.id = so2.company_profile_id
-            WHERE COALESCE(order_user.dealer_id, pc.dealer_id, cp.dealer_id) IS NOT NULL
+            WHERE COALESCE(so2.dealer_id, order_employee.dealer_id, order_user.dealer_id, ordered_admin_dealer.id, ordered_email_dealer.id, pc.dealer_id, cp.dealer_id) IS NOT NULL
         ) stock_scope
         WHERE stock_scope.id = so.id
           AND so.dealer_id IS NULL
@@ -273,6 +369,75 @@ const performDealerOwnershipSync = async () => {
         ) stock_owner
         WHERE stock_owner.company_profile_id = cp.id
           AND cp.dealer_id IS NULL
+    `);
+
+    await run(`
+        UPDATE vehicles v
+        SET dealer_id = vehicle_scope.dealer_id
+        FROM (
+            SELECT
+                v2.id,
+                COALESCE(v2.dealer_id, so.dealer_id, order_employee.dealer_id, order_user.dealer_id, ordered_admin_dealer.id, ordered_email_dealer.id, pc.dealer_id, cp.dealer_id) AS dealer_id
+            FROM vehicles v2
+            LEFT JOIN stock_orders so ON so.id = v2.source_stock_order_id
+            LEFT JOIN users order_user ON order_user.id = so.ordered_by
+            LEFT JOIN employees order_employee ON order_employee.user_id = order_user.id
+            LEFT JOIN dealers ordered_admin_dealer ON ordered_admin_dealer.admin_user_id = order_user.id
+            LEFT JOIN dealers ordered_email_dealer ON LOWER(ordered_email_dealer.contact_email) = LOWER(order_user.email)
+            LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
+            WHERE COALESCE(v2.dealer_id, so.dealer_id, order_employee.dealer_id, order_user.dealer_id, ordered_admin_dealer.id, ordered_email_dealer.id, pc.dealer_id, cp.dealer_id) IS NOT NULL
+        ) vehicle_scope
+        WHERE vehicle_scope.id = v.id
+          AND v.dealer_id IS NULL
+    `);
+
+    await run(`
+        UPDATE customers c
+        SET dealer_id = customer_scope.dealer_id
+        FROM (
+            SELECT
+                c2.id,
+                COALESCE(c2.dealer_id, creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id) AS dealer_id
+            FROM customers c2
+            LEFT JOIN users creator ON creator.id = c2.created_by_agent
+            LEFT JOIN employees creator_employee ON creator_employee.user_id = creator.id
+            LEFT JOIN dealers creator_admin_dealer ON creator_admin_dealer.admin_user_id = creator.id
+            LEFT JOIN dealers creator_email_dealer ON LOWER(creator_email_dealer.contact_email) = LOWER(creator.email)
+            WHERE COALESCE(c2.dealer_id, creator_employee.dealer_id, creator.dealer_id, creator_admin_dealer.id, creator_email_dealer.id) IS NOT NULL
+        ) customer_scope
+        WHERE customer_scope.id = c.id
+          AND c.dealer_id IS NULL
+    `);
+
+    await run(`
+        UPDATE sales_transactions st
+        SET dealer_id = sale_scope.dealer_id
+        FROM (
+            SELECT
+                st2.id,
+                COALESCE(st2.dealer_id, agent_employee.dealer_id, agent.dealer_id, agent_admin_dealer.id, agent_email_dealer.id, c.dealer_id, v.dealer_id, so.dealer_id) AS dealer_id
+            FROM sales_transactions st2
+            JOIN users agent ON agent.id = st2.agent_id
+            LEFT JOIN employees agent_employee ON agent_employee.user_id = agent.id
+            LEFT JOIN dealers agent_admin_dealer ON agent_admin_dealer.admin_user_id = agent.id
+            LEFT JOIN dealers agent_email_dealer ON LOWER(agent_email_dealer.contact_email) = LOWER(agent.email)
+            LEFT JOIN customers c ON c.id = st2.customer_id
+            LEFT JOIN vehicles v ON v.id = st2.vehicle_id
+            LEFT JOIN stock_orders so ON so.id = v.source_stock_order_id
+            WHERE COALESCE(st2.dealer_id, agent_employee.dealer_id, agent.dealer_id, agent_admin_dealer.id, agent_email_dealer.id, c.dealer_id, v.dealer_id, so.dealer_id) IS NOT NULL
+        ) sale_scope
+        WHERE sale_scope.id = st.id
+          AND st.dealer_id IS NULL
+    `);
+
+    await run(`
+        UPDATE sale_installments si
+        SET dealer_id = st.dealer_id
+        FROM sales_transactions st
+        WHERE st.id = si.sale_id
+          AND si.dealer_id IS NULL
+          AND st.dealer_id IS NOT NULL
     `);
 
     await run(`
