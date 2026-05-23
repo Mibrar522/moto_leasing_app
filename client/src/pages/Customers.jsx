@@ -397,6 +397,7 @@ if (!canOpenCustomers) {
                             {filteredCustomers.length === 0 ? (
                                 renderEmptyState('No customers found yet. Create the first customer intake record above.')
                             ) : (
+                                <>
                                 <table className="pro-table">
                                     <thead>
                                         <tr>
@@ -468,6 +469,18 @@ if (!canOpenCustomers) {
                                         })}
                                     </tbody>
                                 </table>
+                                {filteredCustomers.length > 5 ? (
+                                    <div className="inline-actions spaced-top">
+                                        <button
+                                            type="button"
+                                            className="view-btn"
+                                            onClick={() => setCustomerRegisterOpen((current) => !current)}
+                                        >
+                                            {customerRegisterOpen ? 'View less' : 'View more'}
+                                        </button>
+                                    </div>
+                                ) : null}
+                                </>
                             )}
                         </div>
                         ) : null}
