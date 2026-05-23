@@ -408,7 +408,7 @@ const ACCESS_PAGE_GROUPS = [
         key: 'stock',
         label: 'Stock',
         description: 'Stock ordering, receiving, and company stock operations.',
-        featureKeys: ['FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT', 'FEAT_STOCK_ORDER_FORM', 'FEAT_STOCK_RECEIVED_VIEW', 'FEAT_STOCK_REGISTER', 'FEAT_STOCK_RECEIVE', 'FEAT_STOCK_UPDATE', 'FEAT_STOCK_DELETE'],
+        featureKeys: ['FEAT_STOCK_MGMT', 'FEAT_FLEET_MGMT', 'FEAT_STOCK_ORDER_FORM', 'FEAT_STOCK_RECEIVED_VIEW', 'FEAT_STOCK_RECEIVED_UPDATE', 'FEAT_STOCK_RECEIVED_DELETE', 'FEAT_STOCK_REGISTER', 'FEAT_STOCK_RECEIVE', 'FEAT_STOCK_UPDATE', 'FEAT_STOCK_DELETE'],
     },
     {
         key: 'sales',
@@ -1102,6 +1102,8 @@ const FEATURE_ACCESS_LABELS = {
     ...Object.fromEntries(SALES_FIELD_ACCESS.map(([featureKey, label]) => [featureKey, label])),
     FEAT_STOCK_ORDER_FORM: 'Order Stock',
     FEAT_STOCK_RECEIVED_VIEW: 'Stock Received From Company',
+    FEAT_STOCK_RECEIVED_UPDATE: 'Update Received Stock Button',
+    FEAT_STOCK_RECEIVED_DELETE: 'Delete Received Stock Button',
     FEAT_STOCK_REGISTER: 'Stock Ordering Register',
     FEAT_STOCK_RECEIVE: 'Receive Stock Button',
     FEAT_STOCK_UPDATE: 'Update Stock Button',
@@ -2403,6 +2405,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canReceiveStock = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_RECEIVE']);
     const canUpdateStockOrder = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_UPDATE']);
     const canDeleteStockOrder = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_DELETE']);
+    const canUpdateReceivedStock = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_RECEIVED_UPDATE']);
+    const canDeleteReceivedStock = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_RECEIVED_DELETE']);
     const canViewInstallmentOverview = canManageInstallments && hasAnyFeature(user, ['FEAT_INSTALLMENT_OVERVIEW']);
     const canViewInstallmentCollection = canManageInstallments && hasAnyFeature(user, ['FEAT_INSTALLMENT_COLLECTION']);
     const canOpenSalesWorkspace = [
@@ -7497,6 +7501,41 @@ const selectedCustomer = useMemo(
         );
     };
 
+    const findReceivedStockDuplicate = (item = {}) => {
+        const fields = [
+            { key: 'registration_number', label: 'Registration number', value: item.registration_number },
+            { key: 'chassis_number', label: 'Chassis number', value: item.chassis_number },
+            { key: 'engine_number', label: 'Engine number', value: item.engine_number },
+        ];
+
+        for (const field of fields) {
+            const normalizedValue = normalizeTextValue(field.value);
+            if (!normalizedValue) continue;
+
+            const duplicateVehicle = (dashboardData.inventory || []).find((vehicle) => {
+                if (String(vehicle.source_stock_order_id || '') === String(receivingStockOrder?.id || '')) {
+                    return false;
+                }
+
+                return normalizeTextValue(vehicle[field.key]) === normalizedValue;
+            });
+
+            if (duplicateVehicle) {
+                const vehicleLabel = [
+                    duplicateVehicle.brand,
+                    duplicateVehicle.model,
+                    duplicateVehicle.registration_number ? `Reg: ${duplicateVehicle.registration_number}` : '',
+                    duplicateVehicle.chassis_number ? `Chassis: ${duplicateVehicle.chassis_number}` : '',
+                    duplicateVehicle.engine_number ? `Engine: ${duplicateVehicle.engine_number}` : '',
+                ].filter(Boolean).join(' / ');
+
+                return `${field.label} "${String(field.value || '').trim()}" already exists in inventory${vehicleLabel ? ` (${vehicleLabel})` : ''}. Duplicate vehicles are not allowed. Please verify the received stock details before saving.`;
+            }
+        }
+
+        return '';
+    };
+
     const handleSubmitReceivedStock = async (event) => {
         event.preventDefault();
 
@@ -7513,6 +7552,12 @@ const selectedCustomer = useMemo(
 
         if (missingItem) {
             setStockMessage('Registration number, chassis number, and engine number are required for each received vehicle.');
+            return;
+        }
+
+        const duplicateMessage = stockReceiveItems.map(findReceivedStockDuplicate).find(Boolean);
+        if (duplicateMessage) {
+            setStockMessage(duplicateMessage);
             return;
         }
 
@@ -9523,6 +9568,8 @@ const selectedCustomer = useMemo(
                     canReceiveStock={canReceiveStock}
                     canUpdateStockOrder={canUpdateStockOrder}
                     canDeleteStockOrder={canDeleteStockOrder}
+                    canUpdateReceivedStock={canUpdateReceivedStock}
+                    canDeleteReceivedStock={canDeleteReceivedStock}
                     handleEditStockOrder={handleEditStockOrder}
                     handleDeleteStockOrder={handleDeleteStockOrder}
                     resetStockOrderForm={resetStockOrderForm}
@@ -10079,6 +10126,7 @@ const selectedCustomer = useMemo(
                         </div>
 
                         <form className="receive-modal-form" onSubmit={handleSubmitReceivedStock}>
+                            {stockMessage ? <div className="notice-banner stock-receive-warning">{stockMessage}</div> : null}
                             <div className="form-grid">
                                 <label className="field">
                                     <span>Company</span>
