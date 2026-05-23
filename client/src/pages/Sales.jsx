@@ -293,10 +293,26 @@ if (!canCreateSales) {
                                             <div><span className="meta-label">Monthly Installment</span><p className="meta-value">{formatCurrency(saleForm.monthly_installment)}</p></div>
                                         </>
                                     ) : null}
-                                    <div><span className="meta-label">Witness 1</span><p className="meta-value">{[saleForm.witness_name, saleForm.witness_father_name, saleForm.witness_mobile_number, saleForm.witness_cnic].filter(Boolean).join(' / ') || 'Not set'}</p></div>
-                                    <div><span className="meta-label">Witness 1 Address</span><p className="meta-value">{saleForm.witness_address || 'Not set'}</p></div>
-                                    <div><span className="meta-label">Witness 2</span><p className="meta-value">{[saleForm.witness_two_name, saleForm.witness_two_father_name, saleForm.witness_two_mobile_number, saleForm.witness_two_cnic].filter(Boolean).join(' / ') || 'Not set'}</p></div>
-                                    <div><span className="meta-label">Witness 2 Address</span><p className="meta-value">{saleForm.witness_two_address || 'Not set'}</p></div>
+                                    <div className="summary-witness-card full-span">
+                                        <span className="meta-label">Witness 1</span>
+                                        <div className="summary-witness-grid">
+                                            <p><span>Name</span><strong>{saleForm.witness_name || 'Not set'}</strong></p>
+                                            <p><span>Father Name</span><strong>{saleForm.witness_father_name || 'Not set'}</strong></p>
+                                            <p><span>Mobile</span><strong>{saleForm.witness_mobile_number || 'Not set'}</strong></p>
+                                            <p><span>CNIC</span><strong>{saleForm.witness_cnic || 'Not set'}</strong></p>
+                                            <p className="summary-witness-address"><span>Address</span><strong>{saleForm.witness_address || 'Not set'}</strong></p>
+                                        </div>
+                                    </div>
+                                    <div className="summary-witness-card full-span summary-witness-card-optional">
+                                        <span className="meta-label">Witness 2</span>
+                                        <div className="summary-witness-grid">
+                                            <p><span>Name</span><strong>{saleForm.witness_two_name || 'Not set'}</strong></p>
+                                            <p><span>Father Name</span><strong>{saleForm.witness_two_father_name || 'Not set'}</strong></p>
+                                            <p><span>Mobile</span><strong>{saleForm.witness_two_mobile_number || 'Not set'}</strong></p>
+                                            <p><span>CNIC</span><strong>{saleForm.witness_two_cnic || 'Not set'}</strong></p>
+                                            <p className="summary-witness-address"><span>Address</span><strong>{saleForm.witness_two_address || 'Not set'}</strong></p>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="detail-grid sale-document-grid">
                                     <div>
