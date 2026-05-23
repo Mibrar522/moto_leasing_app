@@ -1225,6 +1225,42 @@ const renderPrintAssetMarkup = (assetPath, emptyMessage, label, frameClass = 'pr
     return `<iframe src="${escapeHtml(assetUrl)}" title="${escapeHtml(label)}" class="${escapeHtml(frameClass)}"></iframe>`;
 };
 
+const renderPrintWitnessOneBlock = (sale = {}) => {
+    const witness = {
+        name: String(sale.witness_name || '').trim(),
+        mobile: String(sale.witness_mobile_number || '').trim(),
+        cnic: String(sale.witness_cnic || '').trim(),
+        address: String(sale.witness_address || '').trim(),
+    };
+
+    if (!witness.name && !witness.mobile && !witness.cnic && !witness.address) {
+        return '';
+    }
+
+    return `
+        <div class="witness-card">
+            <span class="label">Witness 1</span>
+            <div class="witness-grid">
+                <div><span>Name</span><strong>${escapeHtml(witness.name || 'Not set')}</strong></div>
+                <div><span>Mobile</span><strong>${escapeHtml(witness.mobile || 'Not set')}</strong></div>
+                <div><span>CNIC</span><strong>${escapeHtml(witness.cnic || 'Not set')}</strong></div>
+                <div class="witness-address"><span>Address</span><strong>${escapeHtml(witness.address || 'Not set')}</strong></div>
+            </div>
+        </div>
+    `;
+};
+
+const renderPrintWitnessOneSummary = (sale = {}) => {
+    const values = [
+        String(sale.witness_name || '').trim(),
+        String(sale.witness_mobile_number || '').trim(),
+        String(sale.witness_cnic || '').trim(),
+        String(sale.witness_address || '').trim(),
+    ].filter(Boolean);
+
+    return values.length ? escapeHtml(values.join(' / ')) : 'Not set';
+};
+
 const getInitials = (name) =>
     name
         ? (() => {
@@ -3957,7 +3993,8 @@ const selectedCustomer = useMemo(
                 if (!matchesReportBranch(sale.branch_name)) return false;
                 if (!matchesReportAgent(sale.agent_name)) return false;
                 if (activeReportSaleMode !== 'ALL' && saleMode !== activeReportSaleMode) return false;
-                if (activeReportStatus !== 'ALL' && status !== activeReportStatus && sale.business_status !== activeReportStatus) return false;
+                const businessReportStatus = ['ALL', 'RECEIVED', 'PENDING', 'PROFIT', 'LOSS'].includes(activeReportStatus) ? activeReportStatus : 'ALL';
+                if (businessReportStatus !== 'ALL' && status !== businessReportStatus && sale.business_status !== businessReportStatus) return false;
                 if (normalizedReportKeyword && !sale.searchable.includes(normalizedReportKeyword)) return false;
                 return true;
             })
@@ -7303,6 +7340,11 @@ const selectedCustomer = useMemo(
                     .hero img, .hero .fallback { width: 100%; height: 220px; object-fit: cover; border-radius: 14px; border: 1px solid #cbd5e1; background: #f8fafc; }
                     .hero .fallback { display: flex; align-items: center; justify-content: center; color: #64748b; font-weight: 700; }
                     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+                    .witness-card { grid-column: 1 / -1; border: 1px solid #dbeafe; border-radius: 12px; background: #f8fbff; padding: 10px 12px; page-break-inside: avoid; break-inside: avoid; }
+                    .witness-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }
+                    .witness-grid span { display: block; color: #64748b; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+                    .witness-grid strong { display: block; color: #0f172a; font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+                    .witness-address { grid-column: 1 / -1; }
                     .label { display: block; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.08em; }
                     .value { font-size: 16px; font-weight: 700; color: #0f172a; }
                     .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0 16px; }
@@ -7388,6 +7430,7 @@ const selectedCustomer = useMemo(
                         <div><span class="label">Customer</span><div class="value">${escapeHtml(selectedInstallmentSale.customer_name)}</div></div>
                         <div><span class="label">Customer CNIC</span><div class="value">${escapeHtml(selectedInstallmentSale.cnic_passport_number)}</div></div>
                         <div><span class="label">Dealer</span><div class="value">${escapeHtml(formatSaleDealerIdentity(selectedInstallmentSale))}</div></div>
+                        ${renderPrintWitnessOneBlock(selectedInstallmentSale)}
                         <div><span class="label">Recorded By</span><div class="value">${escapeHtml(selectedInstallmentSale.agent_name || 'System')}</div></div>
                         <div><span class="label">Vehicle</span><div class="value">${escapeHtml(`${selectedInstallmentSale.brand} ${selectedInstallmentSale.model}`)}</div></div>
                         <div><span class="label">Registration</span><div class="value">${escapeHtml(selectedInstallmentSale.registration_number || 'Not set')}</div></div>
@@ -7498,6 +7541,7 @@ const selectedCustomer = useMemo(
                         <div><span class="label">Customer</span><div class="value">${escapeHtml(sale.customer_name || 'Not set')}</div></div>
                         <div><span class="label">Customer CNIC</span><div class="value">${escapeHtml(sale.cnic_passport_number || 'Not set')}</div></div>
                         <div><span class="label">Dealer</span><div class="value">${escapeHtml(formatSaleDealerIdentity(sale))}</div></div>
+                        ${renderPrintWitnessOneBlock(sale)}
                         <div><span class="label">Recorded By</span><div class="value">${escapeHtml(sale.agent_name || 'System')}</div></div>
                         <div><span class="label">Vehicle</span><div class="value">${escapeHtml(`${sale.brand || ''} ${sale.model || ''}`.trim() || 'Not set')}</div></div>
                         <div><span class="label">Mode</span><div class="value">${escapeHtml(sale.sale_mode || 'Not set')}</div></div>
@@ -8187,6 +8231,7 @@ const selectedCustomer = useMemo(
                         <div><span class="label">Customer</span><div class="value">${escapeHtml(selectedInstallmentSale.customer_name)}</div></div>
                         <div><span class="label">Customer CNIC</span><div class="value">${escapeHtml(selectedInstallmentSale.cnic_passport_number)}</div></div>
                         <div><span class="label">Dealer</span><div class="value">${escapeHtml(formatSaleDealerIdentity(selectedInstallmentSale))}</div></div>
+                        ${renderPrintWitnessOneBlock(selectedInstallmentSale)}
                         <div><span class="label">Recorded By</span><div class="value">${escapeHtml(selectedInstallmentSale.agent_name || 'System')}</div></div>
                         <div><span class="label">Vehicle</span><div class="value">${escapeHtml(`${selectedInstallmentSale.brand} ${selectedInstallmentSale.model}`)}</div></div>
                         <div><span class="label">Registration</span><div class="value">${escapeHtml(selectedInstallmentSale.registration_number || 'Not set')}</div></div>
@@ -8210,6 +8255,7 @@ const selectedCustomer = useMemo(
                     <thead>
                         <tr>
                             <th>Customer</th>
+                            <th>Witness 1</th>
                             <th>Dealer</th>
                             <th>Vehicle</th>
                             <th>Received</th>
@@ -8221,6 +8267,7 @@ const selectedCustomer = useMemo(
                     <tbody>
                         <tr>
                             <td>${escapeHtml(selectedInstallmentSale.customer_name)}</td>
+                            <td>${renderPrintWitnessOneSummary(selectedInstallmentSale)}</td>
                             <td>${escapeHtml(formatSaleDealerIdentity(selectedInstallmentSale))}</td>
                             <td>${escapeHtml(`${selectedInstallmentSale.brand} ${selectedInstallmentSale.model}`)}</td>
                             <td>${escapeHtml(formatCurrency(row.received_amount))}</td>
