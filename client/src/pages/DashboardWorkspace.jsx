@@ -1416,26 +1416,41 @@ const extractOcrFields = (rawText, currentDocumentType, assetType = '') => {
         .replace(/[^\u0600-\u06FF\s]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
+    const cleanUrduAddressCandidate = (value) => String(value || '')
+        .replace(/[0-9\u06F0-\u06F9\u0660-\u0669\-_/|:.,]+/g, ' ')
+        .replace(/(?:\u0645\u0648\u062C\u0648\u062F\u06C1|\u0639\u0627\u0631\u0636\u06CC|\u0645\u0633\u062A\u0642\u0644)\s*\u067E\u062A\u06C1\s*/g, ' ')
+        .replace(/(?:\u0636\u0644\u0639|\u062A\u062D\u0635\u06CC\u0644)\s*:?/g, ' ')
+        .replace(/\u0631\u062C\u0633\u0679\u0631\u0627\u0631|\u062C\u0646\u0631\u0644|\u067E\u0627\u06A9\u0633\u062A\u0627\u0646|\u0634\u0646\u0627\u062E\u062A\u06CC|\u06A9\u0627\u0631\u0688|\u06AF\u0645\u0634\u062F\u06C1|\u0642\u0631\u06CC\u0628\u06CC|\u0644\u06CC\u0679\u0631\s*\u0628\u06A9\u0633|\u0688\u0627\u0644\s*\u062F\u06CC\u06BA/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const isLikelyUrduAddress = (value) => {
+        const cleaned = cleanUrduAddressCandidate(value);
+        if (!containsUrdu(cleaned)) return '';
+        if (cleaned.length < 8) return '';
+        return cleaned;
+    };
     const extractQrAlignedUrduAddress = () => {
+        const labelPatterns = [/\u0645\u0633\u062A\u0642\u0644\s*\u067E\u062A\u06C1/, /\u0639\u0627\u0631\u0636\u06CC\s*\u067E\u062A\u06C1/, /\u0645\u0648\u062C\u0648\u062F\u06C1\s*\u067E\u062A\u06C1/];
+
+        for (let index = 0; index < lines.length; index += 1) {
+            const line = String(lines[index] || '').trim();
+            if (!containsUrdu(line) || !labelPatterns.some((pattern) => pattern.test(line))) continue;
+
+            const sameLine = isLikelyUrduAddress(line);
+            if (sameLine) return sameLine;
+
+            for (let cursor = index + 1; cursor < Math.min(lines.length, index + 4); cursor += 1) {
+                const candidate = isLikelyUrduAddress(lines[cursor]);
+                if (candidate) return candidate;
+            }
+        }
+
         const urduCandidates = lines
-            .map((line, index) => ({ index, line: String(line || '').trim() }))
-            .filter(({ line }) => containsUrdu(line))
-            .filter(({ line }) => !/\d/.test(line))
-            .filter(({ line }) => line.length >= 12)
-            .filter(({ line }) => !/رجسٹرار|شناختی|کارڈ/i.test(line))
-            .filter(({ line }) => !/پرنٹ|والدین/i.test(line));
+            .map((line, index) => ({ index, line: isLikelyUrduAddress(line) }))
+            .filter(({ line }) => line)
+            .filter(({ line }) => !/\u0631\u062C\u0633\u0679\u0631\u0627\u0631|\u0634\u0646\u0627\u062E\u062A\u06CC|\u06A9\u0627\u0631\u0688|\u06AF\u0645\u0634\u062F\u06C1|\u0644\u06CC\u0679\u0631\s*\u0628\u06A9\u0633/i.test(line));
 
         if (urduCandidates.length === 0) return '';
-
-        const rankedByPosition = [...urduCandidates].sort((a, b) => a.index - b.index);
-        if (rankedByPosition.length >= 2) {
-            return rankedByPosition[1].line;
-        }
-
-        const topWindow = rankedByPosition.filter(({ index }) => index <= 3);
-        if (topWindow.length > 0) {
-            return topWindow[topWindow.length - 1].line;
-        }
 
         const grouped = new Map();
         urduCandidates.forEach(({ index, line }) => {
@@ -1528,6 +1543,25 @@ const extractOcrFields = (rawText, currentDocumentType, assetType = '') => {
 
         return /\bpakistan\b/i.test(text) ? 'Pakistan' : '';
     };
+    const normalizeCnicDate = (value) => {
+        const match = String(value || '').match(/\b(\d{2})[./-](\d{2})[./-](\d{4})\b/);
+        return match ? `${match[1]}.${match[2]}.${match[3]}` : '';
+    };
+    const extractDateValue = (labelPatterns) => {
+        for (let index = 0; index < lines.length; index += 1) {
+            const line = lines[index];
+            if (!matchesAnyPattern(line, labelPatterns)) continue;
+
+            const sameLineDate = normalizeCnicDate(line);
+            if (sameLineDate) return sameLineDate;
+
+            const windowText = lines.slice(index + 1, Math.min(lines.length, index + 4)).join(' ');
+            const windowDate = normalizeCnicDate(windowText);
+            if (windowDate) return windowDate;
+        }
+
+        return '';
+    };
     const extractGenderValue = () => {
         const regexGender = normalizedText.match(/gender[^\n]*\n+([MF])/i);
         if (regexGender?.[1]) {
@@ -1583,11 +1617,9 @@ const extractOcrFields = (rawText, currentDocumentType, assetType = '') => {
         /^country/i,
         /^gender/i,
     ]);
-    const dateOfBirth = regexValue(/date\s+of\s+birth[:\s-]*([0-9]{2}[./-][0-9]{2}[./-][0-9]{4})/i)
-        || valueNearLabel([/\bdate\s+of\s+birth\b/i], (value) => {
-            const cleaned = cleanCandidate(value);
-            return /^[0-9]{2}[./-][0-9]{2}[./-][0-9]{4}$/.test(cleaned) ? cleaned : '';
-        });
+    const dateOfBirth = extractDateValue([/\bdate\s+of\s+birth\b/i, /\bdate\s+of\s*birth\b/i])
+        || regexValue(/date\s+of\s+birth[:\s-]*([0-9]{2}[./-][0-9]{2}[./-][0-9]{4})/i)
+        || valueNearLabel([/\bdate\s+of\s+birth\b/i], (value) => normalizeCnicDate(value));
     const fallbackName = extractedName
         || '';
     const fallbackFatherName = fatherName

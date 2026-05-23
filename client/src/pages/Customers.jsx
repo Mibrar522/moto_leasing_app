@@ -78,6 +78,15 @@ export default function Customers({ ctx }) {
   const showCustomerThumbUpload = canEditCustomerFingerprintFields && canEditCustomerField('Thumb Upload');
   const showCustomerSignatureUpload = canEditCustomerField('Signature Upload');
   const showCustomerPassportPhoto = true;
+  const toDateInputValue = (value = '') => {
+    const normalized = String(value || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+
+    const dotted = normalized.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
+    if (dotted) return `${dotted[3]}-${dotted[2]}-${dotted[1]}`;
+
+    return '';
+  };
 
 if (!canOpenCustomers) {
                     return <div className="feedback-card error">Your account does not have customer onboarding access.</div>;
@@ -162,7 +171,7 @@ if (!canOpenCustomers) {
                                     </label>
                                     <label className="field" hidden={!canEditCustomerField('Date Of Birth')}>
                                         <span>Date Of Birth</span>
-                                        <input name="date_of_birth" value={customerForm.date_of_birth} onChange={handleCustomerChange} placeholder="16.06.1994" />
+                                        <input type="date" name="date_of_birth" value={toDateInputValue(customerForm.date_of_birth)} onChange={handleCustomerChange} />
                                     </label>
                                     <label className="field" hidden={!canEditCustomerField('Gender')}>
                                         <span>Gender</span>
