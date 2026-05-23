@@ -1878,6 +1878,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [uploadingSaleCnicBack, setUploadingSaleCnicBack] = useState(false);
     const [uploadingCustomerAsset, setUploadingCustomerAsset] = useState(false);
     const [cnicUploadPreview, setCnicUploadPreview] = useState(null);
+    const cropImageRef = useRef(null);
+    const cropInteractionRef = useRef(null);
     const [uploadingEmployeeDocument, setUploadingEmployeeDocument] = useState(false);
     const [error, setError] = useState('');
     const [customerMessage, setCustomerMessage] = useState('');
@@ -6367,12 +6369,15 @@ const selectedCustomer = useMemo(
 
         try {
             setUploadingState(true);
-            const uploadFile = options.cropCnic ? await cropCnicDocumentImage(file, options.cropSide, options.cropSettings) : file;
+            const uploadFile = options.cropImage
+                ? await cropImageFileByPercent(file, options.cropSettings, options.cropOutput)
+                : (options.cropCnic ? await cropCnicDocumentImage(file, options.cropSide, options.cropSettings) : file);
             const formData = new FormData();
             formData.append('document', uploadFile);
 
             const { data } = await API.post('/sales/upload-document', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: options.onUploadProgress,
             });
             setSaleForm((current) => ({ ...current, [targetField]: data.url }));
             setSaleMessage(`${targetLabel} uploaded: ${data.originalName}`);
@@ -6388,6 +6393,18 @@ const selectedCustomer = useMemo(
         if (!file) return;
 
         try {
+            if (String(file.type || '').startsWith('image/')) {
+                openCnicUploadPreview({
+                    source: 'saleDocument',
+                    file,
+                    targetField,
+                    targetLabel,
+                    setUploadingState,
+                    cropSettings: getDefaultCropSettings(options.assetType || targetField, options.side),
+                });
+                return;
+            }
+
             await uploadSaleDocumentFile(file, targetField, targetLabel, setUploadingState, options);
         } finally {
             event.target.value = '';
@@ -6449,17 +6466,18 @@ const selectedCustomer = useMemo(
             setSavingDealer(false);
         }
     };
-    const handleDealerSignatureUpload = async (event) => {
-        const file = event.target.files?.[0];
+    const uploadDealerSignatureFile = async (file, options = {}) => {
         if (!file) return;
 
+        const uploadFile = options.cropImage ? await cropImageFileByPercent(file, options.cropSettings, { mimeType: 'image/png' }) : file;
         const formData = new FormData();
-        formData.append('dealerSignature', file);
+        formData.append('dealerSignature', uploadFile);
 
         try {
             setSavingDealer(true);
             const { data } = await API.post('/dealers/upload-signature', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: options.onUploadProgress,
             });
             setDealerForm((current) => ({ ...current, dealer_signature_url: data.url }));
             setDealerMessage(`Dealer signature uploaded: ${data.originalName}`);
@@ -6469,17 +6487,39 @@ const selectedCustomer = useMemo(
             setSavingDealer(false);
         }
     };
-    const handleSaleDealerSignatureUpload = async (event) => {
+
+    const handleDealerSignatureUpload = async (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
+        try {
+            if (String(file.type || '').startsWith('image/')) {
+                openCnicUploadPreview({
+                    source: 'dealerSignature',
+                    file,
+                    targetLabel: 'Dealer Signature',
+                    cropSettings: getDefaultCropSettings('SIGNATURE'),
+                });
+                return;
+            }
+
+            await uploadDealerSignatureFile(file);
+        } finally {
+            event.target.value = '';
+        }
+    };
+    const uploadSaleDealerSignatureFile = async (file, options = {}) => {
+        if (!file) return;
+
+        const uploadFile = options.cropImage ? await cropImageFileByPercent(file, options.cropSettings, { mimeType: 'image/png' }) : file;
         const formData = new FormData();
-        formData.append('dealerSignature', file);
+        formData.append('dealerSignature', uploadFile);
 
         try {
             setSavingSale(true);
             const { data } = await API.post('/dealers/upload-signature', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: options.onUploadProgress,
             });
             setSaleForm((current) => ({ ...current, dealer_signature_url: data.url }));
             setSaleMessage(`Dealer signature uploaded for sale: ${data.originalName}`);
@@ -6490,20 +6530,42 @@ const selectedCustomer = useMemo(
         }
     };
 
-    const uploadCustomerAssetFile = async (file, assetType) => {
+    const handleSaleDealerSignatureUpload = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            if (String(file.type || '').startsWith('image/')) {
+                openCnicUploadPreview({
+                    source: 'saleDealerSignature',
+                    file,
+                    targetLabel: 'Dealer Signature',
+                    cropSettings: getDefaultCropSettings('SIGNATURE'),
+                });
+                return;
+            }
+
+            await uploadSaleDealerSignatureFile(file);
+        } finally {
+            event.target.value = '';
+        }
+    };
+
+    const uploadCustomerAssetFile = async (file, assetType, options = {}) => {
         const formData = new FormData();
         formData.append('customerAsset', file);
         formData.append('assetType', assetType);
 
         const { data } = await API.post('/customers/upload-asset', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
+            onUploadProgress: options.onUploadProgress,
         });
 
         return data;
     };
 
 
-    const cropCnicDocumentImage = async (file, side = 'front', settings = {}) => {
+    const cropImageFileByPercent = async (file, settings = {}, output = {}) => {
         if (!String(file?.type || '').startsWith('image/')) {
             return file;
         }
@@ -6514,101 +6576,46 @@ const selectedCustomer = useMemo(
             const image = await new Promise((resolve, reject) => {
                 const img = new Image();
                 img.onload = () => resolve(img);
-                img.onerror = () => reject(new Error('Unable to read CNIC image for crop.'));
+                img.onerror = () => reject(new Error('Unable to read image for crop.'));
                 img.src = objectUrl;
             });
 
-            const zoom = Math.min(Math.max(Number(settings.zoom || 1.05), 1), 2.5);
-            const widthPercent = Math.min(Math.max(Number(settings.width ?? 92), 45), 100) / 100;
-            const heightPercent = Math.min(Math.max(Number(settings.height ?? 86), 35), 100) / 100;
-            const maxCropWidth = Math.max(1, Math.round(image.width * widthPercent));
-            const maxCropHeight = Math.max(1, Math.round(image.height * heightPercent));
-            const cropWidth = Math.max(1, Math.round(maxCropWidth / zoom));
-            const cropHeight = Math.max(1, Math.round(maxCropHeight / zoom));
-            const maxX = Math.max(0, image.width - cropWidth);
-            const maxY = Math.max(0, image.height - cropHeight);
-            const defaultY = String(side).toLowerCase().includes('back') ? 52 : 50;
-            const xPercent = Math.min(Math.max(Number(settings.x ?? 50), 0), 100) / 100;
-            const yPercent = Math.min(Math.max(Number(settings.y ?? defaultY), 0), 100) / 100;
-            const cropX = Math.round(maxX * xPercent);
-            const cropY = Math.round(maxY * yPercent);
-
+            const xPercent = Math.min(Math.max(Number(settings.x ?? 4), 0), 99) / 100;
+            const yPercent = Math.min(Math.max(Number(settings.y ?? 7), 0), 99) / 100;
+            const widthPercent = Math.min(Math.max(Number(settings.width ?? 92), 1), 100) / 100;
+            const heightPercent = Math.min(Math.max(Number(settings.height ?? 86), 1), 100) / 100;
+            const cropX = Math.min(Math.round(image.width * xPercent), image.width - 1);
+            const cropY = Math.min(Math.round(image.height * yPercent), image.height - 1);
+            const cropWidth = Math.max(1, Math.min(Math.round(image.width * widthPercent), image.width - cropX));
+            const cropHeight = Math.max(1, Math.min(Math.round(image.height * heightPercent), image.height - cropY));
             const canvas = document.createElement('canvas');
-            canvas.width = cropWidth;
-            canvas.height = cropHeight;
+            canvas.width = output.width || cropWidth;
+            canvas.height = output.height || cropHeight;
 
             const context = canvas.getContext('2d');
             if (!context) {
-                throw new Error('Unable to prepare CNIC crop.');
+                throw new Error('Unable to prepare image crop.');
             }
 
             context.fillStyle = '#ffffff';
-            context.fillRect(0, 0, cropWidth, cropHeight);
-            context.drawImage(image, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
 
-            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+            const mimeType = output.mimeType || (String(file.type || '').includes('png') ? 'image/png' : 'image/jpeg');
+            const extension = mimeType === 'image/png' ? 'png' : 'jpg';
+            const blob = await new Promise((resolve) => canvas.toBlob(resolve, mimeType, output.quality ?? 0.92));
             if (!blob) {
-                throw new Error('Unable to generate CNIC crop.');
+                throw new Error('Unable to generate image crop.');
             }
 
-            return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'cnic'}-crop.png`, { type: 'image/png' });
+            return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'image'}-crop.${extension}`, { type: mimeType });
         } finally {
             URL.revokeObjectURL(objectUrl);
         }
     };
-    const cropPassportPhotoImage = async (file, settings = {}) => {
-        if (!String(file?.type || '').startsWith('image/')) {
-            return file;
-        }
 
-        const objectUrl = URL.createObjectURL(file);
-
-        try {
-            const image = await new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => resolve(img);
-                img.onerror = () => reject(new Error('Unable to read passport photo for crop.'));
-                img.src = objectUrl;
-            });
-
-            const zoom = Math.min(Math.max(Number(settings.zoom || 1), 1), 2.5);
-            const outputWidth = 420;
-            const outputHeight = 520;
-            const sourceRatio = outputWidth / outputHeight;
-            const maxSourceWidth = Math.min(image.width, Math.round(image.height * sourceRatio));
-            const maxSourceHeight = Math.min(image.height, Math.round(maxSourceWidth / sourceRatio));
-            const cropWidth = Math.max(1, Math.round(maxSourceWidth / zoom));
-            const cropHeight = Math.max(1, Math.round(cropWidth / sourceRatio));
-            const maxX = Math.max(0, image.width - cropWidth);
-            const maxY = Math.max(0, image.height - cropHeight);
-            const xPercent = Math.min(Math.max(Number(settings.x ?? 50), 0), 100) / 100;
-            const yPercent = Math.min(Math.max(Number(settings.y ?? 45), 0), 100) / 100;
-            const cropX = Math.round(maxX * xPercent);
-            const cropY = Math.round(maxY * yPercent);
-
-            const canvas = document.createElement('canvas');
-            canvas.width = outputWidth;
-            canvas.height = outputHeight;
-
-            const context = canvas.getContext('2d');
-            if (!context) {
-                throw new Error('Unable to prepare passport photo crop.');
-            }
-
-            context.fillStyle = '#ffffff';
-            context.fillRect(0, 0, outputWidth, outputHeight);
-            context.drawImage(image, cropX, cropY, cropWidth, cropHeight, 0, 0, outputWidth, outputHeight);
-
-            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-            if (!blob) {
-                throw new Error('Unable to generate passport photo crop.');
-            }
-
-            return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'passport-photo'}-crop.png`, { type: 'image/png' });
-        } finally {
-            URL.revokeObjectURL(objectUrl);
-        }
-    };
+    const cropCnicDocumentImage = async (file, side = 'front', settings = {}) => cropImageFileByPercent(file, settings, { mimeType: 'image/jpeg', quality: 0.92 });
+    const cropPassportPhotoImage = async (file, settings = {}) => cropImageFileByPercent(file, settings, { width: 420, height: 520, mimeType: 'image/jpeg', quality: 0.92 });
     const extractSignatureCropFromCnic = async (file) => {
         if (!String(file?.type || '').startsWith('image/')) {
             return null;
@@ -6728,11 +6735,14 @@ const selectedCustomer = useMemo(
             setUploadingCustomerAsset(true);
             const cropEnabled = Boolean(options.cropCnic) && (assetType === 'CNIC_FRONT' || assetType === 'CNIC_BACK');
             const passportCropEnabled = Boolean(options.cropPassportPhoto) && assetType === 'PASSPORT_PHOTO';
+            const manualCropEnabled = Boolean(options.cropImage) && String(file.type || '').startsWith('image/');
             const uploadFile = passportCropEnabled
                 ? await cropPassportPhotoImage(file, options.cropSettings)
-                : (cropEnabled ? await cropCnicDocumentImage(file, assetType, options.cropSettings) : file);
+                : (manualCropEnabled
+                    ? await cropImageFileByPercent(file, options.cropSettings, options.cropOutput)
+                    : (cropEnabled ? await cropCnicDocumentImage(file, assetType, options.cropSettings) : file));
             const uploadAssetType = assetType === 'CNIC_BACK' ? 'CNIC_BACK_ORIGINAL' : assetType;
-            const data = await uploadCustomerAssetFile(uploadFile, uploadAssetType);
+            const data = await uploadCustomerAssetFile(uploadFile, uploadAssetType, { onUploadProgress: options.onUploadProgress });
             let ocrData = data;
 
             if (assetType === 'CNIC_BACK') {
@@ -6805,7 +6815,7 @@ const selectedCustomer = useMemo(
         if (!file) return;
 
         try {
-            if (assetType === 'CNIC_FRONT' || assetType === 'CNIC_BACK' || assetType === 'PASSPORT_PHOTO') {
+            if (String(file.type || '').startsWith('image/')) {
                 openCnicUploadPreview({
                     source: 'customer',
                     file,
@@ -6813,9 +6823,7 @@ const selectedCustomer = useMemo(
                     targetLabel: successLabel,
                     assetType,
                     side: assetType === 'CNIC_BACK' ? 'back' : 'front',
-                    cropSettings: assetType === 'PASSPORT_PHOTO'
-                        ? { x: 50, y: 45, zoom: 1.15 }
-                        : ((assetType === 'CNIC_FRONT' || assetType === 'CNIC_BACK') ? { x: 50, y: assetType === 'CNIC_BACK' ? 52 : 50, zoom: 1.05, width: 92, height: 86 } : undefined),
+                    cropSettings: getDefaultCropSettings(assetType, assetType === 'CNIC_BACK' ? 'back' : 'front'),
                 });
                 return;
             }
@@ -6826,6 +6834,26 @@ const selectedCustomer = useMemo(
         }
     };
 
+    const getDefaultCropSettings = (assetType = '', side = 'front') => {
+        if (assetType === 'PASSPORT_PHOTO') return { x: 30, y: 4, width: 40, height: 92 };
+        if (assetType === 'SIGNATURE' || String(assetType).toLowerCase().includes('signature')) return { x: 8, y: 25, width: 84, height: 45 };
+        if (assetType === 'THUMB') return { x: 10, y: 10, width: 80, height: 80 };
+        if (assetType === 'CNIC_BACK' || side === 'back') return { x: 4, y: 7, width: 92, height: 86 };
+        if (assetType === 'CNIC_FRONT' || side === 'front') return { x: 4, y: 7, width: 92, height: 86 };
+        return { x: 5, y: 5, width: 90, height: 90 };
+    };
+
+    const normalizeCropSettings = (settings = {}) => {
+        const width = Math.min(Math.max(Number(settings.width ?? 90), 8), 100);
+        const height = Math.min(Math.max(Number(settings.height ?? 90), 8), 100);
+        return {
+            x: Math.min(Math.max(Number(settings.x ?? 5), 0), 100 - width),
+            y: Math.min(Math.max(Number(settings.y ?? 5), 0), 100 - height),
+            width,
+            height,
+        };
+    };
+
     const openCnicUploadPreview = (previewConfig) => {
         if (!previewConfig?.file) return;
 
@@ -6834,15 +6862,21 @@ const selectedCustomer = useMemo(
                 URL.revokeObjectURL(current.previewUrl);
             }
 
+            const isImage = String(previewConfig.file.type || '').startsWith('image/');
             return {
                 ...previewConfig,
                 previewUrl: URL.createObjectURL(previewConfig.file),
-                isImage: String(previewConfig.file.type || '').startsWith('image/'),
+                isImage,
+                cropSettings: normalizeCropSettings(previewConfig.cropSettings || getDefaultCropSettings(previewConfig.assetType, previewConfig.side)),
+                uploadProgress: 0,
+                isUploading: false,
             };
         });
     };
 
     const closeCnicUploadPreview = () => {
+        if (cnicUploadPreview?.isUploading) return;
+
         setCnicUploadPreview((current) => {
             if (current?.previewUrl) {
                 URL.revokeObjectURL(current.previewUrl);
@@ -6854,18 +6888,119 @@ const selectedCustomer = useMemo(
     const updatePassportCropSetting = (name, value) => {
         setCnicUploadPreview((current) => current ? {
             ...current,
-            cropSettings: {
-                ...(current.cropSettings || { x: 50, y: 45, zoom: 1.15 }),
+            cropSettings: normalizeCropSettings({
+                ...(current.cropSettings || getDefaultCropSettings(current.assetType, current.side)),
                 [name]: Number(value),
-            },
+            }),
         } : current);
+    };
+
+    const createPreviewUploadProgressHandler = () => (progressEvent) => {
+        const loaded = Number(progressEvent.loaded || 0);
+        const total = Number(progressEvent.total || 0);
+        const percent = total > 0 ? Math.round((loaded / total) * 100) : 5;
+        setCnicUploadPreview((current) => current ? {
+            ...current,
+            uploadProgress: Math.min(100, Math.max(1, percent)),
+        } : current);
+    };
+
+    const getPointerCropPercent = (event) => {
+        const imageRect = cropImageRef.current?.getBoundingClientRect();
+        if (!imageRect?.width || !imageRect?.height) return null;
+        return {
+            x: ((event.clientX - imageRect.left) / imageRect.width) * 100,
+            y: ((event.clientY - imageRect.top) / imageRect.height) * 100,
+        };
+    };
+
+    const updateManualCropFromPointer = (event) => {
+        const interaction = cropInteractionRef.current;
+        const pointer = getPointerCropPercent(event);
+        if (!interaction || !pointer) return;
+
+        const minSize = 8;
+        const dx = pointer.x - interaction.startPointer.x;
+        const dy = pointer.y - interaction.startPointer.y;
+        const start = interaction.startCrop;
+        let next = { ...start };
+
+        if (interaction.mode === 'move') {
+            next.x = start.x + dx;
+            next.y = start.y + dy;
+        } else {
+            if (interaction.mode.includes('e')) next.width = start.width + dx;
+            if (interaction.mode.includes('s')) next.height = start.height + dy;
+            if (interaction.mode.includes('w')) {
+                next.x = start.x + dx;
+                next.width = start.width - dx;
+            }
+            if (interaction.mode.includes('n')) {
+                next.y = start.y + dy;
+                next.height = start.height - dy;
+            }
+        }
+
+        if (next.width < minSize) {
+            if (interaction.mode.includes('w')) next.x -= minSize - next.width;
+            next.width = minSize;
+        }
+        if (next.height < minSize) {
+            if (interaction.mode.includes('n')) next.y -= minSize - next.height;
+            next.height = minSize;
+        }
+        if (next.x < 0) {
+            next.width += next.x;
+            next.x = 0;
+        }
+        if (next.y < 0) {
+            next.height += next.y;
+            next.y = 0;
+        }
+        if (next.x + next.width > 100) {
+            if (interaction.mode === 'move') next.x = 100 - next.width;
+            else next.width = 100 - next.x;
+        }
+        if (next.y + next.height > 100) {
+            if (interaction.mode === 'move') next.y = 100 - next.height;
+            else next.height = 100 - next.y;
+        }
+
+        setCnicUploadPreview((current) => current ? { ...current, cropSettings: normalizeCropSettings(next) } : current);
+    };
+
+    const stopManualCropInteraction = () => {
+        cropInteractionRef.current = null;
+        window.removeEventListener('pointermove', updateManualCropFromPointer);
+        window.removeEventListener('pointerup', stopManualCropInteraction);
+        window.removeEventListener('pointercancel', stopManualCropInteraction);
+    };
+
+    const startManualCropInteraction = (event, mode = 'move') => {
+        if (cnicUploadPreview?.isUploading) return;
+        const pointer = getPointerCropPercent(event);
+        if (!pointer) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        cropInteractionRef.current = {
+            mode,
+            startPointer: pointer,
+            startCrop: normalizeCropSettings(cnicUploadPreview?.cropSettings || getDefaultCropSettings(cnicUploadPreview?.assetType, cnicUploadPreview?.side)),
+        };
+        window.addEventListener('pointermove', updateManualCropFromPointer);
+        window.addEventListener('pointerup', stopManualCropInteraction);
+        window.addEventListener('pointercancel', stopManualCropInteraction);
     };
     const handleConfirmCnicUpload = async (cropCnic = false) => {
         const pending = cnicUploadPreview;
-        if (!pending?.file) return;
+        if (!pending?.file || pending.isUploading) return;
 
         const shouldCrop = Boolean(cropCnic && pending.isImage);
         const shouldCropPassportPhoto = Boolean(shouldCrop && pending.assetType === 'PASSPORT_PHOTO');
+        const onUploadProgress = createPreviewUploadProgressHandler();
+
+        setCnicUploadPreview((current) => current ? { ...current, isUploading: true, uploadProgress: 1 } : current);
 
         try {
             if (pending.source === 'sale') {
@@ -6874,13 +7009,31 @@ const selectedCustomer = useMemo(
                     pending.targetField,
                     pending.targetLabel,
                     pending.side === 'back' ? setUploadingSaleCnicBack : setUploadingSaleCnicFront,
-                    { cropCnic: shouldCrop, cropSide: pending.side, cropSettings: pending.cropSettings }
+                    { cropCnic: shouldCrop, cropSide: pending.side, cropSettings: pending.cropSettings, onUploadProgress }
+                );
+            } else if (pending.source === 'saleDocument') {
+                await uploadSaleDocumentFile(
+                    pending.file,
+                    pending.targetField,
+                    pending.targetLabel,
+                    pending.setUploadingState,
+                    { cropImage: shouldCrop, cropSettings: pending.cropSettings, onUploadProgress }
+                );
+            } else if (pending.source === 'saleDealerSignature') {
+                await uploadSaleDealerSignatureFile(
+                    pending.file,
+                    { cropImage: shouldCrop, cropSettings: pending.cropSettings, onUploadProgress }
+                );
+            } else if (pending.source === 'dealerSignature') {
+                await uploadDealerSignatureFile(
+                    pending.file,
+                    { cropImage: shouldCrop, cropSettings: pending.cropSettings, onUploadProgress }
                 );
             } else if (pending.source === 'employee') {
                 await uploadEmployeeDocumentFile(
                     pending.file,
                     pending.targetField,
-                    { cropCnic: shouldCrop, cropSide: pending.side, cropSettings: pending.cropSettings }
+                    { cropCnic: shouldCrop, cropSide: pending.side, cropSettings: pending.cropSettings, onUploadProgress }
                 );
             } else {
                 await uploadCustomerAssetFromFile(
@@ -6891,11 +7044,16 @@ const selectedCustomer = useMemo(
                     {
                         cropCnic: shouldCrop && !shouldCropPassportPhoto,
                         cropPassportPhoto: shouldCropPassportPhoto,
+                        cropImage: shouldCrop && !shouldCropPassportPhoto,
                         cropSettings: pending.cropSettings,
+                        cropOutput: pending.assetType === 'SIGNATURE' ? { mimeType: 'image/png' } : undefined,
+                        onUploadProgress,
                     }
                 );
             }
+            setCnicUploadPreview((current) => current ? { ...current, uploadProgress: 100 } : current);
         } finally {
+            setCnicUploadPreview((current) => current ? { ...current, isUploading: false } : current);
             closeCnicUploadPreview();
         }
     };
@@ -6910,6 +7068,7 @@ const selectedCustomer = useMemo(
             formData.append('employeeDocument', uploadFile);
             const { data } = await API.post('/employees/upload-cnic', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: options.onUploadProgress,
             });
 
             setEmployeeForm((current) => ({
@@ -9761,50 +9920,60 @@ const selectedCustomer = useMemo(
                                 Close
                             </button>
                         </div>
-                        <div className="cnic-preview-stage">
+                        <div className={`cnic-preview-stage ${cnicUploadPreview.isImage ? 'manual-crop-stage' : ''}`}>
                             {cnicUploadPreview.isImage ? (
-                                <img src={cnicUploadPreview.previewUrl} alt="Upload preview" className="cnic-preview-image" />
+                                <div className="manual-crop-shell">
+                                    <div className="manual-crop-image-wrap">
+                                        <img
+                                            ref={cropImageRef}
+                                            src={cnicUploadPreview.previewUrl}
+                                            alt="Upload preview"
+                                            className="cnic-preview-image manual-crop-image"
+                                            draggable={false}
+                                        />
+                                        <div
+                                            className="manual-crop-box"
+                                            style={{
+                                                left: `${cnicUploadPreview.cropSettings?.x ?? 5}%`,
+                                                top: `${cnicUploadPreview.cropSettings?.y ?? 5}%`,
+                                                width: `${cnicUploadPreview.cropSettings?.width ?? 90}%`,
+                                                height: `${cnicUploadPreview.cropSettings?.height ?? 90}%`,
+                                            }}
+                                            onPointerDown={(event) => startManualCropInteraction(event, 'move')}
+                                            role="presentation"
+                                        >
+                                            {['nw', 'ne', 'sw', 'se'].map((handle) => (
+                                                <span
+                                                    key={handle}
+                                                    className={`manual-crop-handle manual-crop-handle-${handle}`}
+                                                    onPointerDown={(event) => startManualCropInteraction(event, handle)}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <p className="manual-crop-caption">Drag the crop box or its corners, then upload the cropped image.</p>
+                                </div>
                             ) : (
                                 <iframe src={cnicUploadPreview.previewUrl} title="Upload preview" className="cnic-preview-frame" />
                             )}
                         </div>
-                        {['CNIC_FRONT', 'CNIC_BACK', 'PASSPORT_PHOTO'].includes(cnicUploadPreview.assetType) && cnicUploadPreview.isImage ? (
-                            <div className="form-grid compact-grid spaced-top">
-                                <label className="field">
-                                    <span>Crop Left / Right</span>
-                                    <input type="range" min="0" max="100" value={cnicUploadPreview.cropSettings?.x ?? 50} onChange={(event) => updatePassportCropSetting('x', event.target.value)} />
-                                </label>
-                                <label className="field">
-                                    <span>Crop Up / Down</span>
-                                    <input type="range" min="0" max="100" value={cnicUploadPreview.cropSettings?.y ?? (cnicUploadPreview.assetType === 'CNIC_BACK' ? 52 : 50)} onChange={(event) => updatePassportCropSetting('y', event.target.value)} />
-                                </label>
-                                <label className="field">
-                                    <span>Crop Zoom</span>
-                                    <input type="range" min="1" max="2.5" step="0.05" value={cnicUploadPreview.cropSettings?.zoom ?? (cnicUploadPreview.assetType === 'PASSPORT_PHOTO' ? 1.15 : 1.05)} onChange={(event) => updatePassportCropSetting('zoom', event.target.value)} />
-                                </label>
-                                {cnicUploadPreview.assetType === 'CNIC_FRONT' || cnicUploadPreview.assetType === 'CNIC_BACK' ? (
-                                    <>
-                                        <label className="field">
-                                            <span>Crop Width</span>
-                                            <input type="range" min="45" max="100" value={cnicUploadPreview.cropSettings?.width ?? 92} onChange={(event) => updatePassportCropSetting('width', event.target.value)} />
-                                        </label>
-                                        <label className="field">
-                                            <span>Crop Height</span>
-                                            <input type="range" min="35" max="100" value={cnicUploadPreview.cropSettings?.height ?? 86} onChange={(event) => updatePassportCropSetting('height', event.target.value)} />
-                                        </label>
-                                    </>
-                                ) : null}
+                        {cnicUploadPreview.uploadProgress ? (
+                            <div className="manual-upload-progress" aria-live="polite">
+                                <div className="manual-upload-progress-track">
+                                    <span style={{ width: `${cnicUploadPreview.uploadProgress}%` }} />
+                                </div>
+                                <strong>{cnicUploadPreview.uploadProgress}% uploaded</strong>
                             </div>
                         ) : null}
                         <div className="cnic-preview-actions">
-                            <button type="button" className="view-btn" onClick={closeCnicUploadPreview}>
+                            <button type="button" className="view-btn" onClick={closeCnicUploadPreview} disabled={cnicUploadPreview.isUploading}>
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 className="secondary-btn"
                                 onClick={() => handleConfirmCnicUpload(false)}
-                                disabled={uploadingCustomerAsset || uploadingEmployeeDocument || uploadingSaleCnicFront || uploadingSaleCnicBack}
+                                disabled={cnicUploadPreview.isUploading || uploadingCustomerAsset || uploadingEmployeeDocument || uploadingSaleCnicFront || uploadingSaleCnicBack || savingSale || savingDealer}
                             >
                                 Upload Original
                             </button>
@@ -9812,9 +9981,9 @@ const selectedCustomer = useMemo(
                                 type="button"
                                 className="primary-btn"
                                 onClick={() => handleConfirmCnicUpload(true)}
-                                disabled={!cnicUploadPreview.isImage || uploadingCustomerAsset || uploadingEmployeeDocument || uploadingSaleCnicFront || uploadingSaleCnicBack}
+                                disabled={!cnicUploadPreview.isImage || cnicUploadPreview.isUploading || uploadingCustomerAsset || uploadingEmployeeDocument || uploadingSaleCnicFront || uploadingSaleCnicBack || savingSale}
                             >
-                                Crop & Upload
+                                Upload Cropped Image
                             </button>
                         </div>
                     </div>
