@@ -1469,14 +1469,38 @@ const extractOcrFields = (rawText, currentDocumentType, assetType = '') => {
 
         return '';
     };
-    const cnicMatch = text.match(/\b\d{5}-\d{7}-\d\b|\b\d{13}\b/);
+    const extractIdentityNumber = () => {
+        const direct = text.match(/\b\d{5}-\d{7}-\d\b|\b\d{13}\b/);
+        if (direct?.[0]) return direct[0];
+
+        const spaced = text.match(/\b\d{4,5}[\s-]+\d{7}[\s-]*-?[\s-]*\d\b/);
+        if (spaced?.[0]) {
+            const groups = spaced[0].match(/(\d{4,5})\D+(\d{7})\D*(\d)/);
+            if (groups) return `${groups[1]}-${groups[2]}-${groups[3]}`;
+        }
+
+        const identityIndex = lines.findIndex((line) => /\bidentity\s+number\b|\bidentity\s+no\b|\bnumber\b/i.test(line));
+        if (identityIndex >= 0) {
+            const windowText = lines.slice(identityIndex, identityIndex + 4).join(' ');
+            const windowMatch = windowText.match(/\b\d{4,5}[\s-]+\d{7}[\s-]*-?[\s-]*\d\b|\b\d{12,13}\b/);
+            if (windowMatch?.[0]) {
+                const digits = windowMatch[0].replace(/\D/g, '');
+                if (digits.length === 13) return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`;
+                if (digits.length === 12) return `${digits.slice(0, 4)}-${digits.slice(4, 11)}-${digits.slice(11)}`;
+                return windowMatch[0].trim();
+            }
+        }
+
+        return '';
+    };
+    const cnicNumber = extractIdentityNumber();
     const passportMatch = text.match(/\b[A-Z]{1,2}\d{6,8}\b/i);
     const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
     const phoneCandidates = text.match(/(\+?\d[\d\s-]{7,}\d)/g) || [];
     const phoneMatch = phoneCandidates.find((candidate) => {
         const digits = String(candidate).replace(/\D/g, '');
         if (digits.length < 8 || digits.length > 15) return false;
-        return candidate !== cnicMatch?.[0];
+        return candidate !== cnicNumber;
     });
     const extractCountryValue = () => {
         const regexCountry = normalizedText.match(/country\s+of\s+stay[^\n]*\n+([A-Za-z\s]+)/i);
@@ -1528,9 +1552,25 @@ const extractOcrFields = (rawText, currentDocumentType, assetType = '') => {
 
         return '';
     };
-    const extractedName = regexValue(/(?:^|\n)[^\n]*\bName\b[^\n]*\n+([A-Za-z][A-Za-z\s]{2,})/i)
-        || valueNearLabel([/^name[:\s-]*$/i, /\bname\b/i], isLikelyPersonName)
-        || '';
+    const extractPrimaryName = () => {
+        for (let index = 0; index < lines.length; index += 1) {
+            const line = lines[index];
+            if (!/\bname\b/i.test(line) || /\bfather\b/i.test(line)) continue;
+
+            const sameLineValue = isLikelyPersonName(line.replace(/\bname\b/ig, ''));
+            if (sameLineValue) return sameLineValue;
+
+            for (let cursor = index + 1; cursor < Math.min(lines.length, index + 4); cursor += 1) {
+                const candidate = lines[cursor] || '';
+                if (/\bfather\b|\bgender\b|\bcountry\b|\bidentity\b|\bdate\b/i.test(candidate)) break;
+                const value = isLikelyPersonName(candidate);
+                if (value) return value;
+            }
+        }
+
+        return '';
+    };
+    const extractedName = extractPrimaryName();
     const fatherName = regexValue(/(?:^|\n)[^\n]*\bFather\s+Name\b[^\n]*\n+([A-Za-z][A-Za-z\s]{2,})/i)
         || regexValue(/(?:^|\n)[^\n]*\bFather\s+N(?:ame)?\b[^\n]*\n+([A-Za-z][A-Za-z\s]{2,})/i)
         || valueNearLabel([/^father\s+name[:\s-]*$/i, /\bfather\s+name\b/i, /\bfather\s+n(?:ame)?\b/i], isLikelyPersonName);
@@ -1549,7 +1589,6 @@ const extractOcrFields = (rawText, currentDocumentType, assetType = '') => {
             return /^[0-9]{2}[./-][0-9]{2}[./-][0-9]{4}$/.test(cleaned) ? cleaned : '';
         });
     const fallbackName = extractedName
-        || labelWindowValue([/\bname\b/i], isLikelyPersonName)
         || '';
     const fallbackFatherName = fatherName
         || labelWindowValue([/\bfather\s+name\b/i, /\bfather\s+n(?:ame)?\b/i], isLikelyPersonName)
@@ -1557,7 +1596,7 @@ const extractOcrFields = (rawText, currentDocumentType, assetType = '') => {
     const fallbackAddress = address
         || (assetType === 'CNIC_BACK' && containsUrdu(rawText) ? extractQrAlignedUrduAddress() : '');
 
-    const inferredDocumentType = cnicMatch
+    const inferredDocumentType = cnicNumber
         ? 'CNIC'
         : passportMatch
             ? 'PASSPORT'
@@ -1565,7 +1604,7 @@ const extractOcrFields = (rawText, currentDocumentType, assetType = '') => {
 
     return {
         document_type: inferredDocumentType,
-        cnic_passport_number: cnicMatch?.[0] || passportMatch?.[0] || '',
+        cnic_passport_number: cnicNumber || passportMatch?.[0] || '',
         contact_email: emailMatch?.[0] || '',
         contact_phone: phoneMatch || '',
         gender,
@@ -7405,7 +7444,9 @@ const selectedCustomer = useMemo(
         setStockReceiveItems([createEmptyReceiveItem(order.product_color || order.color || '')]);
     };
 
-    const closeStockReceiveModal = () => {
+    const closeStockReceiveModal = (force = false) => {
+        if (savingStock && !force) return;
+
         setReceivingStockOrder(null);
         setStockReceiveDate(new Date().toISOString().slice(0, 10));
         setStockReceiveItems([createEmptyReceiveItem()]);
@@ -7453,7 +7494,7 @@ const selectedCustomer = useMemo(
             });
             setStockMessage(`Stock order ${receivingStockOrder.id} updated with the received vehicle details.`);
             await loadDashboard();
-            closeStockReceiveModal();
+            closeStockReceiveModal(true);
         } catch (err) {
             setStockMessage(err.response?.data?.message || 'Unable to save received stock details.');
         } finally {
@@ -9991,8 +10032,8 @@ const selectedCustomer = useMemo(
             ) : null}
 
             {receivingStockOrder ? (
-            <div className="receive-modal-backdrop" onClick={closeStockReceiveModal}>
-                <div className="receive-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="receive-modal-backdrop" onClick={() => closeStockReceiveModal()}>
+                <div className={`receive-modal stock-receive-modal ${savingStock ? 'is-stock-saving' : ''}`} onClick={(event) => event.stopPropagation()}>
                         <div className="section-header">
                             <div>
                                 <h3>Receive Stock Details</h3>
@@ -10000,7 +10041,7 @@ const selectedCustomer = useMemo(
                                     {receivingStockOrder.brand} {receivingStockOrder.model} / {receivingStockOrder.vehicle_type}
                                 </p>
                             </div>
-                            <button type="button" className="view-btn" onClick={closeStockReceiveModal}>
+                            <button type="button" className="view-btn" onClick={() => closeStockReceiveModal()} disabled={savingStock}>
                                 Close
                             </button>
                         </div>
@@ -10080,7 +10121,7 @@ const selectedCustomer = useMemo(
                             </div>
 
                             <div className="receive-modal-actions">
-                                <button type="button" className="view-btn" onClick={closeStockReceiveModal}>
+                                <button type="button" className="view-btn" onClick={() => closeStockReceiveModal()} disabled={savingStock}>
                                     Cancel
                                 </button>
                                 <button type="submit" className="primary-btn" disabled={savingStock}>
@@ -10088,6 +10129,14 @@ const selectedCustomer = useMemo(
                                 </button>
                             </div>
                         </form>
+                        {savingStock ? (
+                            <div className="stock-receive-loading-overlay" role="status" aria-live="polite">
+                                <div className="query-loading-pill">
+                                    <span className="query-loading-spinner" aria-hidden="true" />
+                                    Saving received stock...
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
             </div>
             ) : null}
