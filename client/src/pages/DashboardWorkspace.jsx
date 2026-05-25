@@ -9738,6 +9738,131 @@ const selectedCustomer = useMemo(
                             </div>
                         </div>
 
+                        <div className="dashboard-split">
+                            {canViewDashboardProfitTransactions ? (
+                                <div className="table-card">
+                                    <div className="section-header">
+                                        <div>
+                                            <h3>Recent Profit Transactions</h3>
+                                            <p className="section-caption">Latest sales with actual price, selling price, and profit/loss.</p>
+                                        </div>
+                                        <span className="feature-pill">{salesAnalytics.monthLabel}</span>
+                                    </div>
+                                    {salesAnalytics.recentTransactions.length === 0 ? (
+                                        renderEmptyState('No recent profit transactions found for this month.')
+                                    ) : (
+                                        <>
+                                            <table className="pro-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Customer</th>
+                                                        <th>Vehicle</th>
+                                                        <th>Actual</th>
+                                                        <th>Selling</th>
+                                                        <th>Profit / Loss</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {getVisibleRows('dashboard-profit-transactions', salesAnalytics.recentTransactions).map((sale) => (
+                                                        <tr key={sale.id}>
+                                                            <td>{sale.customer_name || 'Customer'}<br />{sale.dealer_name || 'Not set'}</td>
+                                                            <td>{[sale.brand, sale.model].filter(Boolean).join(' ') || 'Vehicle'}<br />{sale.agreement_number || sale.serial_number || 'No reference'}</td>
+                                                            <td>{formatCurrency(sale.actualPrice)}</td>
+                                                            <td>{formatCurrency(sale.sellPrice)}</td>
+                                                            <td className={sale.profit >= 0 ? 'success' : 'danger'}>{formatCurrency(sale.profit)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                            {renderTableLimitControl('dashboard-profit-transactions', salesAnalytics.recentTransactions.length)}
+                                        </>
+                                    )}
+                                </div>
+                            ) : null}
+
+                            {canViewDashboardCompanyProfitability ? (
+                                <div className="table-card">
+                                    <div className="section-header">
+                                        <div>
+                                            <h3>Company Business Profitability</h3>
+                                            <p className="section-caption">Company-wise selling value and profit/loss for this month.</p>
+                                        </div>
+                                        <span className="feature-pill">{companyBusinessAnalytics.length} companies</span>
+                                    </div>
+                                    {companyBusinessAnalytics.length === 0 ? (
+                                        renderEmptyState('No company profitability records found for this month.')
+                                    ) : (
+                                        <>
+                                            <table className="pro-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Company</th>
+                                                        <th>Deals</th>
+                                                        <th>Actual</th>
+                                                        <th>Selling</th>
+                                                        <th>Profit / Loss</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {getVisibleRows('dashboard-company-profitability', companyBusinessAnalytics).map((company) => (
+                                                        <tr key={company.companyName}>
+                                                            <td>{company.companyName}</td>
+                                                            <td>{company.deals}</td>
+                                                            <td>{formatCurrency(company.actual)}</td>
+                                                            <td>{formatCurrency(company.selling)}</td>
+                                                            <td className={company.profit >= 0 ? 'success' : 'danger'}>{formatCurrency(company.profit)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                            {renderTableLimitControl('dashboard-company-profitability', companyBusinessAnalytics.length)}
+                                        </>
+                                    )}
+                                </div>
+                            ) : null}
+                        </div>
+
+                        {canViewDashboardRecentApplications ? (
+                            <div className="dashboard-split dashboard-split-compact">
+                                <div className="table-card">
+                                    <div className="section-header">
+                                        <div>
+                                            <h3>Recent Applications</h3>
+                                            <p className="section-caption">Latest customer leasing applications visible to this profile.</p>
+                                        </div>
+                                        <span className="feature-pill">{dashboardData.applications.length} applications</span>
+                                    </div>
+                                    {dashboardData.applications.length === 0 ? (
+                                        renderEmptyState('No recent applications found.')
+                                    ) : (
+                                        <>
+                                            <table className="pro-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Customer</th>
+                                                        <th>Vehicle</th>
+                                                        <th>Status</th>
+                                                        <th>Agent</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {getVisibleRows('dashboard-recent-applications', dashboardData.applications).map((application) => (
+                                                        <tr key={application.id}>
+                                                            <td>{application.customer_name || 'Customer'}<br />{application.cnic_passport_number || 'No CNIC'}</td>
+                                                            <td>{[application.brand, application.model].filter(Boolean).join(' ') || 'Vehicle'}<br />{application.registration_number || 'No registration'}</td>
+                                                            <td><span className={`status-pill ${getStatusClass(application.status)}`}>{application.status || 'Pending'}</span></td>
+                                                            <td>{application.agent_name || application.created_by_name || 'Not set'}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                            {renderTableLimitControl('dashboard-recent-applications', dashboardData.applications.length)}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        ) : null}
+
                         <div className="dashboard-split dashboard-split-compact">
                             {canViewDashboardRecentEmployees ? (
                             <div className="table-card">

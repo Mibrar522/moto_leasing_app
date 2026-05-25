@@ -24,6 +24,8 @@ export default function Stock({
   canReceiveStock,
   canUpdateStockOrder,
   canDeleteStockOrder,
+  canUpdateReceivedStock,
+  canDeleteReceivedStock,
   handleEditStockOrder,
   handleDeleteStockOrder,
   resetStockOrderForm,
@@ -144,8 +146,8 @@ export default function Stock({
                         <span className="feature-pill">Locked after sale</span>
                       ) : (
                         <div className="inline-actions">
-                          {canUpdateStockOrder ? <button type="button" className="view-btn" onClick={() => handleEditStockOrder(order)} disabled={savingStock}>Update</button> : null}
-                          {canDeleteStockOrder ? <button type="button" className="danger-btn" onClick={() => handleDeleteStockOrder(order)} disabled={savingStock}>Delete</button> : null}
+                          {canUpdateReceivedStock ? <button type="button" className="view-btn" onClick={() => handleEditStockOrder(order)} disabled={savingStock}>Update</button> : null}
+                          {canDeleteReceivedStock ? <button type="button" className="danger-btn" onClick={() => handleDeleteStockOrder(order)} disabled={savingStock}>Delete</button> : null}
                         </div>
                       )}
                     </td>
