@@ -331,6 +331,8 @@ const ACCESS_PAGE_GROUPS = [
             'FEAT_DASHBOARD_CARD_PENDING_LEASES',
             'FEAT_DASHBOARD_CARD_PENDING_TASKS',
             'FEAT_DASHBOARD_CARD_TOTAL_REVENUE',
+            'FEAT_DASHBOARD_CARD_TOTAL_PROFIT',
+            'FEAT_DASHBOARD_CARD_PENDING_BALANCE',
             'FEAT_DASHBOARD_CARD_EMPLOYEE_COMMISSIONS',
             'FEAT_DASHBOARD_CARD_TOTAL_VEHICLES',
             'FEAT_DASHBOARD_CARD_TOTAL_CUSTOMERS',
@@ -1048,6 +1050,8 @@ const FEATURE_ACCESS_LABELS = {
     FEAT_DASHBOARD_CARD_PENDING_LEASES: 'Total Customer Pending Lease',
     FEAT_DASHBOARD_CARD_PENDING_TASKS: 'Total Pending Tasks',
     FEAT_DASHBOARD_CARD_TOTAL_REVENUE: 'Total Revenue',
+    FEAT_DASHBOARD_CARD_TOTAL_PROFIT: 'Total Profit',
+    FEAT_DASHBOARD_CARD_PENDING_BALANCE: 'Pending Balance',
     FEAT_DASHBOARD_CARD_EMPLOYEE_COMMISSIONS: 'Total Employee Commissions',
     FEAT_DASHBOARD_CARD_TOTAL_VEHICLES: 'Total Vehicles',
     FEAT_DASHBOARD_CARD_TOTAL_CUSTOMERS: 'Total Customers',
@@ -2370,6 +2374,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canViewDashboardCardPendingLeases = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_CARD_PENDING_LEASES']);
     const canViewDashboardCardPendingTasks = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_CARD_PENDING_TASKS']);
     const canViewDashboardCardTotalRevenue = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_CARD_TOTAL_REVENUE']);
+    const canViewDashboardCardTotalProfit = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_CARD_TOTAL_PROFIT']);
+    const canViewDashboardCardPendingBalance = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_CARD_PENDING_BALANCE']);
     const canViewDashboardCardEmployeeCommissions = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_CARD_EMPLOYEE_COMMISSIONS']);
     const canViewDashboardCardTotalVehicles = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_CARD_TOTAL_VEHICLES']);
     const canViewDashboardCardTotalCustomers = canViewDashboard && hasAnyFeature(user, ['FEAT_DASHBOARD_CARD_TOTAL_CUSTOMERS']);
@@ -4702,12 +4708,14 @@ const selectedCustomer = useMemo(
             pendingLeases: Number(dashboardData.metrics.pendingLeases || 0),
             pendingTasks: Number(dashboardData.metrics.pendingTasks || 0),
             totalRevenue: salesAnalytics.totals.selling || Number(dashboardData.metrics.totalRevenue || 0),
+            totalProfit: Number(salesAnalytics.totals.profit || 0),
+            pendingBalance: Number(salesAnalytics.totals.pending || 0),
             leasingApplications: Number(dashboardData.metrics.totalApplications || 0),
             cashTransactions,
             installmentTransactions,
             receivedInstallments,
         };
-    }, [dashboardData.metrics, dashboardData.salesTransactions, salesAnalytics.totals.selling]);
+    }, [dashboardData.metrics, dashboardData.salesTransactions, salesAnalytics.totals.pending, salesAnalytics.totals.profit, salesAnalytics.totals.selling]);
     const dashboardSalesMix = useMemo(() => {
         const cashCount = Number(overviewMetrics.cashTransactions || 0);
         const installmentCount = Number(overviewMetrics.installmentTransactions || 0);
@@ -9675,6 +9683,8 @@ const selectedCustomer = useMemo(
                                     {canViewDashboardCardPendingLeases ? renderMetricCard('Total Customer Pending Lease', overviewMetrics.pendingLeases, { valueClassName: 'warning', iconKey: 'tasks' }) : null}
                                     {canViewDashboardCardPendingTasks ? renderMetricCard('Total Pending Tasks', overviewMetrics.pendingTasks, { valueClassName: 'warning', iconKey: 'tasks' }) : null}
                                     {canViewDashboardCardTotalRevenue ? renderMetricCard('Total Revenue', formatCurrency(overviewMetrics.totalRevenue), { valueClassName: 'success', iconKey: 'revenue' }) : null}
+                                    {canViewDashboardCardTotalProfit ? renderMetricCard('Total Profit', formatCurrency(overviewMetrics.totalProfit), { valueClassName: Number(overviewMetrics.totalProfit || 0) >= 0 ? 'success' : 'danger', iconKey: 'revenue' }) : null}
+                                    {canViewDashboardCardPendingBalance ? renderMetricCard('Pending Balance', formatCurrency(overviewMetrics.pendingBalance), { valueClassName: 'warning', iconKey: 'tasks' }) : null}
                                     {canViewDashboardCardEmployeeCommissions ? renderMetricCard('Total Employee Commissions', formatCurrency(totalEmployeeCommission), { valueClassName: 'success', iconKey: 'employees' }) : null}
                                     {canViewDashboardCardTotalVehicles ? renderMetricCard('Total Vehicles', dashboardData.metrics.totalVehicles, { iconKey: 'vehicles' }) : null}
                                     {canViewDashboardCardTotalCustomers ? renderMetricCard('Total Customers', dashboardData.metrics.totalCustomers, { iconKey: 'customers' }) : null}

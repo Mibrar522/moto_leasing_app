@@ -413,6 +413,8 @@ exports.getDashboardData = async (req, res) => {
             'FEAT_REPORT_BUSINESS_TRANSACTIONS',
             'FEAT_REPORT_INVOICE_VIEW',
             'FEAT_DASHBOARD_SALES_PERFORMANCE',
+            'FEAT_DASHBOARD_CARD_TOTAL_PROFIT',
+            'FEAT_DASHBOARD_CARD_PENDING_BALANCE',
             'FEAT_DASHBOARD_PROFIT_TRANSACTIONS',
             'FEAT_DASHBOARD_COMPANY_PROFITABILITY',
         ]);
