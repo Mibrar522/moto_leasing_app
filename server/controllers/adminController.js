@@ -635,10 +635,10 @@ exports.getDashboardData = async (req, res) => {
                 )::int AS pending_sales,
                 COALESCE(SUM(st.vehicle_price), 0)::numeric AS total_sales_revenue
             FROM sales_transactions st
-            LEFT JOIN users su ON su.id = st.agent_id
+            JOIN users su ON su.id = st.agent_id
             ${salesOwnerJoinSql('su')}
-            LEFT JOIN customers c ON c.id = st.customer_id
-            LEFT JOIN vehicles v ON v.id = st.vehicle_id
+            JOIN customers c ON c.id = st.customer_id
+            JOIN vehicles v ON v.id = st.vehicle_id
             ${dashboardSalesMetricScope.whereSql}
             `,
             dashboardSalesMetricScope.params
@@ -657,10 +657,10 @@ exports.getDashboardData = async (req, res) => {
                     st.agreement_date,
                     st.created_at
                 FROM sales_transactions st
-                LEFT JOIN users su ON su.id = st.agent_id
+                JOIN users su ON su.id = st.agent_id
                 ${salesOwnerJoinSql('su')}
-                LEFT JOIN customers c ON c.id = st.customer_id
-                LEFT JOIN vehicles v ON v.id = st.vehicle_id
+                JOIN customers c ON c.id = st.customer_id
+                JOIN vehicles v ON v.id = st.vehicle_id
                 ${dashboardSalesCardScope.whereSql}
             ), installment_activity_sales AS (
                 SELECT DISTINCT st.id
