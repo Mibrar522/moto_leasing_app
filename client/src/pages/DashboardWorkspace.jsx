@@ -4707,7 +4707,7 @@ const selectedCustomer = useMemo(
             settledLeases: Number(dashboardData.metrics.activeLeases || 0),
             pendingLeases: Number(dashboardData.metrics.pendingLeases || 0),
             pendingTasks: Number(dashboardData.metrics.pendingTasks || 0),
-            totalRevenue: salesAnalytics.totals.selling || Number(dashboardData.metrics.totalRevenue || 0),
+            totalRevenue: Number(dashboardData.metrics.totalRevenue ?? salesAnalytics.totals.selling ?? 0),
             totalProfit: Number(dashboardData.metrics.totalProfit ?? salesAnalytics.totals.profit ?? 0),
             pendingBalance: Number(dashboardData.metrics.pendingBalance ?? 0),
             leasingApplications: Number(dashboardData.metrics.totalApplications || 0),

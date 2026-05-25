@@ -689,11 +689,24 @@ exports.getDashboardData = async (req, res) => {
                 FROM scoped_sales st
                 WHERE ${dashboardSalesCardScope.saleDatePredicateSql}
             ), pending_installment_balance AS (
-                SELECT COALESCE(SUM(GREATEST(COALESCE(si.amount, 0) - COALESCE(si.received_amount, 0), 0)), 0)::numeric AS amount
+                SELECT COALESCE(SUM(
+                    GREATEST(
+                        COALESCE(st.vehicle_price, 0)
+                        - COALESCE(st.down_payment, 0)
+                        - COALESCE(installment_totals.received_amount, 0),
+                        0
+                    )
+                ), 0)::numeric AS amount
                 FROM scoped_sales st
-                JOIN sale_installments si ON si.sale_id = st.id
+                LEFT JOIN (
+                    SELECT
+                        sale_id,
+                        SUM(COALESCE(received_amount, 0))::numeric AS received_amount
+                    FROM sale_installments
+                    GROUP BY sale_id
+                ) installment_totals ON installment_totals.sale_id = st.id
                 WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
-                  AND UPPER(COALESCE(si.status, '')) <> 'RECEIVED'
+                  AND ${dashboardSalesCardScope.saleDatePredicateSql}
             ), received_installment_activity AS (
                 SELECT
                     COUNT(si.id)::int AS received_count,
