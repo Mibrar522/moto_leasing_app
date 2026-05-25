@@ -1,6 +1,5 @@
 export default function BusinessTransactionsReport({ ctx }) {
   const {
-    formatCompactCurrency,
     formatCurrency,
     getVisibleRows,
     renderEmptyState,
@@ -34,10 +33,10 @@ return (
                             searchPlaceholder: 'Search customer, vehicle, agreement, agent...',
                         })}
                         <div className="metrics-grid">
-                            {renderMetricCard('Actual Value', formatCompactCurrency(reportBusinessTotals.actual), { iconKey: 'vehicles' })}
-                            {renderMetricCard('Selling Value', formatCompactCurrency(reportBusinessTotals.selling), { valueClassName: 'success', iconKey: 'revenue' })}
-                            {renderMetricCard('Profit', formatCompactCurrency(reportBusinessTotals.profit), { valueClassName: 'success', iconKey: 'activeEmployees' })}
-                            {renderMetricCard('Loss', formatCompactCurrency(reportBusinessTotals.loss), { valueClassName: 'warning', iconKey: 'tasks' })}
+                            {renderMetricCard('Actual Value', formatCurrency(reportBusinessTotals.actual), { iconKey: 'vehicles' })}
+                            {renderMetricCard('Selling Value', formatCurrency(reportBusinessTotals.selling), { valueClassName: 'success', iconKey: 'revenue' })}
+                            {renderMetricCard('Profit', formatCurrency(reportBusinessTotals.profit), { valueClassName: 'success', iconKey: 'activeEmployees' })}
+                            {renderMetricCard('Loss', formatCurrency(reportBusinessTotals.loss), { valueClassName: 'warning', iconKey: 'tasks' })}
                         </div>
                         <div className="table-card">
                             <div className="section-header">

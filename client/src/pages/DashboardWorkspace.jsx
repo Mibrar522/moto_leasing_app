@@ -621,21 +621,6 @@ const formatCurrency = (amount) =>
         minimumFractionDigits: 2,
     }).format(Number(amount || 0));
 
-const formatCompactCurrency = (amount) => {
-    const value = Number(amount || 0);
-
-    if (Math.abs(value) < 100000) {
-        return formatCurrency(value);
-    }
-
-    const compactValue = new Intl.NumberFormat('en', {
-        notation: 'compact',
-        maximumFractionDigits: 1,
-    }).format(value);
-
-    return `Rs ${compactValue}`;
-};
-
 const getStatusClass = (status) => statusClassMap[String(status || '').toUpperCase()] || 'pill-neutral';
 
 const metricIcons = {
@@ -9274,7 +9259,6 @@ const selectedCustomer = useMemo(
         employeeMessage,
         filteredCustomers,
         filteredEmployees,
-        formatCompactCurrency,
         formatCurrency,
         formatSaleAgentIdentity,
         formatSaleDealerIdentity,
