@@ -652,6 +652,7 @@ exports.getDashboardData = async (req, res) => {
                     st.sale_mode,
                     st.vehicle_price,
                     st.down_payment,
+                    v.purchase_price,
                     st.purchase_date,
                     st.agreement_date,
                     st.created_at
@@ -683,6 +684,16 @@ exports.getDashboardData = async (req, res) => {
                 ), 0)::numeric AS amount
                 FROM scoped_sales st
                 WHERE ${dashboardSalesCardScope.saleDatePredicateSql}
+            ), margin_activity AS (
+                SELECT COALESCE(SUM(CASE WHEN COALESCE(st.purchase_price, 0) > 0 THEN GREATEST(COALESCE(st.vehicle_price, 0) - COALESCE(st.purchase_price, 0), 0) ELSE 0 END), 0)::numeric AS amount
+                FROM scoped_sales st
+                WHERE ${dashboardSalesCardScope.saleDatePredicateSql}
+            ), pending_installment_balance AS (
+                SELECT COALESCE(SUM(GREATEST(COALESCE(si.amount, 0) - COALESCE(si.received_amount, 0), 0)), 0)::numeric AS amount
+                FROM scoped_sales st
+                JOIN sale_installments si ON si.sale_id = st.id
+                WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
+                  AND UPPER(COALESCE(si.status, '')) <> 'RECEIVED'
             ), received_installment_activity AS (
                 SELECT
                     COUNT(si.id)::int AS received_count,
@@ -703,11 +714,13 @@ exports.getDashboardData = async (req, res) => {
                 (
                     (SELECT amount FROM sale_activity_revenue)
                     + (SELECT received_amount FROM received_installment_activity)
-                )::numeric AS total_dashboard_revenue
+                )::numeric AS total_dashboard_revenue,
+                (SELECT amount FROM margin_activity)::numeric AS total_dashboard_profit,
+                (SELECT amount FROM pending_installment_balance)::numeric AS pending_installment_balance
             FROM scoped_sales st
             `,
             dashboardSalesCardScope.params
-        ) : { rows: [{ cash_transactions: 0, installment_transactions: 0, received_installments: 0, total_dashboard_revenue: 0 }] };
+        ) : { rows: [{ cash_transactions: 0, installment_transactions: 0, received_installments: 0, total_dashboard_revenue: 0, total_dashboard_profit: 0, pending_installment_balance: 0 }] };
 
         const installmentTaskMetricsResultPromise = wantsGroup('metrics') ? pool.query(
             `
@@ -1636,6 +1649,8 @@ exports.getDashboardData = async (req, res) => {
                 pendingLeases: Number(settledLeaseMetricsResult.rows[0].pending_leases || 0),
                 pendingTasks: Number(leaseMetricsResult.rows[0].pending_applications || 0),
             totalRevenue: Number(leaseMetricsResult.rows[0].total_revenue || 0) + Number(dashboardSalesCardMetricsResult.rows[0].total_dashboard_revenue ?? salesMetricsResult.rows[0].total_sales_revenue ?? 0),
+            totalProfit: Number(dashboardSalesCardMetricsResult.rows[0].total_dashboard_profit || 0),
+            pendingBalance: Number(dashboardSalesCardMetricsResult.rows[0].pending_installment_balance || 0),
             totalVehicles: metricsResult.rows[0].total_vehicles,
             availableVehicles: metricsResult.rows[0].available_vehicles,
             totalApplications: Number(leaseMetricsResult.rows[0].total_applications || 0),

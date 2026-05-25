@@ -4708,14 +4708,14 @@ const selectedCustomer = useMemo(
             pendingLeases: Number(dashboardData.metrics.pendingLeases || 0),
             pendingTasks: Number(dashboardData.metrics.pendingTasks || 0),
             totalRevenue: salesAnalytics.totals.selling || Number(dashboardData.metrics.totalRevenue || 0),
-            totalProfit: Number(salesAnalytics.totals.profit || 0),
-            pendingBalance: Number(salesAnalytics.totals.pending || 0),
+            totalProfit: Number(dashboardData.metrics.totalProfit ?? salesAnalytics.totals.profit ?? 0),
+            pendingBalance: Number(dashboardData.metrics.pendingBalance ?? 0),
             leasingApplications: Number(dashboardData.metrics.totalApplications || 0),
             cashTransactions,
             installmentTransactions,
             receivedInstallments,
         };
-    }, [dashboardData.metrics, dashboardData.salesTransactions, salesAnalytics.totals.pending, salesAnalytics.totals.profit, salesAnalytics.totals.selling]);
+    }, [dashboardData.metrics, dashboardData.salesTransactions, salesAnalytics.totals.profit, salesAnalytics.totals.selling]);
     const dashboardSalesMix = useMemo(() => {
         const cashCount = Number(overviewMetrics.cashTransactions || 0);
         const installmentCount = Number(overviewMetrics.installmentTransactions || 0);
