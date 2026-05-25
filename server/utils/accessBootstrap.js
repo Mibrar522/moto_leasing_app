@@ -88,7 +88,7 @@ const FEATURE_DEFINITIONS = [
     ['FEAT_DASHBOARD_CARD_ACTIVE_LEASES', 'Total Settled Leases'],
     ['FEAT_DASHBOARD_CARD_PENDING_LEASES', 'Total Customer Pending Lease'],
     ['FEAT_DASHBOARD_CARD_PENDING_TASKS', 'Total Pending Tasks'],
-    ['FEAT_DASHBOARD_CARD_TOTAL_REVENUE', 'Total Revenue'],
+    ['FEAT_DASHBOARD_CARD_TOTAL_REVENUE', 'Total Amount'],
     ['FEAT_DASHBOARD_CARD_TOTAL_PROFIT', 'Total Profit'],
     ['FEAT_DASHBOARD_CARD_PENDING_BALANCE', 'Pending Balance'],
     ['FEAT_DASHBOARD_CARD_EMPLOYEE_COMMISSIONS', 'Total Employee Commissions'],

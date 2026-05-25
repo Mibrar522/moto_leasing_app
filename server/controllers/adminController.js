@@ -1648,7 +1648,7 @@ exports.getDashboardData = async (req, res) => {
                 activeLeases: Number(settledLeaseMetricsResult.rows[0].settled_leases || 0),
                 pendingLeases: Number(settledLeaseMetricsResult.rows[0].pending_leases || 0),
                 pendingTasks: Number(leaseMetricsResult.rows[0].pending_applications || 0),
-            totalRevenue: Number(leaseMetricsResult.rows[0].total_revenue || 0) + Number(dashboardSalesCardMetricsResult.rows[0].total_dashboard_revenue ?? salesMetricsResult.rows[0].total_sales_revenue ?? 0),
+            totalRevenue: Number(salesMetricsResult.rows[0].total_sales_revenue || 0),
             totalProfit: Number(dashboardSalesCardMetricsResult.rows[0].total_dashboard_profit || 0),
             pendingBalance: Number(dashboardSalesCardMetricsResult.rows[0].pending_installment_balance || 0),
             totalVehicles: metricsResult.rows[0].total_vehicles,

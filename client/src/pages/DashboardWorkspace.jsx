@@ -1049,7 +1049,7 @@ const FEATURE_ACCESS_LABELS = {
     FEAT_DASHBOARD_CARD_ACTIVE_LEASES: 'Total Settled Leases',
     FEAT_DASHBOARD_CARD_PENDING_LEASES: 'Total Customer Pending Lease',
     FEAT_DASHBOARD_CARD_PENDING_TASKS: 'Total Pending Tasks',
-    FEAT_DASHBOARD_CARD_TOTAL_REVENUE: 'Total Revenue',
+    FEAT_DASHBOARD_CARD_TOTAL_REVENUE: 'Total Amount',
     FEAT_DASHBOARD_CARD_TOTAL_PROFIT: 'Total Profit',
     FEAT_DASHBOARD_CARD_PENDING_BALANCE: 'Pending Balance',
     FEAT_DASHBOARD_CARD_EMPLOYEE_COMMISSIONS: 'Total Employee Commissions',
@@ -9682,7 +9682,7 @@ const selectedCustomer = useMemo(
                                     {canViewDashboardCardActiveLeases ? renderMetricCard('Total Settled Leases', overviewMetrics.settledLeases, { iconKey: 'leases' }) : null}
                                     {canViewDashboardCardPendingLeases ? renderMetricCard('Total Customer Pending Lease', overviewMetrics.pendingLeases, { valueClassName: 'warning', iconKey: 'tasks' }) : null}
                                     {canViewDashboardCardPendingTasks ? renderMetricCard('Total Pending Tasks', overviewMetrics.pendingTasks, { valueClassName: 'warning', iconKey: 'tasks' }) : null}
-                                    {canViewDashboardCardTotalRevenue ? renderMetricCard('Total Revenue', formatCurrency(overviewMetrics.totalRevenue), { valueClassName: 'success', iconKey: 'revenue' }) : null}
+                                    {canViewDashboardCardTotalRevenue ? renderMetricCard('Total Amount', formatCurrency(overviewMetrics.totalRevenue), { valueClassName: 'success', iconKey: 'revenue' }) : null}
                                     {canViewDashboardCardTotalProfit ? renderMetricCard('Total Profit', formatCurrency(overviewMetrics.totalProfit), { valueClassName: Number(overviewMetrics.totalProfit || 0) >= 0 ? 'success' : 'danger', iconKey: 'revenue' }) : null}
                                     {canViewDashboardCardPendingBalance ? renderMetricCard('Pending Balance', formatCurrency(overviewMetrics.pendingBalance), { valueClassName: 'warning', iconKey: 'tasks' }) : null}
                                     {canViewDashboardCardEmployeeCommissions ? renderMetricCard('Total Employee Commissions', formatCurrency(totalEmployeeCommission), { valueClassName: 'success', iconKey: 'employees' }) : null}
