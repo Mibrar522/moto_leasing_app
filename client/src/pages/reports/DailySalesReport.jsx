@@ -1,6 +1,5 @@
 export default function DailySalesReport({ ctx }) {
   const {
-    formatCompactCurrency,
     formatCurrency,
     getReportBranchValue,
     getStatusClass,
@@ -37,10 +36,10 @@ return (
                         })}
                         <div className="metrics-grid">
                             {renderMetricCard('Total Deals', reportSalesTotals.deals, { iconKey: 'applications' })}
-                            {renderMetricCard('Total Amount', formatCompactCurrency(reportSalesTotals.amount), { valueClassName: 'success', iconKey: 'revenue' })}
-                            {renderMetricCard('Received', formatCompactCurrency(reportSalesTotals.received), { valueClassName: 'success', iconKey: 'revenue' })}
-                            {renderMetricCard('Pending', formatCompactCurrency(reportSalesTotals.pending), { valueClassName: 'warning', iconKey: 'tasks' })}
-                            {renderMetricCard('Total Commission', formatCompactCurrency(reportSalesCommissionTotal), { valueClassName: 'success', iconKey: 'employees' })}
+                            {renderMetricCard('Total Amount', formatCurrency(reportSalesTotals.amount), { valueClassName: 'success', iconKey: 'revenue' })}
+                            {renderMetricCard('Received', formatCurrency(reportSalesTotals.received), { valueClassName: 'success', iconKey: 'revenue' })}
+                            {renderMetricCard('Pending', formatCurrency(reportSalesTotals.pending), { valueClassName: 'warning', iconKey: 'tasks' })}
+                            {renderMetricCard('Total Commission', formatCurrency(reportSalesCommissionTotal), { valueClassName: 'success', iconKey: 'employees' })}
                         </div>
                         <div className="table-card">
                             <div className="section-header">
