@@ -135,6 +135,16 @@ export default function Customers({ ctx }) {
     if (normalized === 'other') return 'Other';
     return '';
   };
+  const customerDocumentIsCnic = String(customerForm.document_type || '').toUpperCase() === 'CNIC';
+  const customerIdentityPattern = customerDocumentIsCnic
+    ? '\\d{5}-\\d{7}-\\d{1}'
+    : '[A-Za-z0-9][A-Za-z0-9-]{4,19}';
+  const customerIdentityTitle = customerDocumentIsCnic
+    ? 'CNIC must use dashed format: 12345-1234567-1'
+    : 'Passport number must be 5 to 20 letters, numbers, or dashes.';
+  const customerIdentityPlaceholder = customerDocumentIsCnic
+    ? '12345-1234567-1'
+    : 'Passport number';
 
 if (!canOpenCustomers) {
                     return <div className="feedback-card error">Your account does not have customer onboarding access.</div>;
@@ -239,7 +249,15 @@ if (!canOpenCustomers) {
                                     </label>
                                     <label className="field" hidden={!canEditCustomerField('CNIC / Passport Number')}>
                                         <span>CNIC / Passport Number</span>
-                                        <input name="cnic_passport_number" value={customerForm.cnic_passport_number} onChange={handleCustomerChange} placeholder="35202-1234567-1 or passport no." />
+                                        <input
+                                            name="cnic_passport_number"
+                                            value={customerForm.cnic_passport_number}
+                                            onChange={handleCustomerChange}
+                                            placeholder={customerIdentityPlaceholder}
+                                            pattern={customerIdentityPattern}
+                                            title={customerIdentityTitle}
+                                            maxLength={customerDocumentIsCnic ? 15 : 20}
+                                        />
                                     </label>
                                     {showCustomerCnicFront ? (
                                     <>

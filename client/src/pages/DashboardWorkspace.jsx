@@ -967,6 +967,20 @@ const getDashboardPageFromPathname = (pathname) => {
 };
 const getDashboardPathForPage = (page) => DASHBOARD_PAGE_PATHS[page] || DASHBOARD_PAGE_PATHS.dashboard;
 const normalizeIdentityNumber = (value) => String(value || '').replace(/\D/g, '');
+const formatCnicNumber = (value) => {
+    const digits = normalizeIdentityNumber(value).slice(0, 13);
+    if (digits.length <= 5) return digits;
+    if (digits.length <= 12) return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+    return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`;
+};
+const isValidCustomerIdentity = (documentType, value) => {
+    const normalizedDocumentType = String(documentType || '').toUpperCase();
+    const normalizedValue = String(value || '').trim();
+    if (normalizedDocumentType === 'CNIC') {
+        return /^\d{5}-\d{7}-\d$/.test(normalizedValue);
+    }
+    return /^[A-Za-z0-9][A-Za-z0-9-]{4,19}$/.test(normalizedValue);
+};
 const normalizePreviewAssetPath = (value) => {
     const trimmed = String(value || '').trim();
     if (!trimmed) return '';
@@ -5217,6 +5231,9 @@ const selectedCustomer = useMemo(
                     created_by_agent: current.dealer_id === value ? current.created_by_agent : '',
                 };
             }
+            if (name === 'cnic_passport_number' && String(current.document_type || '').toUpperCase() === 'CNIC') {
+                return { ...current, [name]: formatCnicNumber(value) };
+            }
             return { ...current, [name]: value };
         });
     };
@@ -6011,6 +6028,15 @@ const selectedCustomer = useMemo(
 
         if (!customerForm.full_name.trim() || !customerForm.cnic_passport_number.trim()) {
             setCustomerMessage('Customer name and CNIC/Passport number are required.');
+            return;
+        }
+
+        if (!isValidCustomerIdentity(customerForm.document_type, customerForm.cnic_passport_number)) {
+            setCustomerMessage(
+                String(customerForm.document_type || '').toUpperCase() === 'CNIC'
+                    ? 'CNIC must use dashed format: 12345-1234567-1.'
+                    : 'Passport number must be 5 to 20 letters, numbers, or dashes.'
+            );
             return;
         }
 
