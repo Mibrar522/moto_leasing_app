@@ -140,6 +140,48 @@ const getVehicleUniqueConstraintMessage = (error) => {
             return null;
     }
 };
+const getDuplicateVehicleFieldMessage = (field, value) => {
+    const fieldLabels = {
+        registration_number: 'Registration number',
+        chassis_number: 'Chassis number',
+        engine_number: 'Engine number',
+    };
+    return `${fieldLabels[field] || 'Vehicle reference'} "${value}" already exists in inventory. Duplicate registration, chassis, or engine numbers are not allowed.`;
+};
+const checkReceivedVehicleDuplicate = async (client, { field, value, sourceStockOrderId }) => {
+    const normalizedValue = String(value || '').trim();
+    if (!normalizedValue) return '';
+
+    const allowedFields = new Set(['registration_number', 'chassis_number', 'engine_number']);
+    if (!allowedFields.has(field)) return '';
+
+    const result = await client.query(
+        `
+        SELECT id
+        FROM vehicles
+        WHERE UPPER(${field}) = UPPER($1)
+          AND ($2::uuid IS NULL OR source_stock_order_id IS DISTINCT FROM $2::uuid)
+        LIMIT 1
+        `,
+        [normalizedValue, sourceStockOrderId || null]
+    );
+
+    return result.rows.length > 0 ? getDuplicateVehicleFieldMessage(field, normalizedValue) : '';
+};
+const checkReceivedVehicleDuplicates = async (client, item, sourceStockOrderId) => {
+    const fields = [
+        ['registration_number', item.registration_number],
+        ['chassis_number', item.chassis_number],
+        ['engine_number', item.engine_number],
+    ];
+
+    for (const [field, value] of fields) {
+        const message = await checkReceivedVehicleDuplicate(client, { field, value, sourceStockOrderId });
+        if (message) return message;
+    }
+
+    return '';
+};
 const buildInventorySerialBase = (order, pieceNumber) => {
     return [
         'STK',
@@ -340,6 +382,21 @@ const createReceivedInventoryVehicle = async (client, order, item, pieceNumber) 
 
     if (!registrationNumber || !chassisNumber || !engineNumber) {
         throw new Error('Registration number, chassis number, and engine number are required for each received vehicle.');
+    }
+
+    const duplicateMessage = await checkReceivedVehicleDuplicates(
+        client,
+        {
+            registration_number: registrationNumber,
+            chassis_number: chassisNumber,
+            engine_number: engineNumber,
+        },
+        order.id
+    );
+    if (duplicateMessage) {
+        const duplicateError = new Error(duplicateMessage);
+        duplicateError.statusCode = 409;
+        throw duplicateError;
     }
 
     const serialNumber = await resolveUniqueInventorySerialNumber(
@@ -1009,6 +1066,9 @@ exports.updateStockOrder = async (req, res) => {
         });
         if (error.message === 'Registration number, chassis number, and engine number are required for each received vehicle.') {
             return res.status(400).json({ message: error.message });
+        }
+        if (error.statusCode === 409) {
+            return res.status(409).json({ message: error.message });
         }
         if (error.code === '23505') {
             const uniquenessMessage = getVehicleUniqueConstraintMessage(error);
