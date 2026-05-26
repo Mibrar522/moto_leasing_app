@@ -128,6 +128,13 @@ export default function Customers({ ctx }) {
 
     return '';
   };
+  const toGenderSelectValue = (value = '') => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'm' || normalized === 'male') return 'Male';
+    if (normalized === 'f' || normalized === 'female') return 'Female';
+    if (normalized === 'other') return 'Other';
+    return '';
+  };
 
 if (!canOpenCustomers) {
                     return <div className="feedback-card error">Your account does not have customer onboarding access.</div>;
@@ -216,7 +223,12 @@ if (!canOpenCustomers) {
                                     </label>
                                     <label className="field" hidden={!canEditCustomerField('Gender')}>
                                         <span>Gender</span>
-                                        <input name="gender" value={customerForm.gender} onChange={handleCustomerChange} placeholder="Male / Female" />
+                                        <select name="gender" value={toGenderSelectValue(customerForm.gender)} onChange={handleCustomerChange}>
+                                            <option value="">Select gender</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                            <option value="Other">Other</option>
+                                        </select>
                                     </label>
                                     <label className="field" hidden={!canEditCustomerField('Document Type')}>
                                         <span>Document Type</span>
