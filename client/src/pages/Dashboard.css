@@ -11,8 +11,8 @@ body,
 }
 
 :root {
-    --sidebar-width: 224px;
-    --header-height: 66px;
+    --sidebar-width: 196px;
+    --header-height: 58px;
     --dash-bg: #f4efe6;
     --dash-surface: rgba(255, 252, 246, 0.82);
     --dash-surface-strong: #fffdfa;
@@ -179,7 +179,7 @@ body,
     display: grid;
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
     grid-template-rows: var(--header-height) minmax(0, 1fr);
-    font-size: 0.86rem;
+    font-size: 0.78rem;
     background:
         radial-gradient(circle at top left, var(--dash-layout-glow), transparent 24%),
         linear-gradient(180deg, var(--dash-layout-start) 0%, var(--dash-layout-end) 100%);
@@ -193,10 +193,10 @@ body,
     height: 100vh;
     max-height: 100vh;
     min-height: 100vh;
-    padding: 94px 10px 14px;
+    padding: 74px 8px 12px;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 12px;
     background:
         linear-gradient(180deg, var(--dash-sidebar-start) 0%, var(--dash-sidebar-middle) 48%, var(--dash-sidebar-end) 100%);
     border-right: 1px solid rgba(255, 255, 255, 0.08);
@@ -210,7 +210,7 @@ body,
     content: "";
     position: absolute;
     inset: 0 0 auto 0;
-    height: 88px;
+    height: 68px;
     background:
         linear-gradient(180deg, color-mix(in srgb, var(--dash-sidebar-start) 88%, white 12%) 0%, var(--dash-sidebar-middle) 100%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -235,8 +235,8 @@ body,
     background: transparent;
     color: var(--dash-sidebar-text);
     text-align: left;
-    padding: 8px 10px;
-    border-radius: 12px;
+    padding: 7px 9px;
+    border-radius: 10px;
     cursor: pointer;
     font-weight: 700;
     letter-spacing: 0.01em;
@@ -246,7 +246,7 @@ body,
 .nav-btn-content {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     min-width: 0;
 }
 
@@ -255,13 +255,13 @@ body,
 }
 
 .nav-btn-icon {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 28px;
-    border-radius: 10px;
+    flex: 0 0 24px;
+    border-radius: 8px;
     background:
         radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.3), transparent 38%),
         linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
@@ -270,8 +270,8 @@ body,
 }
 
 .nav-btn-icon svg {
-    width: 15px;
-    height: 15px;
+    width: 13px;
+    height: 13px;
 }
 
 .nav-btn-icon-dashboard {
@@ -510,8 +510,8 @@ body,
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    padding: 6px 10px;
+    gap: 8px;
+    padding: 4px 8px;
     background: var(--dash-header-bg);
     backdrop-filter: blur(18px);
     border-bottom: 2px solid var(--dash-header-border);
@@ -537,10 +537,10 @@ body,
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-left: -40px;
-    margin-top: 6px;
-    padding: 8px 12px 8px 58px;
-    min-height: 46px;
+    margin-left: -32px;
+    margin-top: 4px;
+    padding: 6px 10px 6px 48px;
+    min-height: 38px;
     border-radius: 0;
     background: linear-gradient(135deg, var(--dash-primary-start) 0%, var(--dash-primary-end) 100%);
     border: 1px solid rgba(255, 255, 255, 0.14);
@@ -561,8 +561,8 @@ body,
 }
 
 .header-dealer-logo {
-    width: 76px;
-    height: 58px;
+    width: 62px;
+    height: 48px;
     border-radius: 0;
     flex-shrink: 0;
     object-fit: cover;
@@ -570,7 +570,7 @@ body,
     background: #ffffff;
     box-shadow: 0 12px 24px rgba(34, 50, 76, 0.1);
     position: absolute;
-    left: -32px;
+    left: -26px;
     top: 50%;
     transform: translateY(-50%);
     z-index: 2;
@@ -597,7 +597,7 @@ body,
 .header-dealer-copy strong {
     display: block;
     margin: 0;
-    font-size: 0.92rem;
+    font-size: 0.82rem;
     line-height: 1;
     color: var(--dash-primary-text);
     font-weight: 900;
@@ -610,7 +610,7 @@ body,
     display: block;
     margin: 0;
     color: color-mix(in srgb, var(--dash-primary-text) 82%, transparent);
-    font-size: 0.74rem;
+    font-size: 0.66rem;
     line-height: 1.35;
     word-break: break-word;
 }
@@ -669,8 +669,8 @@ body,
 
 .notification-btn {
     position: relative;
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
     display: grid;
     place-items: center;
     border-radius: 50%;
@@ -848,8 +848,8 @@ body,
 }
 
 .avatar {
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
     display: grid;
     place-items: center;
     border-radius: 50%;
@@ -936,7 +936,7 @@ body,
     position: relative;
     height: calc(100vh - var(--header-height));
     min-height: 0;
-    padding: 12px;
+    padding: 8px;
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -953,9 +953,9 @@ body,
 }
 
 .page-heading {
-    margin-bottom: 12px;
-    padding: 14px 18px;
-    border-radius: 18px;
+    margin-bottom: 10px;
+    padding: 10px 14px;
+    border-radius: 14px;
     background:
         radial-gradient(circle at top right, var(--dash-page-glow), transparent 32%),
         var(--dash-page-panel);
@@ -964,16 +964,16 @@ body,
 }
 
 .page-heading h1 {
-    margin: 0 0 6px;
-    font-size: clamp(1.28rem, 1.8vw, 1.8rem);
+    margin: 0 0 4px;
+    font-size: clamp(1.08rem, 1.42vw, 1.46rem);
     color: var(--dash-text);
 }
 
 .page-heading p {
     max-width: 760px;
     color: var(--dash-text-soft);
-    font-size: 0.82rem;
-    line-height: 1.45;
+    font-size: 0.72rem;
+    line-height: 1.35;
 }
 
 .metrics-grid,
@@ -988,7 +988,7 @@ body,
 .form-grid,
 .scan-preview {
     display: grid;
-    gap: 12px;
+    gap: 10px;
 }
 
 .metrics-grid {
@@ -1000,8 +1000,8 @@ body,
 
 .dashboard-split,
 .customers-grid {
-    grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
-    margin-bottom: 16px;
+    grid-template-columns: minmax(0, 1.18fr) minmax(300px, 0.82fr);
+    margin-bottom: 12px;
 }
 
 .metrics-grid > *,
@@ -1297,7 +1297,7 @@ body,
 .table-card,
 .feedback-card,
 .empty-state {
-    border-radius: 18px;
+    border-radius: 14px;
     background: var(--dash-surface);
     border: 1px solid rgba(255, 255, 255, 0.66);
     box-shadow: var(--dash-shadow);
@@ -1306,10 +1306,10 @@ body,
 
 .metric-card {
     position: relative;
-    padding: 14px 14px 16px;
+    padding: 10px 12px 12px;
     overflow: hidden;
     min-width: 0;
-    min-height: 108px;
+    min-height: 88px;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -1405,19 +1405,19 @@ body,
 }
 
 .dashboard-cards-grid .metric-card {
-    min-height: 116px;
-    padding: 16px 16px 18px;
+    min-height: 92px;
+    padding: 12px 12px 14px;
 }
 
 .dashboard-cards-grid .metric-card-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 14px;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
 }
 
 .dashboard-cards-grid .metric-card label,
 .dashboard-cards-grid .metric-card .value {
-    padding-right: 52px;
+    padding-right: 40px;
 }
 
 .dashboard-cards-grid .metric-card .value {
@@ -1431,16 +1431,16 @@ body,
 
 .metric-card-icon {
     position: absolute;
-    top: 16px;
-    right: 16px;
+    top: 12px;
+    right: 12px;
     z-index: 2;
-    width: 48px;
-    height: 48px;
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--metric-icon-color, var(--dash-primary-start));
-    border-radius: 16px;
+    border-radius: 11px;
     border: 1px solid color-mix(in srgb, var(--metric-icon-color, var(--dash-primary-start)) 14%, rgba(255, 255, 255, 0.48));
     background:
         radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.58), transparent 36%),
@@ -1451,8 +1451,8 @@ body,
 }
 
 .metric-card-icon svg {
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
 }
 
 .metric-card-leases {
@@ -1530,21 +1530,21 @@ body,
     position: relative;
     z-index: 1;
     color: var(--dash-text-soft);
-    font-size: 0.72rem;
+    font-size: 0.62rem;
     font-weight: 800;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     max-width: none;
-    padding-right: 62px;
+    padding-right: 42px;
     line-height: 1.35;
 }
 
 .metric-card .value {
     position: relative;
     z-index: 1;
-    margin-top: 14px;
+    margin-top: 10px;
     font-family: var(--heading);
-    font-size: clamp(0.98rem, 1vw, 1.44rem);
+    font-size: clamp(0.86rem, 0.9vw, 1.16rem);
     line-height: 1.02;
     color: var(--dash-text);
     max-width: none;
@@ -1613,7 +1613,7 @@ body,
     background: var(--dash-surface-strong);
 }
 .table-card {
-    padding: 16px;
+    padding: 12px;
     width: 100%;
     min-width: 0;
     overflow: hidden;
@@ -1775,15 +1775,15 @@ body,
 .invoice-table-wrap h3,
 .section-header h3 {
     color: var(--dash-text);
-    font-size: 1.1rem;
+    font-size: 0.92rem;
 }
 
 .section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 18px;
+    gap: 10px;
+    margin-bottom: 10px;
 }
 
 .installment-profile-header {
@@ -1949,24 +1949,24 @@ body,
 }
 
 .employee-document-preview {
-    min-height: 240px;
-    border-radius: 22px;
+    min-height: 128px;
+    border-radius: 14px;
     border: 1px solid color-mix(in srgb, var(--dash-border) 82%, transparent);
     background: color-mix(in srgb, var(--dash-surface) 88%, white);
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 16px;
+    padding: 10px;
 }
 
 .employee-document-image,
 .employee-document-frame {
     width: 100%;
-    min-height: 220px;
-    max-height: 360px;
+    min-height: 112px;
+    max-height: 180px;
     border: none;
-    border-radius: 16px;
+    border-radius: 10px;
     object-fit: contain;
     background: #fff;
 }
@@ -1996,10 +1996,10 @@ body,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 32px;
-    padding: 6px 14px;
+    min-height: 24px;
+    padding: 4px 10px;
     border-radius: 999px;
-    font-size: 0.76rem;
+    font-size: 0.64rem;
     font-weight: 800;
     letter-spacing: 0.02em;
 }
@@ -2029,9 +2029,9 @@ body,
 .secondary-btn,
 .danger-btn,
 .view-btn {
-    min-height: 42px;
-    padding: 0 16px;
-    border-radius: 14px;
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 9px;
     cursor: pointer;
     font-weight: 800;
     transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
@@ -2048,8 +2048,8 @@ body,
 .profile-switcher {
     display: grid;
     gap: 6px;
-    min-width: 176px;
-    max-width: 240px;
+    min-width: 132px;
+    max-width: 184px;
     align-items: center;
     padding-top: 2px;
 }
@@ -2061,8 +2061,8 @@ body,
 
 .theme-switcher select,
 .profile-switcher select {
-    min-height: 42px;
-    border-radius: 14px;
+    min-height: 30px;
+    border-radius: 9px;
     border: 1px solid rgba(34, 50, 76, 0.12);
     background: rgba(255, 255, 255, 0.9);
     color: var(--dash-text);
@@ -2074,7 +2074,7 @@ body,
 .profile-switcher-wrap {
     display: grid;
     gap: 8px;
-    min-width: 190px;
+    min-width: 160px;
 }
 
 .profile-revert-btn {
@@ -2083,9 +2083,9 @@ body,
 }
 
 .theme-apply-btn {
-    min-height: 42px;
-    padding: 0 14px;
-    border-radius: 12px;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 10px;
     width: 100%;
 }
 
@@ -2166,7 +2166,7 @@ body,
 .field {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 5px;
 }
 
 .form-reset {
@@ -2178,13 +2178,13 @@ body,
 
 .field span {
     color: var(--dash-text);
-    font-size: 0.86rem;
+    font-size: 0.74rem;
     font-weight: 700;
 }
 
 .field-hint {
     color: var(--dash-text-soft);
-    font-size: 0.78rem;
+    font-size: 0.68rem;
     font-weight: 600;
     line-height: 1.4;
 }
@@ -2194,11 +2194,11 @@ body,
 .field textarea,
 .installment-sale-picker {
     width: 100%;
-    border-radius: 12px;
+    border-radius: 9px;
     border: 1px solid rgba(34, 50, 76, 0.12);
     background: rgba(255, 255, 255, 0.88);
     color: var(--dash-text);
-    padding: 10px 12px;
+    padding: 7px 9px;
     outline: none;
     resize: vertical;
     transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
@@ -2692,9 +2692,9 @@ body,
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    padding: 15px 18px;
-    border-radius: 18px;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
     border: 1px solid var(--dash-header-card-border);
     background: linear-gradient(135deg, color-mix(in srgb, var(--dash-glass-soft) 88%, var(--dash-layout-start) 12%) 0%, var(--dash-glass-strong) 100%);
     color: var(--dash-text);
@@ -2726,13 +2726,13 @@ body,
 
 .custom-select-trigger-copy strong {
     color: var(--dash-text);
-    font-size: 0.98rem;
+    font-size: 0.78rem;
     font-weight: 700;
 }
 
 .custom-select-trigger-copy small {
     color: var(--dash-text-soft);
-    font-size: 0.82rem;
+    font-size: 0.68rem;
 }
 
 .custom-select-trigger-icon {
@@ -2748,11 +2748,11 @@ body,
     right: 0;
     z-index: 55;
     display: grid;
-    gap: 8px;
-    max-height: 320px;
+    gap: 6px;
+    max-height: 240px;
     overflow: auto;
-    padding: 12px;
-    border-radius: 22px;
+    padding: 8px;
+    border-radius: 14px;
     border: 1px solid var(--dash-header-card-border);
     background: linear-gradient(180deg, color-mix(in srgb, var(--dash-glass-strong) 92%, var(--dash-layout-start) 8%) 0%, var(--dash-glass-hover) 100%);
     box-shadow: 0 24px 40px rgba(17, 31, 54, 0.16);
@@ -2762,9 +2762,9 @@ body,
     width: 100%;
     display: grid;
     gap: 4px;
-    padding: 12px 14px;
+    padding: 8px 10px;
     border: 1px solid var(--dash-border);
-    border-radius: 16px;
+    border-radius: 10px;
     background: color-mix(in srgb, var(--dash-glass-soft) 70%, var(--dash-layout-end) 30%);
     color: var(--dash-text);
     cursor: pointer;
@@ -2779,14 +2779,14 @@ body,
 }
 
 .custom-select-option-title {
-    font-size: 0.94rem;
+    font-size: 0.76rem;
     font-weight: 700;
     color: var(--dash-text);
     line-height: 1.35;
 }
 
 .custom-select-option-subtitle {
-    font-size: 0.82rem;
+    font-size: 0.68rem;
     color: var(--dash-accent-strong);
     line-height: 1.4;
     word-break: break-word;
@@ -2977,9 +2977,9 @@ body,
 }
 
 .pro-table thead th {
-    padding: 14px 12px;
+    padding: 9px 8px;
     text-align: left;
-    font-size: 0.74rem;
+    font-size: 0.62rem;
     font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -2997,7 +2997,7 @@ body,
 }
 
 .pro-table tbody td {
-    padding: 16px 12px;
+    padding: 10px 8px;
     border-bottom: 1px solid rgba(34, 50, 76, 0.06);
     color: #35445d;
     vertical-align: top;
