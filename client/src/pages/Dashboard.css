@@ -5,6 +5,7 @@
 :root {
     --sidebar-width: 250px;
     --header-height: 76px;
+    --dashboard-zoom: 0.76;
     --dash-bg: #f4efe6;
     --dash-surface: rgba(255, 252, 246, 0.82);
     --dash-surface-strong: #fffdfa;
@@ -164,8 +165,10 @@
 }
 
 .dashboard-layout {
-    height: 100vh;
     min-height: 100vh;
+    width: calc(100% / var(--dashboard-zoom));
+    height: calc(100vh / var(--dashboard-zoom));
+    zoom: var(--dashboard-zoom);
     overflow: hidden;
     display: grid;
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
