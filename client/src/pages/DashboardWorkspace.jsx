@@ -6159,7 +6159,7 @@ const selectedCustomer = useMemo(
             return;
         }
 
-        const shouldDelete = window.confirm(`Delete customer "${customer.full_name}"?`);
+        const shouldDelete = window.confirm(`Delete customer "${customer.full_name}"?\n\nCustomers with sales, installment, application, or account history cannot be deleted.`);
         if (!shouldDelete) return;
 
         try {

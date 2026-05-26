@@ -717,10 +717,53 @@ exports.updateCustomer = async (req, res) => {
 
 exports.deleteCustomer = async (req, res) => {
     try {
-        const globalScope = hasGlobalScope(req.user);
-        const dealerId = getEffectiveDealerId(req.user);
         const deleteParams = [req.params.id];
         const deleteScope = customerScopeClause(req.user, 'c', deleteParams);
+        const existing = await pool.query(
+            `
+            SELECT c.id, c.full_name
+            FROM customers c
+            WHERE c.id = $1
+              ${deleteScope.and}
+            LIMIT 1
+            `,
+            deleteScope.params
+        );
+
+        if (existing.rows.length === 0) {
+            return res.status(404).json({ message: 'Customer not found' });
+        }
+
+        const usageResult = await pool.query(
+            `
+            SELECT
+                (SELECT COUNT(*)::int FROM sales_transactions WHERE customer_id = $1) AS sales_count,
+                (
+                    SELECT COUNT(*)::int
+                    FROM sale_installments si
+                    JOIN sales_transactions st ON st.id = si.sale_id
+                    WHERE st.customer_id = $1
+                ) AS installment_count,
+                (SELECT COUNT(*)::int FROM lease_applications WHERE customer_id = $1) AS application_count,
+                (SELECT COUNT(*)::int FROM customer_orders WHERE customer_id = $1) AS order_count,
+                (SELECT COUNT(*)::int FROM customer_accounts WHERE customer_id = $1) AS account_count
+            `,
+            [req.params.id]
+        );
+        const usage = usageResult.rows[0] || {};
+        const totalUsage = Number(usage.sales_count || 0)
+            + Number(usage.installment_count || 0)
+            + Number(usage.application_count || 0)
+            + Number(usage.order_count || 0)
+            + Number(usage.account_count || 0);
+
+        if (totalUsage > 0) {
+            return res.status(409).json({
+                message: 'This customer has sales, installment, application, or account history and cannot be deleted. Keep the customer record for audit and payment tracking.',
+                usage,
+            });
+        }
+
         const result = await pool.query(
             `
             DELETE FROM customers c
@@ -730,10 +773,6 @@ exports.deleteCustomer = async (req, res) => {
             `,
             deleteScope.params
         );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'Customer not found' });
-        }
 
         res.status(200).json({ message: 'Customer deleted', customer: result.rows[0] });
     } catch (error) {
