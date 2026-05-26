@@ -2374,6 +2374,88 @@
     text-align: center;
 }
 
+.customer-registry-header {
+    align-items: flex-start;
+}
+
+.customer-registry-search-area {
+    flex: 1 1 420px;
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+}
+
+.customer-registry-search-label {
+    color: var(--dash-text);
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.customer-registry-search-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: min(100%, 640px);
+}
+
+.customer-registry-search-toggle {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border: 1px solid rgba(34, 50, 76, 0.12);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(33, 138, 116, 0.12), rgba(32, 146, 210, 0.12));
+    color: #167463;
+    cursor: pointer;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.customer-registry-search-toggle svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+.customer-registry-search-toggle:hover,
+.customer-registry-search-toggle.is-active {
+    border-color: rgba(22, 116, 99, 0.34);
+    box-shadow: 0 10px 20px rgba(22, 116, 99, 0.12);
+    transform: translateY(-1px);
+}
+
+.customer-registry-search-controls input,
+.customer-registry-search-controls select {
+    min-height: 42px;
+    border: 1px solid rgba(34, 50, 76, 0.12);
+    border-radius: 14px;
+    background: rgba(249, 251, 255, 0.96);
+    color: var(--dash-text);
+    padding: 10px 12px;
+    outline: none;
+    font-weight: 700;
+}
+
+.customer-registry-search-controls input {
+    flex: 1 1 280px;
+    min-width: 180px;
+}
+
+.customer-registry-search-controls select {
+    flex: 0 0 180px;
+}
+
+.customer-registry-search-controls input:focus,
+.customer-registry-search-controls select:focus {
+    border-color: rgba(187, 122, 42, 0.54);
+    box-shadow: 0 0 0 4px rgba(187, 122, 42, 0.1);
+}
+
 @media (max-width: 720px) {
     .installment-sale-combobox {
         width: 100%;
@@ -2392,6 +2474,25 @@
 
     .installment-sale-search-row select {
         grid-column: 1 / -1;
+    }
+
+    .customer-registry-header {
+        align-items: stretch;
+    }
+
+    .customer-registry-search-area,
+    .customer-registry-search-controls {
+        width: 100%;
+        justify-items: stretch;
+    }
+
+    .customer-registry-search-controls.is-open {
+        flex-wrap: wrap;
+    }
+
+    .customer-registry-search-controls input,
+    .customer-registry-search-controls select {
+        flex: 1 1 100%;
     }
 }
 

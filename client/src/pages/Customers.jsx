@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 export default function Customers({ ctx }) {
   const {
@@ -46,7 +46,48 @@ export default function Customers({ ctx }) {
   } = ctx;
 
   const [customerRegisterOpen, setCustomerRegisterOpen] = useState(false);
-  const customerRegisterRows = customerRegisterOpen ? filteredCustomers : filteredCustomers.slice(0, 5);
+  const [customerRegistrySearchOpen, setCustomerRegistrySearchOpen] = useState(false);
+  const [customerRegistrySearch, setCustomerRegistrySearch] = useState('');
+  const [customerRegistrySearchField, setCustomerRegistrySearchField] = useState('full_name');
+  const customerRegistrySearchFields = [
+    { value: 'full_name', label: 'Name' },
+    { value: 'cnic_passport_number', label: 'CNIC' },
+    { value: 'mobile_number', label: 'Mobile Number' },
+  ];
+  const normalizeRegistrySearch = (value) => String(value || '').trim().toLowerCase();
+  const getCustomerRegistrySearchValue = (customer, field) => {
+    const ocrDetails = customer.ocr_details || {};
+    if (field === 'mobile_number') {
+      return customer.contact_phone || ocrDetails.contact_phone || '';
+    }
+    return customer[field] || '';
+  };
+  const customerRegistrySearchFieldLabel = customerRegistrySearchFields.find((field) => field.value === customerRegistrySearchField)?.label || 'Name';
+  const customerRegistryFilteredCustomers = useMemo(() => {
+    const term = normalizeRegistrySearch(customerRegistrySearch);
+    if (!term) return filteredCustomers;
+
+    const startsWithMatches = [];
+    const containsMatches = [];
+    filteredCustomers.forEach((customer) => {
+      const fieldValue = normalizeRegistrySearch(getCustomerRegistrySearchValue(customer, customerRegistrySearchField));
+      const combinedValue = normalizeRegistrySearch([
+        customer.full_name,
+        customer.cnic_passport_number,
+        customer.contact_phone,
+        customer.ocr_details?.contact_phone,
+      ].filter(Boolean).join(' '));
+
+      if (fieldValue.startsWith(term) || combinedValue.startsWith(term)) {
+        startsWithMatches.push(customer);
+      } else if (fieldValue.includes(term) || combinedValue.includes(term)) {
+        containsMatches.push(customer);
+      }
+    });
+
+    return [...startsWithMatches, ...containsMatches];
+  }, [customerRegistrySearch, customerRegistrySearchField, filteredCustomers]);
+  const customerRegisterRows = customerRegisterOpen ? customerRegistryFilteredCustomers : customerRegistryFilteredCustomers.slice(0, 5);
 
   const getCustomerCreatedByLabel = (customer = {}) => {
     const isCurrentUserCreator =
@@ -398,13 +439,51 @@ if (!canOpenCustomers) {
 
                         {canViewCustomerRegister ? (
                         <div className="table-card">
-                            <div className="section-header">
+                            <div className="section-header customer-registry-header">
                                 <h3>Customer Registry</h3>
-                                <span className="section-caption">{customerRegisterRows.length} shown of {filteredCustomers.length} customers</span>
+                                <div className="customer-registry-search-area">
+                                    <span className="customer-registry-search-label">Customer Registry Search</span>
+                                    <div className={`customer-registry-search-controls ${customerRegistrySearchOpen ? 'is-open' : ''}`}>
+                                        <button
+                                            type="button"
+                                            className={`customer-registry-search-toggle ${customerRegistrySearchOpen ? 'is-active' : ''}`}
+                                            onClick={() => setCustomerRegistrySearchOpen((current) => !current)}
+                                            aria-label="Search customer registry"
+                                            title="Search customer registry"
+                                        >
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <path d="M10.8 18.1a7.3 7.3 0 1 1 5.1-2.1l4 4a1.2 1.2 0 0 1-1.7 1.7l-4-4a7.2 7.2 0 0 1-3.4.4Zm0-2.4a4.9 4.9 0 1 0 0-9.8 4.9 4.9 0 0 0 0 9.8Z" />
+                                            </svg>
+                                        </button>
+                                        {customerRegistrySearchOpen ? (
+                                            <>
+                                                <input
+                                                    type="search"
+                                                    value={customerRegistrySearch}
+                                                    onChange={(event) => setCustomerRegistrySearch(event.target.value)}
+                                                    placeholder={`Live search by ${customerRegistrySearchFieldLabel}`}
+                                                    autoFocus
+                                                />
+                                                <select
+                                                    value={customerRegistrySearchField}
+                                                    onChange={(event) => {
+                                                        setCustomerRegistrySearchField(event.target.value);
+                                                        setCustomerRegistrySearch('');
+                                                    }}
+                                                >
+                                                    {customerRegistrySearchFields.map((field) => (
+                                                        <option key={field.value} value={field.value}>{field.label}</option>
+                                                    ))}
+                                                </select>
+                                            </>
+                                        ) : null}
+                                    </div>
+                                </div>
+                                <span className="section-caption">{customerRegisterRows.length} shown of {customerRegistryFilteredCustomers.length} customers</span>
                             </div>
 
-                            {filteredCustomers.length === 0 ? (
-                                renderEmptyState('No customers found yet. Create the first customer intake record above.')
+                            {customerRegistryFilteredCustomers.length === 0 ? (
+                                renderEmptyState(customerRegistrySearch ? 'No customers match the selected registry search.' : 'No customers found yet. Create the first customer intake record above.')
                             ) : (
                                 <>
                                 <table className="pro-table">
@@ -478,7 +557,7 @@ if (!canOpenCustomers) {
                                         })}
                                     </tbody>
                                 </table>
-                                {filteredCustomers.length > 5 ? (
+                                {customerRegistryFilteredCustomers.length > 5 ? (
                                     <div className="inline-actions spaced-top">
                                         <button
                                             type="button"
