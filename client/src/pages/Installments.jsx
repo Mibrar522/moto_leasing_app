@@ -1,3 +1,5 @@
+import { useMemo, useState } from 'react';
+
 export default function Installments({ ctx }) {
   const {
     appBrandAddress,
@@ -29,6 +31,33 @@ export default function Installments({ ctx }) {
     setSelectedInstallmentSaleId,
     visibleSelectedInstallmentRows,
   } = ctx;
+
+  const [installmentSaleSearch, setInstallmentSaleSearch] = useState('');
+  const filteredInstallmentSales = useMemo(() => {
+    const searchTerm = installmentSaleSearch.trim().toLowerCase();
+    if (!searchTerm) return installmentSales;
+
+    return installmentSales.filter((sale) => [
+      sale.customer_name,
+      sale.cnic_passport_number,
+      sale.agreement_number,
+      sale.brand,
+      sale.model,
+      sale.dealer_name,
+      sale.agent_name,
+      sale.registration_number,
+      sale.chassis_number,
+      sale.engine_number,
+    ].filter(Boolean).join(' ').toLowerCase().includes(searchTerm));
+  }, [installmentSaleSearch, installmentSales]);
+  const installmentSalePickerOptions = useMemo(() => {
+    if (!selectedInstallmentSale) return filteredInstallmentSales;
+    if (filteredInstallmentSales.some((sale) => sale.id === selectedInstallmentSale.id)) {
+      return filteredInstallmentSales;
+    }
+
+    return [selectedInstallmentSale, ...filteredInstallmentSales];
+  }, [filteredInstallmentSales, selectedInstallmentSale]);
 
 if (!canManageInstallments) {
                     return <div className="feedback-card error">Your account does not have installment management access.</div>;
@@ -77,16 +106,26 @@ if (!canManageInstallments) {
                                                 )}
                                             </div>
                                             <div className="inline-actions">
+                                                <input
+                                                    type="search"
+                                                    value={installmentSaleSearch}
+                                                    onChange={(event) => setInstallmentSaleSearch(event.target.value)}
+                                                    className="installment-sale-picker no-print"
+                                                    placeholder="Search customer, CNIC, agreement, vehicle..."
+                                                />
                                                 <select
                                                     value={selectedInstallmentSale.id}
                                                     onChange={(event) => setSelectedInstallmentSaleId(event.target.value)}
                                                     className="installment-sale-picker no-print"
                                                 >
-                                                    {installmentSales.map((sale) => (
+                                                    {installmentSalePickerOptions.map((sale) => (
                                                         <option key={sale.id} value={sale.id}>
                                                             {sale.customer_name} - {sale.brand} {sale.model} - {sale.dealer_name || 'No dealer'}
                                                         </option>
                                                     ))}
+                                                    {installmentSalePickerOptions.length === 0 ? (
+                                                        <option value="" disabled>No matching installment sale</option>
+                                                    ) : null}
                                                 </select>
                                                 <button type="button" className="primary-btn no-print" onClick={handlePrintInvoice}>
                                                     Print Invoice
