@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 export default function Sales({ ctx }) {
   const {
@@ -68,7 +68,63 @@ export default function Sales({ ctx }) {
   } = ctx;
 
   const [salesRegisterOpen, setSalesRegisterOpen] = useState(false);
-  const salesRegisterRows = salesRegisterOpen ? dashboardData.salesTransactions : dashboardData.salesTransactions.slice(0, 5);
+  const [salesRegisterSearchOpen, setSalesRegisterSearchOpen] = useState(false);
+  const [salesRegisterSearch, setSalesRegisterSearch] = useState('');
+  const [salesRegisterSearchField, setSalesRegisterSearchField] = useState('customer_name');
+  const salesRegisterSearchFields = [
+    { value: 'customer_name', label: 'Customer Name' },
+    { value: 'customer_mobile', label: 'Mobile Number' },
+    { value: 'cnic_passport_number', label: 'CNIC' },
+    { value: 'chassis_number', label: 'Chassis' },
+    { value: 'engine_number', label: 'Engine' },
+    { value: 'registration_number', label: 'Registration' },
+  ];
+  const normalizeSalesRegisterSearch = (value) => String(value || '').trim().toLowerCase();
+  const getSaleCustomerMobile = (sale) => (
+    sale.customer_mobile_number
+    || sale.customer_contact_phone
+    || sale.contact_phone
+    || sale.customer_ocr_details?.contact_phone
+    || sale.customer_ocr_details?.contactPhone
+    || ''
+  );
+  const getSalesRegisterSearchValue = (sale, field) => {
+    if (field === 'customer_mobile') return getSaleCustomerMobile(sale);
+    return sale[field] || '';
+  };
+  const salesRegisterSearchFieldLabel = salesRegisterSearchFields.find((field) => field.value === salesRegisterSearchField)?.label || 'Customer Name';
+  const filteredSalesRegisterRows = useMemo(() => {
+    const term = normalizeSalesRegisterSearch(salesRegisterSearch);
+    const salesRows = dashboardData.salesTransactions || [];
+    if (!term) return salesRows;
+
+    const startsWithMatches = [];
+    const containsMatches = [];
+    salesRows.forEach((sale) => {
+      const fieldValue = normalizeSalesRegisterSearch(getSalesRegisterSearchValue(sale, salesRegisterSearchField));
+      const combinedValue = normalizeSalesRegisterSearch([
+        sale.customer_name,
+        getSaleCustomerMobile(sale),
+        sale.cnic_passport_number,
+        sale.chassis_number,
+        sale.engine_number,
+        sale.registration_number,
+        sale.brand,
+        sale.model,
+        sale.serial_number,
+        sale.agreement_number,
+      ].filter(Boolean).join(' '));
+
+      if (fieldValue.startsWith(term) || combinedValue.startsWith(term)) {
+        startsWithMatches.push(sale);
+      } else if (fieldValue.includes(term) || combinedValue.includes(term)) {
+        containsMatches.push(sale);
+      }
+    });
+
+    return [...startsWithMatches, ...containsMatches];
+  }, [dashboardData.salesTransactions, salesRegisterSearch, salesRegisterSearchField]);
+  const salesRegisterRows = salesRegisterOpen ? filteredSalesRegisterRows : filteredSalesRegisterRows.slice(0, 5);
 
 if (!canCreateSales) {
                     return <div className="feedback-card error">Your account does not have sales access.</div>;
@@ -411,10 +467,52 @@ if (!canCreateSales) {
 
                         {canViewSalesRegister ? (
                         <div className="table-card">
-                            <h3>Sales Transaction Register</h3>
-                            {dashboardData.salesTransactions.length === 0 ? (
-                                renderEmptyState('No vehicle sales transactions have been created yet.')
+                            <div className="section-header customer-registry-header">
+                                <h3>Sales Transaction Register</h3>
+                                <div className="customer-registry-search-area">
+                                    <span className="customer-registry-search-label">Sales Register Search</span>
+                                    <div className={`customer-registry-search-controls ${salesRegisterSearchOpen ? 'is-open' : ''}`}>
+                                        <button
+                                            type="button"
+                                            className={`customer-registry-search-toggle ${salesRegisterSearchOpen ? 'is-active' : ''}`}
+                                            onClick={() => setSalesRegisterSearchOpen((current) => !current)}
+                                            aria-label="Search sales register"
+                                            title="Search sales register"
+                                        >
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <path d="M10.8 18.1a7.3 7.3 0 1 1 5.1-2.1l4 4a1.2 1.2 0 0 1-1.7 1.7l-4-4a7.2 7.2 0 0 1-3.4.4Zm0-2.4a4.9 4.9 0 1 0 0-9.8 4.9 4.9 0 0 0 0 9.8Z" />
+                                            </svg>
+                                        </button>
+                                        {salesRegisterSearchOpen ? (
+                                            <>
+                                                <input
+                                                    type="search"
+                                                    value={salesRegisterSearch}
+                                                    onChange={(event) => setSalesRegisterSearch(event.target.value)}
+                                                    placeholder={`Live search by ${salesRegisterSearchFieldLabel}`}
+                                                    autoFocus
+                                                />
+                                                <select
+                                                    value={salesRegisterSearchField}
+                                                    onChange={(event) => {
+                                                        setSalesRegisterSearchField(event.target.value);
+                                                        setSalesRegisterSearch('');
+                                                    }}
+                                                >
+                                                    {salesRegisterSearchFields.map((field) => (
+                                                        <option key={field.value} value={field.value}>{field.label}</option>
+                                                    ))}
+                                                </select>
+                                            </>
+                                        ) : null}
+                                    </div>
+                                </div>
+                                <span className="section-caption">{salesRegisterRows.length} shown of {filteredSalesRegisterRows.length} sales</span>
+                            </div>
+                            {filteredSalesRegisterRows.length === 0 ? (
+                                renderEmptyState(salesRegisterSearch ? 'No sales transactions match the selected register search.' : 'No vehicle sales transactions have been created yet.')
                             ) : (
+                                <>
                                 <div className="table-scroll">
                                     <table className="pro-table sales-register-table">
                                         <colgroup>
@@ -536,6 +634,18 @@ if (!canCreateSales) {
                                         </tbody>
                                     </table>
                                 </div>
+                                {filteredSalesRegisterRows.length > 5 ? (
+                                    <div className="inline-actions spaced-top">
+                                        <button
+                                            type="button"
+                                            className="view-btn"
+                                            onClick={() => setSalesRegisterOpen((current) => !current)}
+                                        >
+                                            {salesRegisterOpen ? 'View less' : 'View more'}
+                                        </button>
+                                    </div>
+                                ) : null}
+                                </>
                             )}
                         </div>
                         ) : null}
