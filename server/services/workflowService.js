@@ -149,6 +149,91 @@ const findApplicableSalesWorkflowDefinition = async (client, { roleName, dealerI
 const ensureWorkflowDealerColumns = async (client) => {
     await client.query('ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS dealer_id UUID');
     await client.query('ALTER TABLE sale_installments ADD COLUMN IF NOT EXISTS dealer_id UUID');
+    await client.query('ALTER TABLE sales_transactions ADD COLUMN IF NOT EXISTS rejection_reason TEXT');
+};
+
+const getCorrectionOwnerRole = (task) => {
+    const stepNumber = Number(task?.step_number || 1);
+    if (stepNumber <= 1) {
+        return normalizeRoleName(task?.requester_role_name);
+    }
+    if (stepNumber === 2) {
+        return normalizeRoleName(task?.first_approver_role_name);
+    }
+    return normalizeRoleName(task?.second_approver_role_name || task?.first_approver_role_name);
+};
+
+const findLatestRejectedWorkflowTaskForSale = async (client, saleId) => {
+    const result = await client.query(
+        `
+        SELECT
+            wt.*,
+            wd.requester_role_name,
+            wd.first_approver_role_name,
+            wd.second_approver_role_name
+        FROM workflow_tasks wt
+        LEFT JOIN workflow_definitions wd ON wd.id = wt.workflow_definition_id
+        WHERE wt.entity_type = 'SALE'
+          AND wt.entity_id = $1
+          AND UPPER(COALESCE(wt.task_status, '')) = 'REJECTED'
+        ORDER BY wt.acted_at DESC NULLS LAST, wt.updated_at DESC, wt.created_at DESC
+        LIMIT 1
+        `,
+        [saleId]
+    );
+
+    return result.rows[0] || null;
+};
+
+const requeueSaleCorrectionWorkflow = async (client, { sale, actingUser }) => {
+    await ensureWorkflowDealerColumns(client);
+    const rejectedTask = await findLatestRejectedWorkflowTaskForSale(client, sale.id);
+    if (!rejectedTask) {
+        throw new Error('No rejected workflow task was found for this sale correction.');
+    }
+
+    const correctionOwnerRole = getCorrectionOwnerRole(rejectedTask);
+    if (correctionOwnerRole !== normalizeRoleName(actingUser?.role_name)) {
+        throw new Error(`Only ${correctionOwnerRole || 'the correction owner'} can correct and resubmit this sale.`);
+    }
+
+    await client.query(
+        `
+        UPDATE workflow_tasks
+        SET task_status = 'CANCELLED', updated_at = NOW()
+        WHERE entity_type = 'SALE'
+          AND entity_id = $1
+          AND UPPER(COALESCE(task_status, '')) = 'PENDING'
+        `,
+        [sale.id]
+    );
+
+    await client.query(
+        `
+        UPDATE sales_transactions
+        SET
+            approval_status = 'PENDING',
+            status = 'UNDER_REVIEW',
+            current_workflow_step = $2,
+            rejection_reason = NULL,
+            last_workflow_action_at = NOW(),
+            last_workflow_action_by = $3
+        WHERE id = $1
+        `,
+        [sale.id, rejectedTask.step_number || 1, actingUser.id]
+    );
+
+    return createWorkflowTask(client, {
+        workflowDefinitionId: rejectedTask.workflow_definition_id,
+        entityType: 'SALE',
+        entityId: sale.id,
+        dealerId: sale.dealer_id,
+        createdBy: rejectedTask.created_by || sale.agent_id,
+        assignedRoleName: rejectedTask.assigned_role_name,
+        stepNumber: rejectedTask.step_number || 1,
+        totalSteps: rejectedTask.total_steps || 1,
+        taskTitle: rejectedTask.task_title || `Review corrected sale request for ${sale.customer_id}`,
+    });
 };
 
 const queueSaleForWorkflow = async (client, { sale, vehicleId, creator, workflowDefinition }) => {
@@ -369,8 +454,15 @@ const rejectWorkflowTask = async (client, taskId, actingUser, decisionNotes = ''
 
     const taskResult = await client.query(
         `
-        SELECT wt.*, st.vehicle_id, st.dealer_id AS sale_dealer_id
+        SELECT
+            wt.*,
+            st.vehicle_id,
+            st.dealer_id AS sale_dealer_id,
+            wd.requester_role_name,
+            wd.first_approver_role_name,
+            wd.second_approver_role_name
         FROM workflow_tasks wt
+        LEFT JOIN workflow_definitions wd ON wd.id = wt.workflow_definition_id
         LEFT JOIN sales_transactions st ON st.id = wt.entity_id
         WHERE wt.id = $1
         FOR UPDATE OF wt
@@ -413,21 +505,21 @@ const rejectWorkflowTask = async (client, taskId, actingUser, decisionNotes = ''
         `
         UPDATE sales_transactions
         SET
-            approval_status = 'REJECTED',
-            current_workflow_step = 0,
-            status = 'REJECTED',
+            approval_status = 'CORRECTION_REQUIRED',
+            current_workflow_step = $4,
+            status = 'CORRECTION_REQUIRED',
             rejection_reason = $2,
             last_workflow_action_at = NOW(),
             last_workflow_action_by = $3
         WHERE id = $1
         `,
-        [task.entity_id, decisionNotes || null, actingUser.id]
+        [task.entity_id, decisionNotes || null, actingUser.id, task.step_number || 1]
     );
 
     if (task.vehicle_id) {
         await client.query(
             'UPDATE vehicles SET status = $1 WHERE id = $2 AND dealer_id = $3',
-            ['AVAILABLE', task.vehicle_id, task.sale_dealer_id || task.dealer_id]
+            ['RESERVED', task.vehicle_id, task.sale_dealer_id || task.dealer_id]
         );
     }
 
@@ -438,6 +530,8 @@ module.exports = {
     findApplicableSalesWorkflowDefinition,
     queueSaleForWorkflow,
     finalizeApprovedSale,
+    findLatestRejectedWorkflowTaskForSale,
+    requeueSaleCorrectionWorkflow,
     approveWorkflowTask,
     rejectWorkflowTask,
 };

@@ -1992,7 +1992,8 @@ body,
 .feature-pill,
 .pill-neutral,
 .pill-active,
-.pill-warning {
+.pill-warning,
+.pill-danger {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2023,6 +2024,11 @@ body,
 .pill-warning {
     background: var(--dash-warning-bg);
     color: var(--dash-warning-text);
+}
+
+.pill-danger {
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
 }
 
 .primary-btn,

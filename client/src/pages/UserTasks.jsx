@@ -42,14 +42,24 @@ export default function UserTasks({
             <tbody>
               {workflowTaskGroups.map((group) => {
                 const task = group.primaryTask;
+                const attachmentCount = [
+                  task?.agreement_pdf_url,
+                  task?.dealer_signature_url,
+                  task?.authorized_signature_url,
+                  task?.customer_cnic_front_url,
+                  task?.customer_cnic_back_url,
+                  task?.bank_check_url,
+                  task?.misc_document_url,
+                ].filter(Boolean).length;
+
                 return (
                   <tr key={`user-task-group-${group.key}`} className={task?.id === selectedWorkflowTaskId ? 'workflow-task-row is-selected' : 'workflow-task-row'}>
                     <td><span className={getStatusClass(group.overallStatus)}>{group.overallStatus}</span></td>
                     <td>{formatWorkflowDealerIdentity(task)}<br />{task?.requester_name || 'Unknown requester'}</td>
                     <td>{task?.customer_name || 'Not set'}<br />{task?.cnic_passport_number || 'No ID'}</td>
                     <td>{task?.brand} {task?.model}<br />{task?.serial_number || task?.registration_number || 'No serial'}</td>
-                    <td>{task?.agreement_pdf_url ? 'Attached' : 'No file'}</td>
-                    <td>{task.requester_name || 'Unknown'} â†’ {task.assigned_role_name} ({task.step_number}/{task.total_steps})</td>
+                    <td>{attachmentCount > 0 ? `${attachmentCount} uploaded` : 'No file'}</td>
+                    <td>{task?.requester_name || 'Unknown'} -&gt; {task?.assigned_role_name || 'Reviewer'} ({task?.step_number || 1}/{task?.total_steps || 1})</td>
                     <td><button type="button" className="view-btn" onClick={() => setSelectedWorkflowTaskId(task?.id || '')}>View Details</button></td>
                   </tr>
                 );

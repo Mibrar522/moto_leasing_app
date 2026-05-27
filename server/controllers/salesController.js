@@ -5,6 +5,8 @@ const { resolveDurableUploadUrl } = require('../utils/storage');
 const {
     findApplicableSalesWorkflowDefinition,
     queueSaleForWorkflow,
+    findLatestRejectedWorkflowTaskForSale,
+    requeueSaleCorrectionWorkflow,
 } = require('../services/workflowService');
 const { ensurePerformanceIndexes } = require('../utils/performanceIndexes');
 
@@ -938,6 +940,7 @@ exports.updateSale = async (req, res) => {
 
         const currentSale = currentSaleResult.rows[0];
         const currentSaleMode = String(currentSale.sale_mode || '').trim().toUpperCase();
+        const currentApprovalStatus = String(currentSale.approval_status || 'APPROVED').trim().toUpperCase();
         const requiredUpdateModes = Array.from(new Set([currentSaleMode, normalizedSaleMode]));
         const missingUpdateMode = requiredUpdateModes.find((mode) => !canUpdateSaleMode(req.user, mode));
         if (missingUpdateMode) {
@@ -945,6 +948,17 @@ exports.updateSale = async (req, res) => {
             return res.status(403).json({
                 message: `Your account cannot update ${getSaleModeUpdateLabel(missingUpdateMode)} sales. Enable the matching sales update permission from Access Control.`,
             });
+        }
+        if (currentApprovalStatus === 'PENDING') {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ message: 'This sale is still under workflow review and cannot be edited until it is rejected for correction.' });
+        }
+        const latestRejectedTask = currentApprovalStatus === 'CORRECTION_REQUIRED'
+            ? await findLatestRejectedWorkflowTaskForSale(client, currentSale.id)
+            : null;
+        if (currentApprovalStatus === 'CORRECTION_REQUIRED' && !latestRejectedTask) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ message: 'This sale requires correction, but no rejected workflow step was found.' });
         }
 
         if (!isScopedDealerMatch(scope, currentSale.dealer_id)) {
@@ -975,7 +989,7 @@ exports.updateSale = async (req, res) => {
             return res.status(400).json({ message: 'First witness name, father name, mobile number, CNIC, and address are required.' });
         }
 
-        const pendingWorkflowApproval = String(currentSale.approval_status || '').toUpperCase() !== 'APPROVED';
+        const pendingWorkflowApproval = !['APPROVED', ''].includes(currentApprovalStatus);
 
         const receivedInstallmentResult = await client.query(
             `
@@ -1147,6 +1161,20 @@ exports.updateSale = async (req, res) => {
             'UPDATE vehicles SET status = $1 WHERE id = $2 AND dealer_id = $3',
             [pendingWorkflowApproval ? 'RESERVED' : normalizedSaleMode === 'CASH' ? 'SOLD' : 'INSTALLMENT', vehicle_id, resolvedSaleDealerId]
         );
+
+        if (currentApprovalStatus === 'CORRECTION_REQUIRED') {
+            await requeueSaleCorrectionWorkflow(client, {
+                sale: {
+                    ...currentSale,
+                    id: req.params.id,
+                    customer_id,
+                    vehicle_id,
+                    agent_id: currentSale.agent_id,
+                    dealer_id: resolvedSaleDealerId,
+                },
+                actingUser: req.user,
+            });
+        }
 
         const updatedSaleResult = await client.query(
             `

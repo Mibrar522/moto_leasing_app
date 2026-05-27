@@ -444,7 +444,7 @@ exports.getDashboardData = async (req, res) => {
             Object.keys(reportPreviewGroupsByPage).map((pageKey) => [pageKey, ['dealers']])
         );
         const dashboardGroupsByPage = {
-            dashboard: ['metrics', 'ads', 'notifications', 'dealers'],
+            dashboard: ['metrics', 'ads', 'notifications', 'dealers', 'workflowTasks'],
             customers: ['customers', 'dealers', 'roles', 'features', 'rolePermissions'],
             employees: ['employees', 'dealers', 'roles', 'features', 'employeeFinancials'],
             dealers: ['dealers', 'roles'],
@@ -1208,8 +1208,18 @@ exports.getDashboardData = async (req, res) => {
             } else if (!hasGlobalScope) {
                 workflowTaskScopeClause = `
                     WHERE (
-                        (wt.assigned_role_name = $1 AND wt.dealer_id = $2)
+                        (UPPER(COALESCE(wt.assigned_role_name, '')) = UPPER(COALESCE($1, '')) AND wt.dealer_id = $2)
                         OR wt.acted_by = $3
+                        OR (
+                            UPPER(COALESCE(st.approval_status, '')) = 'CORRECTION_REQUIRED'
+                            AND UPPER(COALESCE(wt.task_status, '')) = 'REJECTED'
+                            AND wt.dealer_id = $2
+                            AND (
+                                (COALESCE(wt.step_number, 1) <= 1 AND UPPER(COALESCE(wd.requester_role_name, '')) = UPPER(COALESCE($1, '')))
+                                OR (COALESCE(wt.step_number, 1) = 2 AND UPPER(COALESCE(wd.first_approver_role_name, '')) = UPPER(COALESCE($1, '')))
+                                OR (COALESCE(wt.step_number, 1) > 2 AND UPPER(COALESCE(wd.second_approver_role_name, wd.first_approver_role_name, '')) = UPPER(COALESCE($1, '')))
+                            )
+                        )
                     )
                 `;
                 workflowTaskScopeParams = [req.user.role_name, effectiveDealerId || null, req.user.id];
@@ -1231,6 +1241,11 @@ exports.getDashboardData = async (req, res) => {
                     st.agreement_date,
                     st.agreement_pdf_url,
                     st.dealer_signature_url,
+                    st.authorized_signature_url,
+                    st.customer_cnic_front_url,
+                    st.customer_cnic_back_url,
+                    st.bank_check_url,
+                    st.misc_document_url,
                     st.purchase_date,
                     st.print_actual_price,
                     st.vehicle_price,
@@ -1510,6 +1525,8 @@ exports.getDashboardData = async (req, res) => {
         const shouldIncludePendingWorkflowSales = ['workflow', 'user-tasks'].includes(requestedPage);
         const salesApprovalVisibilitySql = shouldIncludePendingWorkflowSales
             ? ''
+            : requestedPage === 'sales'
+                ? "UPPER(COALESCE(st.approval_status, 'APPROVED')) IN ('APPROVED', 'CORRECTION_REQUIRED')"
             : "UPPER(COALESCE(st.approval_status, 'APPROVED')) = 'APPROVED'";
         const salesResultWhereParts = [salesResultScopeSql, salesApprovalVisibilitySql].filter(Boolean);
         const salesResultWhereSql = salesResultWhereParts.length ? `WHERE ${salesResultWhereParts.join(' AND ')}` : '';

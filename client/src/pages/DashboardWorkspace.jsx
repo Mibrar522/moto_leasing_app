@@ -43,8 +43,10 @@ const statusClassMap = {
     PENDING: 'pill-warning',
     SUBMITTED: 'pill-warning',
     UNDER_REVIEW: 'pill-warning',
+    CORRECTION_REQUIRED: 'pill-warning',
     PROCESSING: 'pill-warning',
     PARTIAL: 'pill-warning',
+    REJECTED: 'pill-danger',
     NOT_CAPTURED: 'pill-neutral',
     DRAFT: 'pill-neutral',
     SOLD: 'pill-neutral',
@@ -2730,11 +2732,15 @@ const Dashboard = ({ pageKey, PageComponent }) => {
                     return new Date(a.created_at || 0) - new Date(b.created_at || 0);
                 });
                 const primaryTask = sortedTasks[sortedTasks.length - 1] || null;
-                const hasRejected = sortedTasks.some((task) => String(task.approval_status || task.task_status || '').toUpperCase() === 'REJECTED');
+                const hasCorrectionRequired = sortedTasks.some((task) => String(task.approval_status || '').toUpperCase() === 'CORRECTION_REQUIRED');
+                const hasRejected = sortedTasks.some((task) => String(task.task_status || '').toUpperCase() === 'REJECTED');
                 const hasPending = sortedTasks.some((task) => String(task.task_status || '').toUpperCase() === 'PENDING');
-                const overallStatus = hasRejected
-                    ? 'REJECTED'
-                    : hasPending
+                const approvalStatus = String(primaryTask?.approval_status || '').toUpperCase();
+                const overallStatus = hasCorrectionRequired || approvalStatus === 'CORRECTION_REQUIRED'
+                    ? 'CORRECTION_REQUIRED'
+                    : hasRejected
+                        ? 'REJECTED'
+                        : hasPending
                         ? 'PENDING'
                         : String(primaryTask?.approval_status || primaryTask?.task_status || 'APPROVED').toUpperCase();
                 const approvalTrail = sortedTasks
@@ -2752,8 +2758,9 @@ const Dashboard = ({ pageKey, PageComponent }) => {
                 };
             })
             .sort((a, b) => {
-                const pendingDelta = (a.overallStatus === 'PENDING' ? 0 : 1) - (b.overallStatus === 'PENDING' ? 0 : 1);
-                if (pendingDelta !== 0) return pendingDelta;
+                const statusRank = { PENDING: 0, CORRECTION_REQUIRED: 1 };
+                const statusDelta = (statusRank[a.overallStatus] ?? 2) - (statusRank[b.overallStatus] ?? 2);
+                if (statusDelta !== 0) return statusDelta;
                 return new Date(b.primaryTask?.created_at || 0) - new Date(a.primaryTask?.created_at || 0);
             });
     }, [dashboardData.workflowTasks]);
@@ -2762,12 +2769,26 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         [workflowTaskGroups, selectedWorkflowTaskId]
     );
     const selectedWorkflowTask = selectedWorkflowTaskGroup?.primaryTask || null;
+    const selectedWorkflowAttachments = useMemo(() => {
+        if (!selectedWorkflowTask) return [];
+        return [
+            ['Agreement PDF', selectedWorkflowTask.agreement_pdf_url],
+            ['Dealer Signature', selectedWorkflowTask.dealer_signature_url],
+            ['Authorized Signature', selectedWorkflowTask.authorized_signature_url],
+            ['Customer CNIC Front', selectedWorkflowTask.customer_cnic_front_url],
+            ['Customer CNIC Back', selectedWorkflowTask.customer_cnic_back_url],
+            ['Bank Check', selectedWorkflowTask.bank_check_url],
+            ['Misc Document', selectedWorkflowTask.misc_document_url],
+        ]
+            .filter(([, url]) => Boolean(url))
+            .map(([label, url]) => ({ label, url }));
+    }, [selectedWorkflowTask]);
     const pendingWorkflowTasks = useMemo(
-        () => workflowTaskGroups.filter((group) => group.overallStatus === 'PENDING'),
+        () => workflowTaskGroups.filter((group) => ['PENDING', 'CORRECTION_REQUIRED'].includes(group.overallStatus)),
         [workflowTaskGroups]
     );
     const completedWorkflowTasks = useMemo(
-        () => workflowTaskGroups.filter((group) => group.overallStatus !== 'PENDING'),
+        () => workflowTaskGroups.filter((group) => !['PENDING', 'CORRECTION_REQUIRED'].includes(group.overallStatus)),
         [workflowTaskGroups]
     );
     useEffect(() => {
@@ -3626,6 +3647,20 @@ const selectedCustomer = useMemo(
                 occurredAt: task.created_at || task.updated_at || '',
                 pageKey: 'user-tasks',
             }));
+        const workflowCorrectionNotifications = (dashboardData.workflowTasks || [])
+            .filter((task) =>
+                String(task.approval_status || '').toUpperCase() === 'CORRECTION_REQUIRED'
+                && String(task.task_status || '').toUpperCase() === 'REJECTED'
+            )
+            .map((task) => ({
+                id: `workflow-correction-${task.id}`,
+                type: 'WORKFLOW_CORRECTION',
+                taskId: task.id,
+                title: `Correction required for ${task.customer_name || 'sale request'}`,
+                description: `${task.rejection_reason || task.decision_notes || 'Review the rejected approval step and update the sale.'}`,
+                occurredAt: task.acted_at || task.updated_at || task.created_at || '',
+                pageKey: 'sales',
+            }));
         const saleNotifications = (dashboardData.salesTransactions || []).map((sale) => ({
             id: `sale-${sale.id}`,
             type: 'SALE',
@@ -3667,6 +3702,7 @@ const selectedCustomer = useMemo(
 
         return [
             ...workflowNotifications,
+            ...workflowCorrectionNotifications,
             ...saleNotifications,
             ...stockOrderNotifications,
             ...stockReceivedNotifications,
@@ -10587,10 +10623,14 @@ const selectedCustomer = useMemo(
                             <div><span className="meta-label">Purchase Date</span><p className="meta-value">{selectedWorkflowTask.purchase_date || selectedWorkflowTask.agreement_date || 'Not set'}</p></div>
                         </div>
                         <div className="inline-actions spaced-top">
-                            {selectedWorkflowTask.agreement_pdf_url ? (
-                                <a className="view-btn" href={buildAssetUrl(selectedWorkflowTask.agreement_pdf_url)} target="_blank" rel="noreferrer">Open Attachment</a>
+                            {selectedWorkflowAttachments.length > 0 ? (
+                                selectedWorkflowAttachments.map((attachment) => (
+                                    <a key={`${attachment.label}-${attachment.url}`} className="view-btn" href={buildAssetUrl(attachment.url)} target="_blank" rel="noreferrer">
+                                        {attachment.label}
+                                    </a>
+                                ))
                             ) : (
-                                <span className="feature-pill muted">No attachment uploaded</span>
+                                <span className="feature-pill muted">No attachments uploaded</span>
                             )}
                             {canViewSalesAgreementForm ? (
                                 <button
