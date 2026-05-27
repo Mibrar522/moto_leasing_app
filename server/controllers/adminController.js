@@ -754,19 +754,69 @@ exports.getDashboardData = async (req, res) => {
         const employeeSalesResultPromise = wantsGroup('metrics') && isEmployeeLogin
             ? pool.query(
                 `
+                WITH scoped_sales AS (
+                    SELECT
+                        st.id,
+                        st.sale_mode,
+                        st.vehicle_price,
+                        st.down_payment,
+                        st.purchase_date,
+                        st.agreement_date,
+                        st.created_at,
+                        st.approval_status
+                    FROM sales_transactions st
+                    JOIN users su ON su.id = st.agent_id
+                    ${salesOwnerJoinSql('su')}
+                    JOIN customers c ON c.id = st.customer_id
+                    JOIN vehicles v ON v.id = st.vehicle_id
+                    ${dashboardSalesCardScope.whereSql ? `${dashboardSalesCardScope.whereSql} AND` : 'WHERE'}
+                    UPPER(COALESCE(st.approval_status, 'APPROVED')) = 'APPROVED'
+                ), sale_activity AS (
+                    SELECT
+                        COUNT(*)::int AS sales_count,
+                        COALESCE(SUM(
+                            CASE
+                                WHEN UPPER(COALESCE(sale_mode, '')) = 'CASH' THEN COALESCE(vehicle_price, 0)
+                                WHEN UPPER(COALESCE(sale_mode, '')) = 'INSTALLMENT' THEN COALESCE(down_payment, 0)
+                                ELSE 0
+                            END
+                        ), 0)::numeric AS sale_amount
+                    FROM scoped_sales st
+                    WHERE ${dashboardSalesCardScope.saleDatePredicateSql}
+                ), installment_receipts AS (
+                    SELECT
+                        COUNT(si.id)::int AS received_installment_count,
+                        COALESCE(SUM(COALESCE(si.received_amount, 0)), 0)::numeric AS received_installment_amount
+                    FROM scoped_sales st
+                    JOIN sale_installments si ON si.sale_id = st.id
+                    WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
+                      AND (UPPER(COALESCE(si.status, '')) = 'RECEIVED' OR COALESCE(si.received_amount, 0) > 0)
+                      AND ${dashboardSalesCardScope.receivedDatePredicateSql}
+                ), pending_installments AS (
+                    SELECT
+                        COUNT(si.id)::int AS pending_installment_count,
+                        COALESCE(SUM(GREATEST(COALESCE(si.amount, 0) - COALESCE(si.received_amount, 0), 0)), 0)::numeric AS pending_installment_amount
+                    FROM scoped_sales st
+                    JOIN sale_installments si ON si.sale_id = st.id
+                    WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
+                      AND UPPER(COALESCE(si.status, '')) <> 'RECEIVED'
+                      AND ${dashboardSalesCardScope.saleDatePredicateSql}
+                ), overdue_installments AS (
+                    SELECT COUNT(si.id)::int AS overdue_count
+                    FROM scoped_sales st
+                    JOIN sale_installments si ON si.sale_id = st.id
+                    WHERE UPPER(COALESCE(st.sale_mode, '')) = 'INSTALLMENT'
+                      AND UPPER(COALESCE(si.status, '')) <> 'RECEIVED'
+                      AND si.due_date < date_trunc('month', CURRENT_DATE)
+                )
                 SELECT
-                    COUNT(*) FILTER (WHERE UPPER(status) = ANY($1::text[]))::int AS received_count,
-                    COUNT(*) FILTER (WHERE UPPER(status) = ANY($2::text[]))::int AS pending_count,
-                    COALESCE(SUM(total_amount) FILTER (WHERE UPPER(status) = ANY($1::text[])), 0)::numeric AS received_value,
-                    COALESCE(SUM(total_amount) FILTER (WHERE UPPER(status) = ANY($2::text[])), 0)::numeric AS pending_value,
-                    COUNT(*) FILTER (
-                        WHERE UPPER(status) = ANY($2::text[])
-                        AND created_at < date_trunc('month', CURRENT_DATE)
-                    )::int AS overdue_followups
-                FROM lease_applications
-                WHERE agent_id = $3
+                    ((SELECT sales_count FROM sale_activity) + (SELECT received_installment_count FROM installment_receipts))::int AS received_count,
+                    (SELECT pending_installment_count FROM pending_installments)::int AS pending_count,
+                    ((SELECT sale_amount FROM sale_activity) + (SELECT received_installment_amount FROM installment_receipts))::numeric AS received_value,
+                    (SELECT pending_installment_amount FROM pending_installments)::numeric AS pending_value,
+                    (SELECT overdue_count FROM overdue_installments)::int AS overdue_followups
                 `,
-                [['RECEIVED'], PENDING_APPLICATION_STATUSES, req.user.id]
+                dashboardSalesCardScope.params
             )
             : { rows: [{ received_count: 0, pending_count: 0, received_value: 0, pending_value: 0, overdue_followups: 0 }] };
 

@@ -9764,13 +9764,13 @@ const selectedCustomer = useMemo(
                         <div className="metrics-grid dashboard-cards-grid">
                             {user?.role_name === 'AGENT' ? (
                                 <>
-                                    <div className="metric-card"><label>Received Sales</label><div className="value success">{formatCurrency(dashboardData.employeeSales.receivedValue)}</div></div>
-                                    <div className="metric-card"><label>Pending Sales</label><div className="value warning">{formatCurrency(dashboardData.employeeSales.pendingValue)}</div></div>
+                                    <div className="metric-card"><label>Transaction Amount</label><div className="value success">{formatCurrency(dashboardData.employeeSales.receivedValue)}</div></div>
+                                    <div className="metric-card"><label>Pending Balance</label><div className="value warning">{formatCurrency(dashboardData.employeeSales.pendingValue)}</div></div>
                                     <div className="metric-card"><label>Earned Commission</label><div className="value success">{formatCurrency(employeeCurrentMonthCommission)}</div></div>
                                     <div className="metric-card"><label>Outstanding Advance</label><div className="value warning">{formatCurrency(selectedEmployeeOutstandingAdvance)}</div></div>
                                     <div className="metric-card"><label>Overdue This Month</label><div className="value warning">{dashboardData.employeeSales.overdueFollowups}</div></div>
-                                    <div className="metric-card"><label>Received Count</label><div className="value">{dashboardData.employeeSales.receivedCount}</div></div>
-                                    <div className="metric-card"><label>Pending Count</label><div className="value">{dashboardData.employeeSales.pendingCount}</div></div>
+                                    <div className="metric-card"><label>Sales Activity Count</label><div className="value">{dashboardData.employeeSales.receivedCount}</div></div>
+                                    <div className="metric-card"><label>Pending Installments</label><div className="value">{dashboardData.employeeSales.pendingCount}</div></div>
                                     <div className="metric-card"><label>Visible Applications</label><div className="value">{filteredApplications.length}</div></div>
                                 </>
                             ) : (
