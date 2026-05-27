@@ -1,3 +1,26 @@
+const escapePrintText = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const getInstallmentSortValue = (row) => {
+    const installmentNumber = Number(row?.installment_number);
+    if (Number.isFinite(installmentNumber) && installmentNumber > 0) {
+        return installmentNumber;
+    }
+
+    const dueTime = row?.due_date ? new Date(row.due_date).getTime() : Number.NaN;
+    return Number.isFinite(dueTime) ? dueTime : Number.MAX_SAFE_INTEGER;
+};
+
+const sortInstallmentRows = (rows = []) => [...rows].sort((a, b) => {
+    const numberDiff = getInstallmentSortValue(a) - getInstallmentSortValue(b);
+    if (numberDiff !== 0) return numberDiff;
+    return String(a?.due_date || '').localeCompare(String(b?.due_date || ''));
+});
+
 export default function Transactions({ ctx }) {
   const {
     canManageSales,
@@ -20,6 +43,101 @@ export default function Transactions({ ctx }) {
   const isInvoiceOpen = transactionActionState.action === 'view' && selectedTransactionSale;
   const selectedInvoiceSummary = isInvoiceOpen ? summarizeSaleInstallments(selectedTransactionSale) : null;
   const selectedInvoiceIsInstallment = isInvoiceOpen && String(selectedTransactionSale.sale_mode || '').toUpperCase() === 'INSTALLMENT';
+  const selectedInstallmentRows = selectedInvoiceIsInstallment ? sortInstallmentRows(selectedTransactionSale.installments || []) : [];
+
+  const handlePrintInstallmentPreview = () => {
+    if (!selectedInvoiceIsInstallment || !selectedTransactionSale) {
+      handlePrintTransaction(selectedTransactionSale);
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=980,height=720');
+    if (!printWindow) {
+      handlePrintTransaction(selectedTransactionSale);
+      return;
+    }
+
+    const rowsHtml = selectedInstallmentRows.map((row) => `
+      <tr>
+        <td>${escapePrintText(row.installment_number || '')}</td>
+        <td>${escapePrintText(row.due_date || 'Not set')}</td>
+        <td>${escapePrintText(formatCurrency(row.amount || 0))}</td>
+        <td>${escapePrintText(formatCurrency(row.received_amount || 0))}</td>
+        <td>${escapePrintText(row.status || 'Not set')}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Installment Invoice ${escapePrintText(selectedTransactionSale.agreement_number || '')}</title>
+          <style>
+            @page { size: A4; margin: 14mm; }
+            * { box-sizing: border-box; }
+            body { margin: 0; color: #17233d; font-family: Arial, sans-serif; font-size: 12px; }
+            .page { width: 100%; }
+            .header { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 14px; border-bottom: 2px solid #dbe6f5; margin-bottom: 16px; }
+            h1 { margin: 0 0 6px; font-size: 24px; }
+            .subtitle { margin: 0; color: #65758f; }
+            .meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+            .box { border: 1px solid #dbe2ee; border-radius: 8px; padding: 10px; min-height: 52px; }
+            .label { display: block; color: #718096; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 5px; }
+            .value { font-weight: 700; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { padding: 9px 10px; border-bottom: 1px solid #e6edf6; text-align: left; }
+            th { background: #f4f7fb; color: #66758f; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+            .totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+            .footer { margin-top: 20px; color: #718096; font-size: 11px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="page">
+            <div class="header">
+              <div>
+                <h1>Installment Invoice</h1>
+                <p class="subtitle">${escapePrintText(selectedTransactionSale.customer_name || 'Customer')} - ${escapePrintText([selectedTransactionSale.brand, selectedTransactionSale.model].filter(Boolean).join(' ') || 'Vehicle')}</p>
+              </div>
+              <div>
+                <span class="label">Printed On</span>
+                <div class="value">${escapePrintText(new Date().toLocaleDateString('en-PK'))}</div>
+              </div>
+            </div>
+            <div class="meta">
+              <div class="box"><span class="label">Customer</span><div class="value">${escapePrintText(selectedTransactionSale.customer_name || 'Not set')}</div></div>
+              <div class="box"><span class="label">CNIC</span><div class="value">${escapePrintText(selectedTransactionSale.cnic_passport_number || 'Not set')}</div></div>
+              <div class="box"><span class="label">Agreement</span><div class="value">${escapePrintText(selectedTransactionSale.agreement_number || 'No number')}</div></div>
+              <div class="box"><span class="label">Vehicle</span><div class="value">${escapePrintText([selectedTransactionSale.brand, selectedTransactionSale.model].filter(Boolean).join(' ') || 'Not set')}</div></div>
+            </div>
+            <div class="totals">
+              <div class="box"><span class="label">Received</span><div class="value">${escapePrintText(formatCurrency(selectedInvoiceSummary.receivedAmount))}</div></div>
+              <div class="box"><span class="label">Pending</span><div class="value">${escapePrintText(formatCurrency(selectedInvoiceSummary.totalRemainingAmount))}</div></div>
+              <div class="box"><span class="label">Installments</span><div class="value">${escapePrintText(`${selectedInvoiceSummary.actualReceivedCount}/${selectedInvoiceSummary.totalPlannedMonths}`)}</div></div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Due Date</th>
+                  <th>Amount</th>
+                  <th>Received</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>${rowsHtml || '<tr><td colspan="5">No installments found.</td></tr>'}</tbody>
+            </table>
+            <p class="footer">Generated from the installment invoice preview.</p>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    window.setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
 
 if (!canManageSales) {
                     return <div className="feedback-card error">Your account does not have sales transaction access.</div>;
@@ -133,7 +251,7 @@ if (!canManageSales) {
                                             </p>
                                         </div>
                                         <div className="inline-actions">
-                                            <button type="button" className="view-btn" onClick={() => handlePrintTransaction(selectedTransactionSale)}>
+                                            <button type="button" className="view-btn" onClick={selectedInvoiceIsInstallment ? handlePrintInstallmentPreview : () => handlePrintTransaction(selectedTransactionSale)}>
                                                 Print
                                             </button>
                                             <button type="button" className="secondary-btn" onClick={handleCloseTransactionInvoice}>
@@ -172,7 +290,7 @@ if (!canManageSales) {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {(selectedTransactionSale.installments || []).map((row) => (
+                                                    {selectedInstallmentRows.map((row) => (
                                                         <tr key={row.id}>
                                                             <td>{row.installment_number}</td>
                                                             <td>{row.due_date || 'Not set'}</td>
