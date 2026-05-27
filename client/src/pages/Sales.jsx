@@ -26,7 +26,6 @@ export default function Sales({ ctx }) {
     handleEditSale,
     handleOpenInstallmentPage,
     handleSaleChange,
-    handleSaleDealerSignatureUpload,
     handleSaleDocumentUpload,
     handleSaleSubmit,
     handleViewSale,
@@ -304,7 +303,6 @@ if (!canCreateSales) {
                                         </div>
                                     </div>
                                     <label className="field full-span" hidden={!canEditSalesField('Agreement PDF')}><span>Agreement PDF</span><input type="file" accept="application/pdf" onChange={handleAgreementUpload} /></label>
-                                    <label className="field full-span" hidden={!canEditSalesField('Dealer Signature Upload')}><span>Dealer Signature Upload</span><input type="file" accept="image/*" onChange={handleSaleDealerSignatureUpload} disabled={saleFormReadOnly || savingSale} /></label>
                                     <label className="field full-span" hidden={!canEditSalesField('Authorized Signature Upload')}><span>Authorized Signature Upload</span><input type="file" accept="image/*,.pdf" onChange={(event) => handleSaleDocumentUpload(event, 'authorized_signature_url', 'Authorized signature', setUploadingSaleAuthorizedSignature)} disabled={saleFormReadOnly || savingSale} /></label>
                                     <label className="field full-span" hidden={!canEditSalesField('Bank Check Upload')}><span>Bank Check Upload</span><input type="file" accept="*/*" onChange={(event) => handleSaleDocumentUpload(event, 'bank_check_url', 'Bank check', setUploadingSaleBankCheck)} /></label>
                                     <label className="field full-span" hidden={!canEditSalesField('Misc Document Upload')}><span>Misc Document Upload</span><input type="file" accept="*/*" onChange={(event) => handleSaleDocumentUpload(event, 'misc_document_url', 'Misc document', setUploadingSaleMiscDocument)} /></label>
