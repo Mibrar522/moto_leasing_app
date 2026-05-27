@@ -3299,7 +3299,6 @@ const selectedCustomer = useMemo(
     );
     const transactionSales = useMemo(
         () => dashboardData.salesTransactions
-            .filter((sale) => String(sale.sale_mode || '').toUpperCase() === 'CASH')
             .sort((a, b) => new Date(b.purchase_date || b.created_at || 0) - new Date(a.purchase_date || a.created_at || 0)),
         [dashboardData.salesTransactions]
     );
@@ -7787,20 +7786,10 @@ const selectedCustomer = useMemo(
 
         setTransactionActionState({ saleId: sale.id, action: 'view' });
         setSelectedTransactionSaleId(sale.id);
+    };
 
-        window.requestAnimationFrame(() => {
-            if (String(sale.sale_mode || '').toUpperCase() === 'INSTALLMENT') {
-                const summary = summarizeSaleInstallments(sale);
-                if (summary.pendingCount > 0) {
-                    handleOpenInstallmentPage(sale.id);
-                    setTransactionActionState({ saleId: '', action: '' });
-                    return;
-                }
-            }
-
-            goToPage('transactions');
-            setTransactionActionState({ saleId: '', action: '' });
-        });
+    const handleCloseTransactionInvoice = () => {
+        setTransactionActionState({ saleId: '', action: '' });
     };
 
     const handlePrintTransaction = (sale) => {
@@ -9322,6 +9311,7 @@ const selectedCustomer = useMemo(
         handlePrintInvoice,
         handlePrintSalarySlip,
         handlePrintTransaction,
+        handleCloseTransactionInvoice,
         handleProcessOcr,
         handleReceiveInstallment,
         handleSaleChange,
@@ -9411,6 +9401,7 @@ const selectedCustomer = useMemo(
         selectedSalaryEmployee,
         selectedSalaryEmployeeMonthCommission,
         selectedSalaryEmployeeOutstandingAdvance,
+        selectedTransactionSale,
         selectedSaleCustomer,
         selectedSaleCustomerSignatureUrl,
         selectedSaleCustomerPassportPhotoUrl,
