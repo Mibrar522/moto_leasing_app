@@ -417,6 +417,24 @@ const normalizeTextInput = (value) => {
     return raw ? raw : null;
 };
 
+const hasFeature = (user = {}, featureKey) =>
+    Array.isArray(user?.feature_keys) && user.feature_keys.includes(featureKey);
+
+const canUpdateSaleMode = (user = {}, saleMode) => {
+    const normalizedMode = String(saleMode || '').trim().toUpperCase();
+    if (normalizedMode === 'CASH') {
+        return hasFeature(user, 'FEAT_SALES_UPDATE_CASH');
+    }
+    if (normalizedMode === 'INSTALLMENT') {
+        return hasFeature(user, 'FEAT_SALES_UPDATE_INSTALLMENT');
+    }
+    return false;
+};
+
+const getSaleModeUpdateLabel = (saleMode) => (
+    String(saleMode || '').trim().toUpperCase() === 'INSTALLMENT' ? 'installment' : 'cash'
+);
+
 const recordEmployeeCommission = async (client, { userId, saleId, installmentId = null, commissionType, baseAmount, note = null }) => {
     const employeeResult = await client.query(
         `
@@ -890,6 +908,11 @@ exports.updateSale = async (req, res) => {
             witness_two_address,
             remarks,
         } = req.body;
+        const normalizedSaleMode = String(sale_mode || '').trim().toUpperCase();
+
+        if (!['CASH', 'INSTALLMENT'].includes(normalizedSaleMode)) {
+            return res.status(400).json({ message: 'sale_mode must be CASH or INSTALLMENT.' });
+        }
 
         await client.query('BEGIN');
         await ensureSalesDealerColumns(client);
@@ -914,6 +937,16 @@ exports.updateSale = async (req, res) => {
         }
 
         const currentSale = currentSaleResult.rows[0];
+        const currentSaleMode = String(currentSale.sale_mode || '').trim().toUpperCase();
+        const requiredUpdateModes = Array.from(new Set([currentSaleMode, normalizedSaleMode]));
+        const missingUpdateMode = requiredUpdateModes.find((mode) => !canUpdateSaleMode(req.user, mode));
+        if (missingUpdateMode) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({
+                message: `Your account cannot update ${getSaleModeUpdateLabel(missingUpdateMode)} sales. Enable the matching sales update permission from Access Control.`,
+            });
+        }
+
         if (!isScopedDealerMatch(scope, currentSale.dealer_id)) {
             await client.query('ROLLBACK');
             return res.status(403).json({ message: 'You can only update transactions for your dealer.' });
@@ -1041,7 +1074,7 @@ exports.updateSale = async (req, res) => {
                 req.params.id,
                 customer_id,
                 vehicle_id,
-                sale_mode,
+                normalizedSaleMode,
                 agreement_number || null,
                 agreement_date,
                 agreement_pdf_url || null,
@@ -1071,13 +1104,13 @@ exports.updateSale = async (req, res) => {
                 witness_two_cnic || null,
                 witness_two_address || null,
                 remarks || null,
-                pendingWorkflowApproval ? 'UNDER_REVIEW' : sale_mode === 'CASH' ? 'RECEIVED' : 'PENDING',
+                pendingWorkflowApproval ? 'UNDER_REVIEW' : normalizedSaleMode === 'CASH' ? 'RECEIVED' : 'PENDING',
             ]
         );
 
         await client.query('DELETE FROM sale_installments WHERE sale_id = $1', [req.params.id]);
 
-        if (!pendingWorkflowApproval && sale_mode === 'INSTALLMENT' && Number(installment_months) > 0 && first_due_date) {
+        if (!pendingWorkflowApproval && normalizedSaleMode === 'INSTALLMENT' && Number(installment_months) > 0 && first_due_date) {
             const installmentAmounts = buildInstallmentAmounts({
                 financedAmount: financed_amount || Math.max(Number(vehicle_price || 0) - Number(down_payment || 0), 0),
                 monthlyInstallment: monthly_installment,
@@ -1112,7 +1145,7 @@ exports.updateSale = async (req, res) => {
 
         await client.query(
             'UPDATE vehicles SET status = $1 WHERE id = $2 AND dealer_id = $3',
-            [pendingWorkflowApproval ? 'RESERVED' : sale_mode === 'CASH' ? 'SOLD' : 'INSTALLMENT', vehicle_id, resolvedSaleDealerId]
+            [pendingWorkflowApproval ? 'RESERVED' : normalizedSaleMode === 'CASH' ? 'SOLD' : 'INSTALLMENT', vehicle_id, resolvedSaleDealerId]
         );
 
         const updatedSaleResult = await client.query(

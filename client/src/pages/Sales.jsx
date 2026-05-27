@@ -11,6 +11,8 @@ export default function Sales({ ctx }) {
     canViewSalesAgreementSummary,
     canViewSalesInstallmentPreview,
     canViewSalesRegister,
+    canUpdateCashSalesRegister,
+    canUpdateInstallmentSalesRegister,
     canUpdateSalesRegister,
     canViewSalesUrlFields,
     canEditSalesField,
@@ -541,7 +543,10 @@ if (!canCreateSales) {
                                                 const isViewing = transactionActionState.saleId === sale.id && transactionActionState.action === 'view';
                                                 const isPrinting = transactionActionState.saleId === sale.id && transactionActionState.action === 'print';
                                                 const isRoutingInstallment = transactionActionState.saleId === sale.id && transactionActionState.action === 'installments';
-                                                const canUpdateSaleRecord = canUpdateSalesRegister
+                                                const canUpdateSaleType = isInstallmentSale
+                                                    ? canUpdateInstallmentSalesRegister
+                                                    : canUpdateCashSalesRegister;
+                                                const canUpdateSaleRecord = canUpdateSaleType
                                                     && canViewSalesAgreementForm
                                                     && !hasReceivedInstallment;
 

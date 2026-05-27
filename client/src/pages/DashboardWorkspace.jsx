@@ -416,7 +416,7 @@ const ACCESS_PAGE_GROUPS = [
         key: 'sales',
         label: 'Sales',
         description: 'Sale creation, sales register, and transaction register access.',
-        featureKeys: ['FEAT_SALES_CREATE', 'FEAT_SALES_MGMT', 'FEAT_SALES_AGREEMENT_FORM', 'FEAT_SALES_AGREEMENT_SUMMARY', 'FEAT_SALES_INSTALLMENT_PREVIEW', 'FEAT_SALES_REGISTER', 'FEAT_SALES_UPDATE', 'FEAT_TRANSACTION_REGISTER', ...SALES_FIELD_ACCESS.map(([featureKey]) => featureKey)],
+        featureKeys: ['FEAT_SALES_CREATE', 'FEAT_SALES_MGMT', 'FEAT_SALES_AGREEMENT_FORM', 'FEAT_SALES_AGREEMENT_SUMMARY', 'FEAT_SALES_INSTALLMENT_PREVIEW', 'FEAT_SALES_REGISTER', 'FEAT_SALES_UPDATE_CASH', 'FEAT_SALES_UPDATE_INSTALLMENT', 'FEAT_TRANSACTION_REGISTER', ...SALES_FIELD_ACCESS.map(([featureKey]) => featureKey)],
     },
     {
         key: 'installments',
@@ -1104,6 +1104,8 @@ const FEATURE_ACCESS_LABELS = {
     FEAT_SALES_INSTALLMENT_PREVIEW: 'Installment Page',
     FEAT_SALES_REGISTER: 'Sales Transaction Register',
     FEAT_SALES_UPDATE: 'Sales Register Update Button',
+    FEAT_SALES_UPDATE_CASH: 'Update Cash Sale Button',
+    FEAT_SALES_UPDATE_INSTALLMENT: 'Update Installment Sale Button',
     FEAT_SALES_URL_FIELDS: 'Sales Attachment URL Fields',
     FEAT_TRANSACTION_REGISTER: 'Transaction Register',
     ...Object.fromEntries(SALES_FIELD_ACCESS.map(([featureKey, label]) => [featureKey, label])),
@@ -2405,7 +2407,9 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canViewSalesAgreementSummary = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_AGREEMENT_SUMMARY']);
     const canViewSalesInstallmentPreview = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_INSTALLMENT_PREVIEW']);
     const canViewSalesRegister = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_REGISTER']);
-    const canUpdateSalesRegister = hasAnyFeature(user, ['FEAT_SALES_UPDATE']);
+    const canUpdateCashSalesRegister = hasAnyFeature(user, ['FEAT_SALES_UPDATE_CASH']);
+    const canUpdateInstallmentSalesRegister = hasAnyFeature(user, ['FEAT_SALES_UPDATE_INSTALLMENT']);
+    const canUpdateSalesRegister = canUpdateCashSalesRegister || canUpdateInstallmentSalesRegister;
     const canViewSalesUrlFields = canCreateSales && hasAnyFeature(user, ['FEAT_SALES_URL_FIELDS']);
     const canViewTransactionRegister = canManageSales && hasAnyFeature(user, ['FEAT_TRANSACTION_REGISTER']);
     const canViewStockOrderForm = canManageStock && hasAnyFeature(user, ['FEAT_STOCK_ORDER_FORM']);
@@ -5803,7 +5807,11 @@ const selectedCustomer = useMemo(
     };
 
     const handleEditSale = (sale) => {
-        if (!canUpdateSalesRegister || !canViewSalesAgreementForm) {
+        const saleMode = String(sale?.sale_mode || '').toUpperCase();
+        const canUpdateThisSale = saleMode === 'INSTALLMENT'
+            ? canUpdateInstallmentSalesRegister
+            : canUpdateCashSalesRegister;
+        if (!canUpdateThisSale || !canViewSalesAgreementForm) {
             setSaleMessage('Your account does not have permission to update sales transactions.');
             return;
         }
@@ -9270,6 +9278,8 @@ const selectedCustomer = useMemo(
         canViewSalesAgreementSummary,
         canViewSalesInstallmentPreview,
         canViewSalesRegister,
+        canUpdateCashSalesRegister,
+        canUpdateInstallmentSalesRegister,
         canUpdateSalesRegister,
         canViewSalesUrlFields,
         canEditSalesField,

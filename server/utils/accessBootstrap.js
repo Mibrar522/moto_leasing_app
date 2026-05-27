@@ -123,6 +123,8 @@ const FEATURE_DEFINITIONS = [
     ['FEAT_SALES_INSTALLMENT_PREVIEW', 'Installment Page'],
     ['FEAT_SALES_REGISTER', 'Sales Transaction Register'],
     ['FEAT_SALES_UPDATE', 'Sales Register Update Button'],
+    ['FEAT_SALES_UPDATE_CASH', 'Update Cash Sale Button'],
+    ['FEAT_SALES_UPDATE_INSTALLMENT', 'Update Installment Sale Button'],
     ['FEAT_SALES_URL_FIELDS', 'Sales Attachment URL Fields'],
     ['FEAT_TRANSACTION_REGISTER', 'Transaction Register'],
     ...SALES_FIELD_ACCESS,
