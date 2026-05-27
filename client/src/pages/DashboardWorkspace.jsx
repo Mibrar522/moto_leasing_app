@@ -5592,11 +5592,24 @@ const selectedCustomer = useMemo(
 
         try {
             setSavingWorkflowDefinition(true);
-            await API.post('/workflow/definitions', {
+            const { data: savedDefinition } = await API.post('/workflow/definitions', {
                 ...workflowDefinitionForm,
                 dealer_id: isSuperAdmin ? (workflowDefinitionForm.dealer_id || null) : (user?.dealer_id || null),
             });
-            await loadDashboard();
+            await loadDashboard({ page: 'workflow' });
+            if (savedDefinition?.id) {
+                setDashboardData((current) => {
+                    const definitions = current.workflowDefinitions || [];
+                    if (definitions.some((definition) => definition.id === savedDefinition.id)) {
+                        return current;
+                    }
+
+                    return {
+                        ...current,
+                        workflowDefinitions: [savedDefinition, ...definitions],
+                    };
+                });
+            }
             resetWorkflowDefinitionForm();
             setWorkflowMessage('Workflow definition saved successfully.');
         } catch (err) {

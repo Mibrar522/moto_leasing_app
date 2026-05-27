@@ -450,7 +450,7 @@ exports.getDashboardData = async (req, res) => {
             dealers: ['dealers', 'roles'],
             access: ['roles', 'features', 'rolePermissions'],
             applications: ['applications'],
-            workflow: ['workflowDefinitions', 'workflowTasks', 'salesTransactions'],
+            workflow: ['workflowDefinitions', 'workflowTasks', 'salesTransactions', 'dealers'],
             'user-tasks': ['workflowTasks', 'salesTransactions'],
             products: ['products', 'vehicleTypes'],
             companies: ['companies'],
