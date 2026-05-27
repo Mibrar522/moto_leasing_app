@@ -1507,6 +1507,12 @@ exports.getDashboardData = async (req, res) => {
         } catch (adsError) {
             console.warn('Dashboard ads fallback:', adsError.message);
         }
+        const shouldIncludePendingWorkflowSales = ['workflow', 'user-tasks'].includes(requestedPage);
+        const salesApprovalVisibilitySql = shouldIncludePendingWorkflowSales
+            ? ''
+            : "UPPER(COALESCE(st.approval_status, 'APPROVED')) = 'APPROVED'";
+        const salesResultWhereParts = [salesResultScopeSql, salesApprovalVisibilitySql].filter(Boolean);
+        const salesResultWhereSql = salesResultWhereParts.length ? `WHERE ${salesResultWhereParts.join(' AND ')}` : '';
         const salesResult = wantsGroup('salesTransactions') && canViewSalesTransactions
             ? await safeDashboardQuery(
                 () => pool.query(
@@ -1590,7 +1596,7 @@ exports.getDashboardData = async (req, res) => {
                 ${salesOwnerJoinSql('u')}
                 LEFT JOIN dealers d ON d.id = ${salesDealerOwnerSql('u')}
                 LEFT JOIN sale_installments si ON si.sale_id = st.id
-                ${salesResultScopeSql ? `WHERE ${salesResultScopeSql}` : ''}
+                ${salesResultWhereSql}
                 GROUP BY
                     st.id,
                     st.customer_id,

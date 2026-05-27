@@ -72,6 +72,17 @@ const getWorkflowStepRoles = (definition) => (
     [definition?.first_approver_role_name, definition?.second_approver_role_name].filter(Boolean)
 );
 
+const normalizeRoleName = (value) => String(value || '').trim().toUpperCase();
+
+const assertAssignedWorkflowActor = (task, actingUser) => {
+    const assignedRoleName = normalizeRoleName(task?.assigned_role_name);
+    const actingRoleName = normalizeRoleName(actingUser?.role_name);
+
+    if (!assignedRoleName || assignedRoleName !== actingRoleName) {
+        throw new Error(`Only ${assignedRoleName || 'the assigned role'} can process this workflow step.`);
+    }
+};
+
 const createWorkflowTask = async (client, {
     workflowDefinitionId,
     entityType,
@@ -304,6 +315,7 @@ const approveWorkflowTask = async (client, taskId, actingUser, decisionNotes = '
     if (String(task.task_status || '').toUpperCase() !== 'PENDING') {
         throw new Error('This workflow task has already been completed.');
     }
+    assertAssignedWorkflowActor(task, actingUser);
 
     await client.query(
         `
@@ -369,6 +381,7 @@ const rejectWorkflowTask = async (client, taskId, actingUser, decisionNotes = ''
     if (String(task.task_status || '').toUpperCase() !== 'PENDING') {
         throw new Error('This workflow task has already been completed.');
     }
+    assertAssignedWorkflowActor(task, actingUser);
 
     await client.query(
         `
