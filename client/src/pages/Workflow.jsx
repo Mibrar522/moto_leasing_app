@@ -29,6 +29,12 @@ export default function Workflow({ ctx }) {
     workflowMessage,
     workflowRoleOptions,
   } = ctx;
+  const workflowDefinitions = dashboardData.workflowDefinitions || [];
+  const formatDefinitionDate = (value) => {
+    if (!value) return 'Not set';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Not set' : date.toLocaleDateString('en-GB');
+  };
 
 if (!canOpenWorkflowWorkspace) {
                     return <div className="feedback-card error">Your account does not have workflow access.</div>;
@@ -120,6 +126,57 @@ if (!canOpenWorkflowWorkspace) {
                                 </div>
                             </div>
                         ) : null}
+
+                        <div className="table-card">
+                            <div className="section-header">
+                                <h3>Workflow Definitions</h3>
+                                <span className="section-caption">{workflowDefinitions.length} saved</span>
+                            </div>
+                            {workflowDefinitions.length === 0 ? renderEmptyState('No workflow definitions saved yet.') : (
+                                <table className="pro-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Workflow</th>
+                                            <th>Dealer</th>
+                                            <th>Requester</th>
+                                            <th>Approval Route</th>
+                                            <th>Status</th>
+                                            <th>Updated</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {workflowDefinitions.map((definition) => {
+                                            const approvalRoute = [
+                                                definition.first_approver_role_name,
+                                                definition.second_approver_role_name,
+                                            ].filter(Boolean).join(' -> ');
+                                            return (
+                                                <tr key={definition.id}>
+                                                    <td>
+                                                        <strong>{definition.definition_name || 'Sale Approval'}</strong>
+                                                        <br />
+                                                        <span className="muted-text">{definition.workflow_type || 'SALE_APPROVAL'}</span>
+                                                    </td>
+                                                    <td>{definition.dealer_name || 'All Dealers'}</td>
+                                                    <td>{definition.requester_role_name || 'Not set'}</td>
+                                                    <td>{approvalRoute || 'Direct approval'}</td>
+                                                    <td><span className={getStatusClass(definition.is_active ? 'ACTIVE' : 'INACTIVE')}>{definition.is_active ? 'ACTIVE' : 'INACTIVE'}</span></td>
+                                                    <td>{formatDefinitionDate(definition.updated_at || definition.created_at)}</td>
+                                                    <td>
+                                                        {canViewWorkflowConfig ? (
+                                                            <button type="button" className="view-btn" onClick={() => handleEditWorkflowDefinition(definition)}>Edit</button>
+                                                        ) : (
+                                                            <span className="feature-pill muted">View only</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
 
                         {false ? (
                             <div className="dashboard-split">

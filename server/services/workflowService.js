@@ -120,6 +120,11 @@ const createWorkflowTask = async (client, {
 };
 
 const findApplicableSalesWorkflowDefinition = async (client, { roleName, dealerId }) => {
+    const requesterRoleName = normalizeRoleName(roleName);
+    if (requesterRoleName === 'APPLICATION_ADMIN') {
+        return null;
+    }
+
     if (!dealerId) {
         return null;
     }
@@ -129,13 +134,13 @@ const findApplicableSalesWorkflowDefinition = async (client, { roleName, dealerI
         SELECT *
         FROM workflow_definitions
         WHERE workflow_type = 'SALE_APPROVAL'
-          AND requester_role_name = $1
+          AND UPPER(requester_role_name) = $1
           AND is_active = TRUE
           AND dealer_id = $2
         ORDER BY updated_at DESC, created_at DESC
         LIMIT 1
         `,
-        [roleName, dealerId]
+        [requesterRoleName, dealerId]
     );
 
     return result.rows[0] || null;

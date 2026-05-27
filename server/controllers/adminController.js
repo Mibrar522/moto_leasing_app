@@ -316,7 +316,7 @@ exports.getDashboardData = async (req, res) => {
             return clauses.join(' AND ');
         };
         const canViewWorkflowWorkspace = hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_VIEW']);
-        const canViewWorkflowDefinitions = canViewWorkflowWorkspace && hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_CONFIG']);
+        const canViewWorkflowDefinitions = canViewWorkflowWorkspace && hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_CONFIG', 'FEAT_WORKFLOW_TASKS']);
         const canViewWorkflowTasks = canViewWorkflowWorkspace && hasAnyFeature(req.user.feature_keys || [], ['FEAT_WORKFLOW_TASKS']);
         const leaseMetricsWhereClause = hasDealerDataScope
             ? 'WHERE COALESCE(la.dealer_id, u.dealer_id) = $2'
