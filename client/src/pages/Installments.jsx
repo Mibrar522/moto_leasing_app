@@ -141,18 +141,18 @@ if (!canManageInstallments) {
                                     ) : (
                                         <div className="installment-hero-image fallback">No vehicle image</div>
                                     )}
+                                    <div className="installment-customer-photo-card" aria-label="Customer Photo">
+                                        {selectedInstallmentCustomerPhotoUrl ? (
+                                            <img src={selectedInstallmentCustomerPhotoUrl} alt="Customer" />
+                                        ) : (
+                                            <span>No photo</span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="installment-hero-content">
                                     <div className="section-header installment-profile-header">
                                         <h3>{selectedInstallmentSale.brand} {selectedInstallmentSale.model}</h3>
                                         <div className="installment-header-tools">
-                                            <div className="installment-customer-photo-card" aria-label="Customer Photo">
-                                                {selectedInstallmentCustomerPhotoUrl ? (
-                                                    <img src={selectedInstallmentCustomerPhotoUrl} alt="Customer" />
-                                                ) : (
-                                                    <span>No photo</span>
-                                                )}
-                                            </div>
                                             <div className="inline-actions">
                                                 <div className="installment-sale-combobox no-print" ref={installmentDropdownRef}>
                                                     <button
