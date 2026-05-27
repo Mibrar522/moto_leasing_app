@@ -1,5 +1,6 @@
 const path = require('path');
 const pool = require('../config/db');
+const { buildHtml, sendMailSafe } = require('../utils/mail');
 const { resolveDurableUploadUrl } = require('../utils/storage');
 const {
     findApplicableSalesWorkflowDefinition,
@@ -76,6 +77,132 @@ const resolveSaleDealerId = (scope, reqUser, customerDealerId = null, vehicleDea
 
 const formatCurrencyAmount = (value) => `Rs ${Number(value || 0).toFixed(2)}`;
 const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100;
+const formatInstallmentMonth = (value) => {
+    const date = value ? new Date(value) : new Date();
+    if (Number.isNaN(date.getTime())) {
+        return new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+};
+
+const sendInstallmentReceiptEmail = async ({ saleId, installmentId, receivedAmount }) => {
+    try {
+        const receiptResult = await pool.query(
+            `
+            SELECT
+                si.id,
+                si.sale_id,
+                si.installment_number,
+                si.amount,
+                si.due_date,
+                si.paid_date,
+                si.received_amount,
+                st.agreement_number,
+                st.vehicle_price,
+                st.financed_amount,
+                st.down_payment,
+                c.full_name AS customer_name,
+                c.ocr_details,
+                d.dealer_name,
+                d.contact_email,
+                d.mobile_country_code,
+                d.mobile_number,
+                admin_user.email AS admin_email,
+                agent_user.email AS agent_email
+            FROM sale_installments si
+            JOIN sales_transactions st ON st.id = si.sale_id
+            JOIN customers c ON c.id = st.customer_id
+            LEFT JOIN dealers d ON d.id = COALESCE(st.dealer_id, c.dealer_id)
+            LEFT JOIN users admin_user ON admin_user.id = d.admin_user_id
+            LEFT JOIN users agent_user ON agent_user.id = st.agent_id
+            WHERE si.id = $1
+              AND si.sale_id = $2
+            `,
+            [installmentId, saleId]
+        );
+
+        const row = receiptResult.rows[0];
+        if (!row) {
+            return;
+        }
+
+        const ocrDetails = row.ocr_details && typeof row.ocr_details === 'object' ? row.ocr_details : {};
+        const customerEmail = String(ocrDetails.contact_email || '').trim();
+        if (!customerEmail) {
+            console.warn('Installment receipt email skipped: customer email is missing', { saleId, installmentId });
+            return;
+        }
+
+        const totalsResult = await pool.query(
+            `
+            SELECT COALESCE(SUM(COALESCE(received_amount, 0)), 0) AS total_received_amount
+            FROM sale_installments
+            WHERE sale_id = $1
+            `,
+            [saleId]
+        );
+
+        const totalInstallmentAmount = Number(row.financed_amount || 0) > 0
+            ? Number(row.financed_amount || 0)
+            : Math.max(Number(row.vehicle_price || 0) - Number(row.down_payment || 0), 0);
+        const totalReceivedAmount = Number(totalsResult.rows[0]?.total_received_amount || 0);
+        const remainingBalance = roundMoney(Math.max(totalInstallmentAmount - totalReceivedAmount, 0));
+        const monthName = formatInstallmentMonth(row.due_date || row.paid_date);
+        const dealerName = row.dealer_name || 'MotorLease';
+        const receiptAmount = Number(receivedAmount || row.received_amount || row.amount || 0);
+        const subject = `Installment received for ${monthName} - ${dealerName}`;
+        const lines = [
+            `We have received your installment payment for ${monthName}.`,
+            `Received amount: ${formatCurrencyAmount(receiptAmount)}`,
+            `Remaining balance: ${formatCurrencyAmount(remainingBalance)}`,
+            row.agreement_number ? `Agreement number: ${row.agreement_number}` : '',
+            row.installment_number ? `Installment number: ${row.installment_number}` : '',
+            'Thank you for your payment. Please keep this email for your records.',
+        ].filter(Boolean);
+        const dealer = {
+            name: `${dealerName} Admin`,
+            contact_email: row.contact_email || row.admin_email || row.agent_email || process.env.SMTP_USER,
+            mobile_country_code: row.mobile_country_code,
+            mobile_number: row.mobile_number,
+        };
+        const text = [
+            `Dear ${row.customer_name || 'Customer'},`,
+            '',
+            ...lines,
+            '',
+            `Thanks and regards,`,
+            `${dealerName} Admin`,
+        ].join('\n');
+        const html = buildHtml({
+            title: 'Installment Payment Received',
+            greeting: `Dear ${row.customer_name || 'Customer'},`,
+            lines,
+            dealer,
+        });
+
+        const result = await sendMailSafe({
+            to: customerEmail,
+            subject,
+            text,
+            html,
+            dealer,
+        });
+
+        if (!result.sent) {
+            console.warn('Installment receipt email failed:', result.error);
+        }
+    } catch (error) {
+        console.warn('Installment receipt email failed:', error.message);
+    }
+};
+
+const queueInstallmentReceiptEmail = (payload) => {
+    setImmediate(() => {
+        sendInstallmentReceiptEmail(payload);
+    });
+};
+
 const buildInstallmentAmounts = ({ financedAmount, monthlyInstallment, installmentMonths }) => {
     const total = Math.max(roundMoney(financedAmount), 0);
     const monthly = Math.max(roundMoney(monthlyInstallment), 0);
@@ -1122,6 +1249,11 @@ exports.receiveInstallment = async (req, res) => {
         }
 
         await client.query('COMMIT');
+        queueInstallmentReceiptEmail({
+            saleId,
+            installmentId: req.params.id,
+            receivedAmount,
+        });
         res.status(200).json(installmentResult.rows[0]);
     } catch (error) {
         await client.query('ROLLBACK');
