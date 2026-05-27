@@ -71,12 +71,15 @@ if (!canOpenWorkflowWorkspace) {
                                     <label className="field">
                                         <span>First Approval Target</span>
                                         <select name="first_approver_role_name" value={workflowDefinitionForm.first_approver_role_name} onChange={handleWorkflowDefinitionChange}>
+                                            {workflowDefinitionForm.requester_role_name === 'APPLICATION_ADMIN' ? (
+                                                <option value="">Skip approval - direct sale</option>
+                                            ) : null}
                                             {workflowRoleOptions.filter((roleName) => roleName !== workflowDefinitionForm.requester_role_name).map((roleName) => <option key={`first-${roleName}`} value={roleName}>{roleName}</option>)}
                                         </select>
                                     </label>
                                     <label className="field">
                                         <span>Second Approval Target</span>
-                                        <select name="second_approver_role_name" value={workflowDefinitionForm.second_approver_role_name} onChange={handleWorkflowDefinitionChange}>
+                                        <select name="second_approver_role_name" value={workflowDefinitionForm.second_approver_role_name} onChange={handleWorkflowDefinitionChange} disabled={!workflowDefinitionForm.first_approver_role_name}>
                                             <option value="">Skip second approval</option>
                                             {workflowRoleOptions
                                                 .filter((roleName) => roleName !== workflowDefinitionForm.requester_role_name && roleName !== workflowDefinitionForm.first_approver_role_name)
@@ -100,7 +103,7 @@ if (!canOpenWorkflowWorkspace) {
                                     </label>
                                 </form>
                                 <div className="notice-banner spaced-top">
-                                    Direct flow: set <strong>First Approval Target</strong> to <strong>APPLICATION_ADMIN</strong> and leave <strong>Second Approval Target</strong> empty. Manager flow: set <strong>First Approval Target</strong> to <strong>MANAGER</strong> and <strong>Second Approval Target</strong> to <strong>APPLICATION_ADMIN</strong>.
+                                    Direct flow: application admin sales are approved immediately. Agent flow: set <strong>First Approval Target</strong> to <strong>MANAGER</strong> and <strong>Second Approval Target</strong> to <strong>APPLICATION_ADMIN</strong>. Manager flow: set <strong>First Approval Target</strong> to <strong>APPLICATION_ADMIN</strong> and leave second approval empty.
                                 </div>
                                 <div className="feature-list spaced-top">
                                     {(dashboardData.workflowDefinitions || []).length > 0 ? (

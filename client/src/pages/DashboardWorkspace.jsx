@@ -5489,10 +5489,40 @@ const selectedCustomer = useMemo(
 
     const handleWorkflowDefinitionChange = (event) => {
         const { name, type, value, checked } = event.target;
-        setWorkflowDefinitionForm((current) => ({
-            ...current,
-            [name]: type === 'checkbox' ? checked : value,
-        }));
+        setWorkflowDefinitionForm((current) => {
+            if (name === 'requester_role_name' && value === 'APPLICATION_ADMIN') {
+                return {
+                    ...current,
+                    requester_role_name: value,
+                    first_approver_role_name: '',
+                    second_approver_role_name: '',
+                };
+            }
+            if (name === 'requester_role_name') {
+                const nextFirstApprover = current.first_approver_role_name && current.first_approver_role_name !== value
+                    ? current.first_approver_role_name
+                    : workflowRoleOptions.find((roleName) => roleName !== value) || '';
+                return {
+                    ...current,
+                    requester_role_name: value,
+                    first_approver_role_name: nextFirstApprover,
+                    second_approver_role_name: current.second_approver_role_name === value || current.second_approver_role_name === nextFirstApprover
+                        ? ''
+                        : current.second_approver_role_name,
+                };
+            }
+            if (name === 'first_approver_role_name' && !value) {
+                return {
+                    ...current,
+                    first_approver_role_name: '',
+                    second_approver_role_name: '',
+                };
+            }
+            return {
+                ...current,
+                [name]: type === 'checkbox' ? checked : value,
+            };
+        });
     };
 
     const handleEditWorkflowDefinition = (definition) => {
@@ -5502,7 +5532,7 @@ const selectedCustomer = useMemo(
             workflow_type: definition.workflow_type || 'SALE_APPROVAL',
             dealer_id: definition.dealer_id || '',
             requester_role_name: definition.requester_role_name || 'AGENT',
-            first_approver_role_name: definition.first_approver_role_name || 'MANAGER',
+            first_approver_role_name: definition.first_approver_role_name || '',
             second_approver_role_name: definition.second_approver_role_name || '',
             is_active: definition.is_active ?? true,
         });
@@ -5598,6 +5628,8 @@ const selectedCustomer = useMemo(
             setSavingWorkflowDefinition(true);
             const { data: savedDefinition } = await API.post('/workflow/definitions', {
                 ...workflowDefinitionForm,
+                first_approver_role_name: workflowDefinitionForm.first_approver_role_name || '',
+                second_approver_role_name: workflowDefinitionForm.first_approver_role_name ? workflowDefinitionForm.second_approver_role_name : '',
                 dealer_id: isSuperAdmin ? (workflowDefinitionForm.dealer_id || null) : (user?.dealer_id || null),
             });
             await loadDashboard({ page: 'workflow' });

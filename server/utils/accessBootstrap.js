@@ -828,7 +828,7 @@ exports.syncAccessControlDefaults = async () => {
                 workflow_type VARCHAR(60) NOT NULL DEFAULT 'SALE_APPROVAL',
                 dealer_id UUID REFERENCES dealers(id) ON DELETE CASCADE,
                 requester_role_name VARCHAR(60) NOT NULL,
-                first_approver_role_name VARCHAR(60) NOT NULL,
+                first_approver_role_name VARCHAR(60),
                 second_approver_role_name VARCHAR(60),
                 is_active BOOLEAN NOT NULL DEFAULT TRUE,
                 created_by UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -837,6 +837,7 @@ exports.syncAccessControlDefaults = async () => {
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
         `);
+        await client.query('ALTER TABLE workflow_definitions ALTER COLUMN first_approver_role_name DROP NOT NULL');
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS workflow_tasks (

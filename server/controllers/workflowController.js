@@ -9,9 +9,13 @@ const isSuperAdminSession = (user = {}) =>
     (user?.real_role_name || user?.role_name) === 'SUPER_ADMIN';
 const getEffectiveDealerId = (user = {}) => user.effective_dealer_id || user.dealer_id || null;
 const hasGlobalScope = (user = {}) => isSuperAdminSession(user) && !getEffectiveDealerId(user);
+const ensureWorkflowDefinitionShape = async () => {
+    await pool.query('ALTER TABLE workflow_definitions ALTER COLUMN first_approver_role_name DROP NOT NULL');
+};
 
 exports.saveWorkflowDefinition = async (req, res) => {
     try {
+        await ensureWorkflowDefinitionShape();
         const {
             id,
             definition_name,
@@ -25,13 +29,24 @@ exports.saveWorkflowDefinition = async (req, res) => {
         const globalScope = hasGlobalScope(req.user);
         const effectiveDealerId = getEffectiveDealerId(req.user);
         const workflowDealerId = globalScope ? (dealer_id || null) : effectiveDealerId;
+        const requesterRoleName = String(requester_role_name || '').trim().toUpperCase();
+        const firstApproverRoleName = String(first_approver_role_name || '').trim().toUpperCase();
+        const secondApproverRoleName = String(second_approver_role_name || '').trim().toUpperCase();
 
         if (!String(definition_name || '').trim()) {
             return res.status(400).json({ message: 'Workflow name is required.' });
         }
 
-        if (!String(requester_role_name || '').trim() || !String(first_approver_role_name || '').trim()) {
-            return res.status(400).json({ message: 'Requester role and first approver role are required.' });
+        if (!requesterRoleName) {
+            return res.status(400).json({ message: 'Requester role is required.' });
+        }
+
+        if (requesterRoleName !== 'APPLICATION_ADMIN' && !firstApproverRoleName) {
+            return res.status(400).json({ message: 'First approver role is required unless the requester is Application Admin.' });
+        }
+
+        if (!firstApproverRoleName && secondApproverRoleName) {
+            return res.status(400).json({ message: 'Second approval cannot be selected when first approval is skipped.' });
         }
 
         if (!workflowDealerId) {
@@ -42,9 +57,9 @@ exports.saveWorkflowDefinition = async (req, res) => {
             String(definition_name || '').trim(),
             String(workflow_type || 'SALE_APPROVAL').trim().toUpperCase(),
             workflowDealerId,
-            String(requester_role_name || '').trim().toUpperCase(),
-            String(first_approver_role_name || '').trim().toUpperCase(),
-            String(second_approver_role_name || '').trim().toUpperCase() || null,
+            requesterRoleName,
+            firstApproverRoleName || null,
+            secondApproverRoleName || null,
             Boolean(is_active),
         ];
 
