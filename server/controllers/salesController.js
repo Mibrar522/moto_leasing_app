@@ -1,6 +1,6 @@
 const path = require('path');
 const pool = require('../config/db');
-const { buildHtml, sendMailSafe } = require('../utils/mail');
+const { buildHtml, buildLocalAttachments, sendMailSafe } = require('../utils/mail');
 const { resolveDurableUploadUrl } = require('../utils/storage');
 const {
     findApplicableSalesWorkflowDefinition,
@@ -200,6 +200,124 @@ const sendInstallmentReceiptEmail = async ({ saleId, installmentId, receivedAmou
 const queueInstallmentReceiptEmail = (payload) => {
     setImmediate(() => {
         sendInstallmentReceiptEmail(payload);
+    });
+};
+
+const sendSaleCreationEmail = async ({ saleId }) => {
+    try {
+        const saleResult = await pool.query(
+            `
+            SELECT
+                st.id,
+                st.sale_mode,
+                st.agreement_number,
+                st.agreement_date,
+                st.agreement_pdf_url,
+                st.vehicle_price,
+                st.down_payment,
+                st.financed_amount,
+                st.monthly_installment,
+                st.installment_months,
+                st.first_due_date,
+                c.full_name AS customer_name,
+                c.ocr_details,
+                v.brand,
+                v.model,
+                v.vehicle_type,
+                v.registration_number,
+                v.chassis_number,
+                v.engine_number,
+                d.dealer_name,
+                d.contact_email,
+                d.mobile_country_code,
+                d.mobile_number,
+                admin_user.email AS admin_email,
+                agent_user.email AS agent_email
+            FROM sales_transactions st
+            JOIN customers c ON c.id = st.customer_id
+            JOIN vehicles v ON v.id = st.vehicle_id
+            LEFT JOIN dealers d ON d.id = COALESCE(st.dealer_id, c.dealer_id)
+            LEFT JOIN users admin_user ON admin_user.id = d.admin_user_id
+            LEFT JOIN users agent_user ON agent_user.id = st.agent_id
+            WHERE st.id = $1
+            `,
+            [saleId]
+        );
+
+        const row = saleResult.rows[0];
+        if (!row) {
+            return;
+        }
+
+        const ocrDetails = row.ocr_details && typeof row.ocr_details === 'object' ? row.ocr_details : {};
+        const customerEmail = String(ocrDetails.contact_email || '').trim();
+        if (!customerEmail) {
+            console.warn('Sale creation email skipped: customer email is missing', { saleId });
+            return;
+        }
+
+        const saleMode = String(row.sale_mode || '').toUpperCase();
+        const isInstallment = saleMode === 'INSTALLMENT';
+        const dealerName = row.dealer_name || 'MotorLease';
+        const vehicleName = [row.brand, row.model].filter(Boolean).join(' ') || 'selected vehicle';
+        const subject = `${isInstallment ? 'Installment agreement' : 'Cash sale'} created - ${dealerName}`;
+        const lines = [
+            `Your ${isInstallment ? 'installment agreement' : 'cash sale'} has been created for ${vehicleName}.`,
+            row.agreement_number ? `Agreement number: ${row.agreement_number}` : '',
+            row.agreement_date ? `Agreement date: ${new Date(row.agreement_date).toLocaleDateString('en-GB')}` : '',
+            `Sale type: ${isInstallment ? 'Installment' : 'Cash'}`,
+            `Vehicle price: ${formatCurrencyAmount(row.vehicle_price)}`,
+            isInstallment ? `Down payment: ${formatCurrencyAmount(row.down_payment)}` : '',
+            isInstallment ? `Financed amount: ${formatCurrencyAmount(row.financed_amount)}` : '',
+            isInstallment ? `Monthly installment: ${formatCurrencyAmount(row.monthly_installment)}` : '',
+            isInstallment && row.installment_months ? `Installment plan: ${row.installment_months} month(s)` : '',
+            isInstallment && row.first_due_date ? `First due month: ${formatInstallmentMonth(row.first_due_date)}` : '',
+            row.registration_number ? `Registration number: ${row.registration_number}` : '',
+            row.chassis_number ? `Chassis number: ${row.chassis_number}` : '',
+            row.engine_number ? `Engine number: ${row.engine_number}` : '',
+            row.agreement_pdf_url ? 'The agreement PDF/invoice is attached when available.' : 'The agreement PDF/invoice will be shared separately when available.',
+        ].filter(Boolean);
+        const dealer = {
+            name: `${dealerName} Admin`,
+            contact_email: row.contact_email || row.admin_email || row.agent_email || process.env.SMTP_USER,
+            mobile_country_code: row.mobile_country_code,
+            mobile_number: row.mobile_number,
+        };
+        const text = [
+            `Dear ${row.customer_name || 'Customer'},`,
+            '',
+            ...lines,
+            '',
+            `Thanks and regards,`,
+            `${dealerName} Admin`,
+        ].join('\n');
+        const html = buildHtml({
+            title: isInstallment ? 'Installment Agreement Created' : 'Cash Sale Created',
+            greeting: `Dear ${row.customer_name || 'Customer'},`,
+            lines,
+            dealer,
+        });
+
+        const result = await sendMailSafe({
+            to: customerEmail,
+            subject,
+            text,
+            html,
+            dealer,
+            attachments: buildLocalAttachments([row.agreement_pdf_url]),
+        });
+
+        if (!result.sent) {
+            console.warn('Sale creation email failed:', result.error);
+        }
+    } catch (error) {
+        console.warn('Sale creation email failed:', error.message);
+    }
+};
+
+const queueSaleCreationEmail = (payload) => {
+    setImmediate(() => {
+        sendSaleCreationEmail(payload);
     });
 };
 
@@ -718,6 +836,7 @@ exports.createSale = async (req, res) => {
         }
 
         await client.query('COMMIT');
+        queueSaleCreationEmail({ saleId: saleResult.rows[0].id });
         res.status(201).json(saleResult.rows[0]);
     } catch (error) {
         await client.query('ROLLBACK');
