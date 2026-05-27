@@ -903,6 +903,7 @@ const DASHBOARD_PAGE_TOKENS = {
 const DASHBOARD_TOKEN_PAGES = Object.fromEntries(
     Object.entries(DASHBOARD_PAGE_TOKENS).map(([page, token]) => [token, page])
 );
+const DASHBOARD_ROUTE_KEY = 'd7p8rr0sfn5c73edm7kg';
 const getDashboardPageFromSearch = (search) => {
     const params = new URLSearchParams(search || '');
     const token = String(params.get('v') || '').trim().toLowerCase();
@@ -965,7 +966,10 @@ const getDashboardPageFromPathname = (pathname) => {
 
     return match?.[0] || '';
 };
-const getDashboardPathForPage = (page) => DASHBOARD_PAGE_PATHS[page] || DASHBOARD_PAGE_PATHS.dashboard;
+const getDashboardPathForPage = (page) => {
+    const nextPage = DASHBOARD_PAGE_PATHS[page] ? page : 'dashboard';
+    return `/dashboard?page=${encodeURIComponent(nextPage)}&key=${DASHBOARD_ROUTE_KEY}`;
+};
 const normalizeIdentityNumber = (value) => String(value || '').replace(/\D/g, '');
 const formatCnicNumber = (value) => {
     const digits = normalizeIdentityNumber(value).slice(0, 13);
