@@ -1,3 +1,5 @@
+import { useMemo, useState } from 'react';
+
 const escapePrintText = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -40,6 +42,63 @@ export default function Transactions({ ctx }) {
     transactionActionState,
     transactionSales,
   } = ctx;
+  const [transactionRegisterSearchOpen, setTransactionRegisterSearchOpen] = useState(false);
+  const [transactionRegisterSearch, setTransactionRegisterSearch] = useState('');
+  const [transactionRegisterSearchField, setTransactionRegisterSearchField] = useState('customer_name');
+  const transactionRegisterSearchFields = [
+    { value: 'customer_name', label: 'Customer Name' },
+    { value: 'customer_mobile', label: 'Mobile Number' },
+    { value: 'cnic_passport_number', label: 'CNIC' },
+    { value: 'chassis_number', label: 'Chassis' },
+    { value: 'engine_number', label: 'Engine' },
+    { value: 'registration_number', label: 'Registration' },
+    { value: 'agreement_number', label: 'Agreement' },
+  ];
+  const normalizeTransactionRegisterSearch = (value) => String(value || '').trim().toLowerCase();
+  const getTransactionCustomerMobile = (sale) => (
+    sale.customer_mobile_number
+    || sale.customer_contact_phone
+    || sale.contact_phone
+    || sale.customer_ocr_details?.contact_phone
+    || sale.customer_ocr_details?.contactPhone
+    || ''
+  );
+  const getTransactionRegisterSearchValue = (sale, field) => {
+    if (field === 'customer_mobile') return getTransactionCustomerMobile(sale);
+    return sale[field] || '';
+  };
+  const transactionRegisterSearchFieldLabel = transactionRegisterSearchFields.find((field) => field.value === transactionRegisterSearchField)?.label || 'Customer Name';
+  const filteredTransactionSales = useMemo(() => {
+    const term = normalizeTransactionRegisterSearch(transactionRegisterSearch);
+    if (!term) return transactionSales;
+
+    const startsWithMatches = [];
+    const containsMatches = [];
+    transactionSales.forEach((sale) => {
+      const fieldValue = normalizeTransactionRegisterSearch(getTransactionRegisterSearchValue(sale, transactionRegisterSearchField));
+      const combinedValue = normalizeTransactionRegisterSearch([
+        sale.customer_name,
+        getTransactionCustomerMobile(sale),
+        sale.cnic_passport_number,
+        sale.chassis_number,
+        sale.engine_number,
+        sale.registration_number,
+        sale.brand,
+        sale.model,
+        sale.serial_number,
+        sale.agreement_number,
+        sale.sale_mode,
+      ].filter(Boolean).join(' '));
+
+      if (fieldValue.startsWith(term) || combinedValue.startsWith(term)) {
+        startsWithMatches.push(sale);
+      } else if (fieldValue.includes(term) || combinedValue.includes(term)) {
+        containsMatches.push(sale);
+      }
+    });
+
+    return [...startsWithMatches, ...containsMatches];
+  }, [transactionRegisterSearch, transactionRegisterSearchField, transactionSales]);
   const isInvoiceOpen = transactionActionState.action === 'view' && selectedTransactionSale;
   const selectedInvoiceSummary = isInvoiceOpen ? summarizeSaleInstallments(selectedTransactionSale) : null;
   const selectedInvoiceIsInstallment = isInvoiceOpen && String(selectedTransactionSale.sale_mode || '').toUpperCase() === 'INSTALLMENT';
@@ -152,9 +211,50 @@ if (!canManageSales) {
 
                         {canViewTransactionRegister ? (
                         <div className="table-card">
-                            <h3>Sales Transaction Register</h3>
-                            {transactionSales.length === 0 ? (
-                                renderEmptyState('No sales transactions are available yet.')
+                            <div className="section-header customer-registry-header">
+                                <h3>Sales Transaction Register</h3>
+                                <div className="customer-registry-search-area">
+                                    <span className="customer-registry-search-label">Sales Register Search</span>
+                                    <div className={`customer-registry-search-controls ${transactionRegisterSearchOpen ? 'is-open' : ''}`}>
+                                        <button
+                                            type="button"
+                                            className={`customer-registry-search-toggle ${transactionRegisterSearchOpen ? 'is-active' : ''}`}
+                                            onClick={() => setTransactionRegisterSearchOpen((current) => !current)}
+                                            aria-label="Search sales transaction register"
+                                            title="Search sales transaction register"
+                                        >
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <path d="M10.8 18.1a7.3 7.3 0 1 1 5.1-2.1l4 4a1.2 1.2 0 0 1-1.7 1.7l-4-4a7.2 7.2 0 0 1-3.4.4Zm0-2.4a4.9 4.9 0 1 0 0-9.8 4.9 4.9 0 0 0 0 9.8Z" />
+                                            </svg>
+                                        </button>
+                                        {transactionRegisterSearchOpen ? (
+                                            <>
+                                                <input
+                                                    type="search"
+                                                    value={transactionRegisterSearch}
+                                                    onChange={(event) => setTransactionRegisterSearch(event.target.value)}
+                                                    placeholder={`Live search by ${transactionRegisterSearchFieldLabel}`}
+                                                    autoFocus
+                                                />
+                                                <select
+                                                    value={transactionRegisterSearchField}
+                                                    onChange={(event) => {
+                                                        setTransactionRegisterSearchField(event.target.value);
+                                                        setTransactionRegisterSearch('');
+                                                    }}
+                                                >
+                                                    {transactionRegisterSearchFields.map((field) => (
+                                                        <option key={field.value} value={field.value}>{field.label}</option>
+                                                    ))}
+                                                </select>
+                                            </>
+                                        ) : null}
+                                    </div>
+                                </div>
+                                <span />
+                            </div>
+                            {filteredTransactionSales.length === 0 ? (
+                                renderEmptyState(transactionRegisterSearch ? 'No sales transactions match the selected register search.' : 'No sales transactions are available yet.')
                             ) : (
                                 <div className="table-scroll">
                                 <table className="pro-table transaction-register-table">
@@ -171,7 +271,7 @@ if (!canManageSales) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {transactionSales.map((sale) => {
+                                        {filteredTransactionSales.map((sale) => {
                                             const summary = summarizeSaleInstallments(sale);
                                             const hasPendingInstallments = String(sale.sale_mode || '').toUpperCase() === 'INSTALLMENT' && summary.pendingCount > 0;
                                             const isViewing = transactionActionState.saleId === sale.id && transactionActionState.action === 'view';
