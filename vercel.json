@@ -2,7 +2,7 @@
   "redirects": [
     {
       "source": "/(.*)",
-      "destination": "https://your-new-website.com",
+      "destination": "https://test.motoleasingapp.online/login",
       "permanent": true
     }
   ]
