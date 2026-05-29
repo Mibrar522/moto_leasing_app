@@ -27,7 +27,7 @@ const appOrderRoutes = require('./routes/appOrderRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 
 // Import utilities
-const { syncAccessControlDefaults, syncAccessCatalogDefaults } = require('./utils/accessBootstrap');
+const { syncAccessControlDefaults, syncAccessCatalogDefaults, syncAccessRuntimeTables } = require('./utils/accessBootstrap');
 const { syncCustomerAppSchema } = require('./utils/customerAppBootstrap');
 const { syncCustomerCoreSchema } = require('./utils/customerCoreBootstrap');
 const { syncDealerOwnership } = require('./utils/dealerOwnershipBootstrap');
@@ -146,6 +146,13 @@ const startServer = async () => {
             console.log('Access-control catalog verified.');
         } catch (catalogError) {
             console.warn('Access-control catalog skipped:', catalogError.message);
+        }
+
+        try {
+            await syncAccessRuntimeTables();
+            console.log('Access-control runtime tables verified.');
+        } catch (runtimeTableError) {
+            console.warn('Access-control runtime tables skipped:', runtimeTableError.message);
         }
 
         try {
