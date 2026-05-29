@@ -2,7 +2,6 @@ export default function Workflow({ ctx }) {
   const {
     buildAssetUrl,
     canOpenWorkflowWorkspace,
-    canViewSalesAgreementForm,
     canViewWorkflowConfig,
     canViewWorkflowTasks,
     completedWorkflowTasks,
@@ -11,7 +10,6 @@ export default function Workflow({ ctx }) {
     formatWorkflowApprovalLine,
     formatWorkflowDealerIdentity,
     getStatusClass,
-    handleEditSale,
     handleEditWorkflowDefinition,
     handleWorkflowDefinitionChange,
     handleWorkflowDefinitionSubmit,
@@ -242,20 +240,6 @@ if (!canOpenWorkflowWorkspace) {
                                                 ) : (
                                                     <span className="feature-pill muted">No attachment uploaded</span>
                                                 )}
-                                                {canViewSalesAgreementForm ? (
-                                                    <button
-                                                        type="button"
-                                                        className="view-btn"
-                                                        onClick={() => {
-                                                            const workflowSale = (dashboardData.salesTransactions || []).find((sale) => sale.id === selectedWorkflowTask.entity_id);
-                                                            if (workflowSale) {
-                                                                handleEditSale(workflowSale);
-                                                            }
-                                                        }}
-                                                    >
-                                                        View / Edit Form
-                                                    </button>
-                                                ) : null}
                                                 {String(selectedWorkflowTask.task_status || '').toUpperCase() === 'PENDING' ? (
                                                     <>
                                                         <button
