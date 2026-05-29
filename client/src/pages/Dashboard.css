@@ -2184,6 +2184,25 @@ body,
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.sales-live-summary .summary-witness-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.sales-live-witness-card {
+    padding: 10px;
+    border-radius: 12px;
+}
+
+.sales-live-witness-card .summary-witness-grid span {
+    font-size: 0.56rem;
+}
+
+.sales-live-witness-card .summary-witness-grid strong {
+    font-size: 0.72rem;
+    line-height: 1.25;
+}
+
 .sales-live-documents .view-btn {
     width: 100%;
 }
@@ -2215,6 +2234,22 @@ body,
     min-height: 0;
     padding: 12px;
     font-size: 0.74rem;
+}
+
+.sales-live-installment-preview {
+    padding: 12px;
+    border-radius: 14px;
+}
+
+.sales-live-installment-preview h3 {
+    margin: 0 0 8px;
+    font-size: 0.86rem;
+}
+
+.sales-live-installment-preview .pro-table thead th,
+.sales-live-installment-preview .pro-table tbody td {
+    padding: 7px 6px;
+    font-size: 0.68rem;
 }
 
 .sales-form-modal .full-span,

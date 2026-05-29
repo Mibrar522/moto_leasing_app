@@ -362,8 +362,12 @@ if (!canCreateSales) {
                                         <div className="detail-grid sales-live-summary-grid">
                                             <div><span className="meta-label">Customer</span><p className="meta-value">{selectedSaleCustomer?.full_name || 'Select customer'}</p></div>
                                             <div><span className="meta-label">Customer CNIC</span><p className="meta-value">{selectedSaleCustomer?.cnic_passport_number || 'Select customer'}</p></div>
+                                            <div><span className="meta-label">Customer Photo</span><p className="meta-value">{selectedSaleCustomerPassportPhotoUrl ? 'Ready' : 'Not uploaded'}</p></div>
                                             <div><span className="meta-label">Dealer</span><p className="meta-value">{editingSaleRecord?.dealer_name || user?.dealer_name || 'Not set'}{editingSaleRecord?.dealer_code ? ` / ${editingSaleRecord.dealer_code}` : ''}</p></div>
                                             <div><span className="meta-label">Vehicle</span><p className="meta-value">{selectedSaleVehicle ? `${selectedSaleVehicle.brand} ${selectedSaleVehicle.model}` : 'Select vehicle'}</p></div>
+                                            <div><span className="meta-label">Vehicle Type</span><p className="meta-value">{selectedSaleVehicle?.vehicle_type || 'Select vehicle'}</p></div>
+                                            <div><span className="meta-label">Color</span><p className="meta-value">{selectedSaleVehicle?.color || 'Not set'}</p></div>
+                                            <div><span className="meta-label">Stock Status</span><p className="meta-value">{selectedSaleVehicle ? (isSelectedSaleVehicleAvailable ? 'Available' : 'Assigned') : 'Select vehicle'}</p></div>
                                             <div><span className="meta-label">Chassis Number</span><p className="meta-value">{selectedSaleVehicle?.chassis_number || 'Select vehicle'}</p></div>
                                             <div><span className="meta-label">Engine Number</span><p className="meta-value">{selectedSaleVehicle?.engine_number || 'Select vehicle'}</p></div>
                                             <div><span className="meta-label">Actual Price</span><p className="meta-value">{formatCurrency(actualVehiclePrice)}</p></div>
@@ -374,6 +378,26 @@ if (!canCreateSales) {
                                                     <div><span className="meta-label">Monthly Installment</span><p className="meta-value">{formatCurrency(saleForm.monthly_installment)}</p></div>
                                                 </>
                                             ) : null}
+                                            <div className="summary-witness-card full-span sales-live-witness-card">
+                                                <span className="meta-label">Witness 1</span>
+                                                <div className="summary-witness-grid">
+                                                    <p><span>Name</span><strong>{saleForm.witness_name || 'Not set'}</strong></p>
+                                                    <p><span>Father Name</span><strong>{saleForm.witness_father_name || 'Not set'}</strong></p>
+                                                    <p><span>Mobile</span><strong>{saleForm.witness_mobile_number || 'Not set'}</strong></p>
+                                                    <p><span>CNIC</span><strong>{saleForm.witness_cnic || 'Not set'}</strong></p>
+                                                    <p className="summary-witness-address"><span>Address</span><strong>{saleForm.witness_address || 'Not set'}</strong></p>
+                                                </div>
+                                            </div>
+                                            <div className="summary-witness-card full-span summary-witness-card-optional sales-live-witness-card">
+                                                <span className="meta-label">Witness 2</span>
+                                                <div className="summary-witness-grid">
+                                                    <p><span>Name</span><strong>{saleForm.witness_two_name || 'Not set'}</strong></p>
+                                                    <p><span>Father Name</span><strong>{saleForm.witness_two_father_name || 'Not set'}</strong></p>
+                                                    <p><span>Mobile</span><strong>{saleForm.witness_two_mobile_number || 'Not set'}</strong></p>
+                                                    <p><span>CNIC</span><strong>{saleForm.witness_two_cnic || 'Not set'}</strong></p>
+                                                    <p className="summary-witness-address"><span>Address</span><strong>{saleForm.witness_two_address || 'Not set'}</strong></p>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div className="detail-grid sale-document-grid sales-live-documents">
                                             <div>
@@ -386,6 +410,30 @@ if (!canCreateSales) {
                                                 <span className="meta-label">Customer Photo</span>
                                                 <div className="employee-document-preview">
                                                     {renderAssetPreview(selectedSaleCustomerPassportPhotoUrl, 'Customer photo not available.', 'Customer Photo')}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <span className="meta-label">Customer CNIC Front</span>
+                                                <div className="employee-document-preview">
+                                                    {renderAssetPreview(saleCustomerCnicFrontUrl, 'Customer CNIC front not available.', 'Customer CNIC Front')}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <span className="meta-label">Customer CNIC Back</span>
+                                                <div className="employee-document-preview">
+                                                    {renderAssetPreview(saleCustomerCnicBackUrl, 'Customer CNIC back not available.', 'Customer CNIC Back')}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <span className="meta-label">Customer Signature</span>
+                                                <div className="employee-document-preview">
+                                                    {renderAssetPreview(selectedSaleCustomerSignatureUrl, 'Customer signature not available.', 'Customer Signature')}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <span className="meta-label">Authorized Signature</span>
+                                                <div className="employee-document-preview">
+                                                    {renderAssetPreview(saleAuthorizedSignatureUrl, 'Authorized signature not available.', 'Authorized Signature')}
                                                 </div>
                                             </div>
                                             <div>
@@ -419,6 +467,29 @@ if (!canCreateSales) {
                                                 )}
                                             </div>
                                         </div>
+                                        {saleForm.sale_mode === 'INSTALLMENT' && canViewSalesInstallmentPreview ? (
+                                            <div className="scanner-box sales-live-installment-preview">
+                                                <h3>Installment Preview</h3>
+                                                {installmentPreview.length === 0 ? (
+                                                    renderEmptyState('Enter installment count, monthly amount, and first due date to generate the schedule preview.')
+                                                ) : (
+                                                    <table className="pro-table">
+                                                        <thead>
+                                                            <tr><th>No.</th><th>Due Date</th><th>Amount</th></tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {installmentPreview.map((row) => (
+                                                                <tr key={row.installment_number}>
+                                                                    <td>{row.installment_number}</td>
+                                                                    <td>{row.due_date}</td>
+                                                                    <td>{formatCurrency(row.amount)}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                )}
+                                            </div>
+                                        ) : null}
                                     </aside>
                                 ) : null}
                             </form>
