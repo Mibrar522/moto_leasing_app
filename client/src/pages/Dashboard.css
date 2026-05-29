@@ -2054,6 +2054,97 @@ body,
     flex-wrap: wrap;
 }
 
+.sales-workspace-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.sales-workspace-action-card {
+    display: grid;
+    gap: 6px;
+    min-height: 82px;
+    padding: 16px 18px;
+    border: 1px solid color-mix(in srgb, var(--dash-accent-outline) 58%, transparent);
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at top right, color-mix(in srgb, var(--dash-accent-soft) 58%, transparent), transparent 42%),
+        var(--dash-glass-strong);
+    color: var(--dash-text);
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--dash-shadow-soft);
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.sales-workspace-action-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--dash-accent-outline);
+    box-shadow: var(--dash-shadow);
+}
+
+.sales-workspace-action-card span {
+    color: var(--dash-text-soft);
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.sales-workspace-action-card strong {
+    color: var(--dash-text);
+    font-size: 1rem;
+}
+
+.sales-workspace-action-card-soft {
+    background:
+        radial-gradient(circle at top right, rgba(255, 255, 255, 0.82), transparent 42%),
+        var(--dash-glass-soft);
+}
+
+.sales-modal-backdrop {
+    z-index: 80;
+}
+
+.sales-workspace-modal {
+    width: min(1180px, calc(100vw - 36px));
+    border-radius: 22px;
+}
+
+.sales-workspace-modal .section-header:first-child {
+    position: sticky;
+    top: -24px;
+    z-index: 3;
+    margin: -24px -24px 16px;
+    padding: 18px 24px 14px;
+    background: var(--dash-surface-strong);
+    border-bottom: 1px solid color-mix(in srgb, var(--dash-border) 76%, transparent);
+}
+
+.sales-form-modal .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sales-form-modal .full-span,
+.sales-summary-modal .full-span {
+    grid-column: 1 / -1;
+}
+
+.sales-summary-modal {
+    width: min(1040px, calc(100vw - 36px));
+}
+
+.sales-pagination {
+    background: color-mix(in srgb, var(--dash-glass-soft) 78%, transparent);
+    border-radius: 16px;
+    padding: 14px;
+}
+
+.sales-pagination-current {
+    min-width: 92px;
+    text-align: center;
+}
+
 .feature-stack {
     display: grid;
     gap: 14px;
@@ -3461,6 +3552,10 @@ body,
 
     .transaction-invoice-summary {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .sales-form-modal .form-grid {
+        grid-template-columns: 1fr;
     }
 
     .sales-donut {

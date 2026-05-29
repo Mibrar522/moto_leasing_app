@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 
+const SALES_REGISTER_ROWS_PER_PAGE = 20;
+
 export default function Sales({ ctx }) {
   const {
     actualVehiclePrice,
@@ -68,7 +70,9 @@ export default function Sales({ ctx }) {
     user,
   } = ctx;
 
-  const [salesRegisterOpen, setSalesRegisterOpen] = useState(false);
+  const [salesFormModalOpen, setSalesFormModalOpen] = useState(false);
+  const [salesSummaryModalOpen, setSalesSummaryModalOpen] = useState(false);
+  const [salesRegisterPage, setSalesRegisterPage] = useState(1);
   const [salesRegisterSearchOpen, setSalesRegisterSearchOpen] = useState(false);
   const [salesRegisterSearch, setSalesRegisterSearch] = useState('');
   const [salesRegisterSearchField, setSalesRegisterSearchField] = useState('customer_name');
@@ -125,7 +129,26 @@ export default function Sales({ ctx }) {
 
     return [...startsWithMatches, ...containsMatches];
   }, [dashboardData.salesTransactions, salesRegisterSearch, salesRegisterSearchField]);
-  const salesRegisterRows = salesRegisterOpen ? filteredSalesRegisterRows : filteredSalesRegisterRows.slice(0, 5);
+  const salesRegisterTotalPages = Math.max(1, Math.ceil(filteredSalesRegisterRows.length / SALES_REGISTER_ROWS_PER_PAGE));
+  const safeSalesRegisterPage = Math.min(salesRegisterPage, salesRegisterTotalPages);
+  const salesRegisterRows = useMemo(() => {
+    const startIndex = (safeSalesRegisterPage - 1) * SALES_REGISTER_ROWS_PER_PAGE;
+    return filteredSalesRegisterRows.slice(startIndex, startIndex + SALES_REGISTER_ROWS_PER_PAGE);
+  }, [filteredSalesRegisterRows, safeSalesRegisterPage]);
+  const salesRegisterStartRow = filteredSalesRegisterRows.length === 0 ? 0 : ((safeSalesRegisterPage - 1) * SALES_REGISTER_ROWS_PER_PAGE) + 1;
+  const salesRegisterEndRow = Math.min(safeSalesRegisterPage * SALES_REGISTER_ROWS_PER_PAGE, filteredSalesRegisterRows.length);
+  const openSalesFormModal = () => {
+    if (saleFormReadOnly) resetSaleForm();
+    setSalesFormModalOpen(true);
+  };
+  const closeSalesFormModal = () => {
+    resetSaleForm();
+    setSalesFormModalOpen(false);
+  };
+  const closeSalesSummaryModal = () => {
+    if (saleFormReadOnly) resetSaleForm();
+    setSalesSummaryModalOpen(false);
+  };
 
 if (!canCreateSales) {
                     return <div className="feedback-card error">Your account does not have sales access.</div>;
@@ -137,17 +160,36 @@ if (!canCreateSales) {
                             <p>Create complete vehicle sales agreements with witness details, cash or installment mode, and PDF upload.</p>
                         </div>
 
-                        <div className="customers-grid">
+                        <div className="sales-workspace-actions">
                             {canViewSalesAgreementForm ? (
-                            <form className="table-card customer-form-card" onSubmit={handleSaleSubmit}>
+                                <button type="button" className="sales-workspace-action-card" onClick={openSalesFormModal}>
+                                    <span>Vehicle Agreement</span>
+                                    <strong>Create or update sale</strong>
+                                </button>
+                            ) : null}
+                            {canViewSalesAgreementSummary ? (
+                                <button type="button" className="sales-workspace-action-card sales-workspace-action-card-soft" onClick={() => setSalesSummaryModalOpen(true)}>
+                                    <span>Agreement Summary</span>
+                                    <strong>Preview selected sale</strong>
+                                </button>
+                            ) : null}
+                        </div>
+
+                        {canViewSalesAgreementForm && salesFormModalOpen ? (
+                            <div className="receive-modal-backdrop sales-modal-backdrop">
+                            <form className="receive-modal sales-workspace-modal sales-form-modal" onSubmit={handleSaleSubmit}>
                                 <div className="section-header">
                                     <h3>{saleForm.id ? (saleFormReadOnly ? 'View Vehicle Sale' : 'Edit Vehicle Sale') : 'Vehicle Agreement Creation'}</h3>
                                     <div className="inline-actions">
                                         {saleForm.id ? (
-                                            <button type="button" className="view-btn" onClick={resetSaleForm}>
+                                            <button type="button" className="view-btn" onClick={closeSalesFormModal}>
                                                 {saleFormReadOnly ? 'Close View' : 'Cancel Edit'}
                                             </button>
-                                        ) : null}
+                                        ) : (
+                                            <button type="button" className="view-btn" onClick={closeSalesFormModal}>
+                                                Close
+                                            </button>
+                                        )}
                                         {!saleFormReadOnly ? (
                                             <button type="submit" className="primary-btn" disabled={savingSale}>
                                                 {savingSale ? 'Saving...' : saleForm.id ? 'Update Sale' : 'Create Sale'}
@@ -318,11 +360,18 @@ if (!canCreateSales) {
                                 ) : null}
                                 </fieldset>
                             </form>
+                            </div>
                             ) : null}
 
-                            {canViewSalesAgreementSummary ? (
-                            <div className="table-card">
-                                <h3>Agreement Summary</h3>
+                            {canViewSalesAgreementSummary && salesSummaryModalOpen ? (
+                            <div className="receive-modal-backdrop sales-modal-backdrop">
+                            <div className="receive-modal sales-workspace-modal sales-summary-modal">
+                                <div className="section-header">
+                                    <h3>Agreement Summary</h3>
+                                    <div className="inline-actions">
+                                        <button type="button" className="view-btn" onClick={closeSalesSummaryModal}>Close</button>
+                                    </div>
+                                </div>
                                 <div className="detail-grid">
                                     <div><span className="meta-label">Customer</span><p className="meta-value">{selectedSaleCustomer?.full_name || 'Select customer'}</p></div>
                                     <div><span className="meta-label">Customer CNIC</span><p className="meta-value">{selectedSaleCustomer?.cnic_passport_number || 'Select customer'}</p></div>
@@ -456,8 +505,8 @@ if (!canCreateSales) {
                                     </div>
                                 ) : null}
                             </div>
+                            </div>
                             ) : null}
-                        </div>
 
                         {canViewSalesRegister ? (
                         <div className="table-card">
@@ -482,7 +531,10 @@ if (!canCreateSales) {
                                                 <input
                                                     type="search"
                                                     value={salesRegisterSearch}
-                                                    onChange={(event) => setSalesRegisterSearch(event.target.value)}
+                                                    onChange={(event) => {
+                                                        setSalesRegisterSearch(event.target.value);
+                                                        setSalesRegisterPage(1);
+                                                    }}
                                                     placeholder={`Live search by ${salesRegisterSearchFieldLabel}`}
                                                     autoFocus
                                                 />
@@ -491,6 +543,7 @@ if (!canCreateSales) {
                                                     onChange={(event) => {
                                                         setSalesRegisterSearchField(event.target.value);
                                                         setSalesRegisterSearch('');
+                                                        setSalesRegisterPage(1);
                                                     }}
                                                 >
                                                     {salesRegisterSearchFields.map((field) => (
@@ -501,7 +554,7 @@ if (!canCreateSales) {
                                         ) : null}
                                     </div>
                                 </div>
-                                <span className="section-caption">{salesRegisterRows.length} shown of {filteredSalesRegisterRows.length} sales</span>
+                                <span className="section-caption">{salesRegisterStartRow}-{salesRegisterEndRow} shown of {filteredSalesRegisterRows.length} sales</span>
                             </div>
                             {filteredSalesRegisterRows.length === 0 ? (
                                 renderEmptyState(salesRegisterSearch ? 'No sales transactions match the selected register search.' : 'No vehicle sales transactions have been created yet.')
@@ -603,7 +656,10 @@ if (!canCreateSales) {
                                                                 <button
                                                                     type="button"
                                                                     className="icon-action-btn"
-                                                                    onClick={() => handleViewSale(sale)}
+                                                                    onClick={() => {
+                                                                        handleViewSale(sale);
+                                                                        setSalesSummaryModalOpen(true);
+                                                                    }}
                                                                     disabled={isViewing || isPrinting || isRoutingInstallment}
                                                                     title={isViewing ? 'Loading view' : 'View'}
                                                                     aria-label={isViewing ? 'Loading view' : 'View'}
@@ -615,7 +671,10 @@ if (!canCreateSales) {
                                                                     <button
                                                                         type="button"
                                                                         className="icon-action-btn"
-                                                                        onClick={() => handleEditSale(sale)}
+                                                                        onClick={() => {
+                                                                            handleEditSale(sale);
+                                                                            setSalesFormModalOpen(true);
+                                                                        }}
                                                                         title="Update sale"
                                                                         aria-label="Update sale"
                                                                     >
@@ -631,15 +690,28 @@ if (!canCreateSales) {
                                         </tbody>
                                     </table>
                                 </div>
-                                {filteredSalesRegisterRows.length > 5 ? (
-                                    <div className="inline-actions spaced-top">
-                                        <button
-                                            type="button"
-                                            className="view-btn"
-                                            onClick={() => setSalesRegisterOpen((current) => !current)}
-                                        >
-                                            {salesRegisterOpen ? 'View less' : 'View more'}
-                                        </button>
+                                {filteredSalesRegisterRows.length > 0 ? (
+                                    <div className="table-pagination sales-pagination">
+                                        <span className="table-pagination-summary">
+                                            Showing {salesRegisterStartRow}-{salesRegisterEndRow} of {filteredSalesRegisterRows.length}
+                                        </span>
+                                        <div className="table-pagination-actions">
+                                            <button type="button" className="view-btn" onClick={() => setSalesRegisterPage(1)} disabled={safeSalesRegisterPage === 1}>
+                                                {'<<'} First
+                                            </button>
+                                            <button type="button" className="view-btn" onClick={() => setSalesRegisterPage((page) => Math.max(1, page - 1))} disabled={safeSalesRegisterPage === 1}>
+                                                {'<'} Prev
+                                            </button>
+                                            <span className="table-pagination-current sales-pagination-current">
+                                                Page {safeSalesRegisterPage} / {salesRegisterTotalPages}
+                                            </span>
+                                            <button type="button" className="view-btn" onClick={() => setSalesRegisterPage((page) => Math.min(salesRegisterTotalPages, page + 1))} disabled={safeSalesRegisterPage === salesRegisterTotalPages}>
+                                                Next {'>'}
+                                            </button>
+                                            <button type="button" className="view-btn" onClick={() => setSalesRegisterPage(salesRegisterTotalPages)} disabled={safeSalesRegisterPage === salesRegisterTotalPages}>
+                                                Last {'>>'}
+                                            </button>
+                                        </div>
                                     </div>
                                 ) : null}
                                 </>
