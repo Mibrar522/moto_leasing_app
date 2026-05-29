@@ -23,6 +23,8 @@ const sortInstallmentRows = (rows = []) => [...rows].sort((a, b) => {
     return String(a?.due_date || '').localeCompare(String(b?.due_date || ''));
 });
 
+const TRANSACTION_ROWS_PER_PAGE = 20;
+
 export default function Transactions({ ctx }) {
   const {
     canManageSales,
@@ -45,6 +47,7 @@ export default function Transactions({ ctx }) {
   const [transactionRegisterSearchOpen, setTransactionRegisterSearchOpen] = useState(false);
   const [transactionRegisterSearch, setTransactionRegisterSearch] = useState('');
   const [transactionRegisterSearchField, setTransactionRegisterSearchField] = useState('customer_name');
+  const [transactionRegisterPage, setTransactionRegisterPage] = useState(1);
   const transactionRegisterSearchFields = [
     { value: 'customer_name', label: 'Customer Name' },
     { value: 'customer_mobile', label: 'Mobile Number' },
@@ -99,6 +102,14 @@ export default function Transactions({ ctx }) {
 
     return [...startsWithMatches, ...containsMatches];
   }, [transactionRegisterSearch, transactionRegisterSearchField, transactionSales]);
+  const transactionRegisterTotalPages = Math.max(1, Math.ceil(filteredTransactionSales.length / TRANSACTION_ROWS_PER_PAGE));
+  const safeTransactionRegisterPage = Math.min(transactionRegisterPage, transactionRegisterTotalPages);
+  const paginatedTransactionSales = useMemo(() => {
+    const startIndex = (safeTransactionRegisterPage - 1) * TRANSACTION_ROWS_PER_PAGE;
+    return filteredTransactionSales.slice(startIndex, startIndex + TRANSACTION_ROWS_PER_PAGE);
+  }, [filteredTransactionSales, safeTransactionRegisterPage]);
+  const transactionRegisterStartRow = filteredTransactionSales.length === 0 ? 0 : ((safeTransactionRegisterPage - 1) * TRANSACTION_ROWS_PER_PAGE) + 1;
+  const transactionRegisterEndRow = Math.min(safeTransactionRegisterPage * TRANSACTION_ROWS_PER_PAGE, filteredTransactionSales.length);
   const isInvoiceOpen = transactionActionState.action === 'view' && selectedTransactionSale;
   const selectedInvoiceSummary = isInvoiceOpen ? summarizeSaleInstallments(selectedTransactionSale) : null;
   const selectedInvoiceIsInstallment = isInvoiceOpen && String(selectedTransactionSale.sale_mode || '').toUpperCase() === 'INSTALLMENT';
@@ -232,7 +243,10 @@ if (!canManageSales) {
                                                 <input
                                                     type="search"
                                                     value={transactionRegisterSearch}
-                                                    onChange={(event) => setTransactionRegisterSearch(event.target.value)}
+                                                    onChange={(event) => {
+                                                        setTransactionRegisterSearch(event.target.value);
+                                                        setTransactionRegisterPage(1);
+                                                    }}
                                                     placeholder={`Live search by ${transactionRegisterSearchFieldLabel}`}
                                                     autoFocus
                                                 />
@@ -241,6 +255,7 @@ if (!canManageSales) {
                                                     onChange={(event) => {
                                                         setTransactionRegisterSearchField(event.target.value);
                                                         setTransactionRegisterSearch('');
+                                                        setTransactionRegisterPage(1);
                                                     }}
                                                 >
                                                     {transactionRegisterSearchFields.map((field) => (
@@ -271,7 +286,7 @@ if (!canManageSales) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filteredTransactionSales.map((sale) => {
+                                        {paginatedTransactionSales.map((sale) => {
                                             const summary = summarizeSaleInstallments(sale);
                                             const hasPendingInstallments = String(sale.sale_mode || '').toUpperCase() === 'INSTALLMENT' && summary.pendingCount > 0;
                                             const isViewing = transactionActionState.saleId === sale.id && transactionActionState.action === 'view';
@@ -337,6 +352,30 @@ if (!canManageSales) {
                                 </table>
                                 </div>
                             )}
+                            {filteredTransactionSales.length > 0 ? (
+                                <div className="table-pagination">
+                                    <span className="table-pagination-summary">
+                                        Showing {transactionRegisterStartRow}-{transactionRegisterEndRow} of {filteredTransactionSales.length}
+                                    </span>
+                                    <div className="table-pagination-actions">
+                                        <button type="button" className="view-btn" onClick={() => setTransactionRegisterPage(1)} disabled={safeTransactionRegisterPage === 1}>
+                                            {'<<'} First
+                                        </button>
+                                        <button type="button" className="view-btn" onClick={() => setTransactionRegisterPage((page) => Math.max(1, page - 1))} disabled={safeTransactionRegisterPage === 1}>
+                                            {'<'} Prev
+                                        </button>
+                                        <span className="table-pagination-current">
+                                            Page {safeTransactionRegisterPage} / {transactionRegisterTotalPages}
+                                        </span>
+                                        <button type="button" className="view-btn" onClick={() => setTransactionRegisterPage((page) => Math.min(transactionRegisterTotalPages, page + 1))} disabled={safeTransactionRegisterPage === transactionRegisterTotalPages}>
+                                            Next {'>'}
+                                        </button>
+                                        <button type="button" className="view-btn" onClick={() => setTransactionRegisterPage(transactionRegisterTotalPages)} disabled={safeTransactionRegisterPage === transactionRegisterTotalPages}>
+                                            Last {'>>'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : null}
                         </div>
                         ) : <div className="feedback-card">No enabled transaction functions for this role.</div>}
 
