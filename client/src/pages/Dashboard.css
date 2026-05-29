@@ -12,7 +12,7 @@ body,
 
 :root {
     --sidebar-width: 196px;
-    --header-height: 58px;
+    --header-height: 76px;
     --dash-bg: #f4efe6;
     --dash-surface: rgba(255, 252, 246, 0.82);
     --dash-surface-strong: #fffdfa;
@@ -229,7 +229,7 @@ body,
     height: 100vh;
     max-height: 100vh;
     min-height: 100vh;
-    padding: 74px 8px 12px;
+    padding: 92px 8px 12px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -246,7 +246,7 @@ body,
     content: "";
     position: absolute;
     inset: 0 0 auto 0;
-    height: 68px;
+    height: 84px;
     background:
         linear-gradient(180deg, color-mix(in srgb, var(--dash-sidebar-start) 88%, white 12%) 0%, var(--dash-sidebar-middle) 100%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -593,10 +593,11 @@ body,
 .dashboard-header {
     grid-column: 2 / 3;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 8px;
-    padding: 4px 8px;
+    min-height: var(--header-height);
+    padding: 10px 8px 8px;
     background: var(--dash-header-bg);
     backdrop-filter: blur(18px);
     border-bottom: 2px solid var(--dash-header-border);
@@ -712,7 +713,7 @@ body,
     box-shadow: var(--dash-shadow-soft);
     color: var(--dash-text);
     white-space: nowrap;
-    margin-top: 4px;
+    margin-top: 0;
 }
 
 .user-meta > span {

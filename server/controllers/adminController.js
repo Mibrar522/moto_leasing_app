@@ -1993,11 +1993,28 @@ exports.updateDashboardSettings = async (req, res) => {
 exports.updateThemeSettings = async (req, res) => {
     try {
         const dealerId = req.user.effective_dealer_id || req.user.dealer_id || null;
+        const themeKey = normalizeThemeKey(req.body.theme_key);
         if (!dealerId) {
-            return res.status(400).json({ message: 'Switch to a dealer profile before applying a dealer theme.' });
+            if (!isRealSuperAdminSession(req.user)) {
+                return res.status(400).json({ message: 'Dealer scope is required before applying a theme.' });
+            }
+
+            await pool.query(
+                `
+                UPDATE dealers
+                SET theme_key = $1,
+                    updated_at = NOW()
+                `,
+                [themeKey]
+            );
+
+            return res.status(200).json({
+                message: 'Theme applied globally for all dealer logins.',
+                scope: 'global',
+                theme_key: themeKey,
+            });
         }
 
-        const themeKey = normalizeThemeKey(req.body.theme_key);
         const result = await pool.query(
             `
             UPDATE dealers
@@ -2015,6 +2032,7 @@ exports.updateThemeSettings = async (req, res) => {
 
         return res.status(200).json({
             message: `${result.rows[0].dealer_name || 'Dealer'} theme applied for all users.`,
+            scope: 'dealer',
             dealer_id: result.rows[0].id,
             theme_key: result.rows[0].theme_key,
         });

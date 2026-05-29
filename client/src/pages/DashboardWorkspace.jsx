@@ -864,7 +864,7 @@ const buildGeneratedVehicleSerial = ({ brand, color, model, chassis_number, engi
 };
 const DASHBOARD_THEME_STORAGE_KEY = 'dashboard_theme';
 const dashboardThemes = [
-    { key: 'ooredoo-red', label: 'Ooredoo Red' },
+    { key: 'ooredoo-red', label: 'Red Hat' },
     { key: 'sandstone', label: 'Sandstone Pro' },
     { key: 'crimson-navy', label: 'Crimson Navy' },
     { key: 'emerald-ledger', label: 'Emerald Ledger' },
@@ -5101,7 +5101,7 @@ const selectedCustomer = useMemo(
                     theme_key: savedTheme,
                 },
                 dealers: (current.dealers || []).map((dealer) => (
-                    String(dealer.id || '') === String(data.dealer_id || currentProfileDealerId || user?.dealer_id || '')
+                    data.scope === 'global' || String(dealer.id || '') === String(data.dealer_id || currentProfileDealerId || user?.dealer_id || '')
                         ? { ...dealer, theme_key: savedTheme }
                         : dealer
                 )),
