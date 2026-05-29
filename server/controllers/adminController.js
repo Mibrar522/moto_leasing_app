@@ -184,6 +184,12 @@ const normalizeDashboardDateFilter = (value) => {
     return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
 };
 
+const ALLOWED_THEME_KEYS = ['ooredoo-red', 'sandstone', 'crimson-navy', 'emerald-ledger', 'navin-blue'];
+const normalizeThemeKey = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    return ALLOWED_THEME_KEYS.includes(normalized) ? normalized : 'sandstone';
+};
+
 const getDashboardDefaultDateFrom = async () => {
     try {
         const result = await pool.query(
@@ -1981,6 +1987,40 @@ exports.updateDashboardSettings = async (req, res) => {
     } catch (error) {
         console.error('Dashboard settings update error:', error.message);
         return res.status(500).json({ message: 'Failed to update dashboard settings.', error: error.message });
+    }
+};
+
+exports.updateThemeSettings = async (req, res) => {
+    try {
+        const dealerId = req.user.effective_dealer_id || req.user.dealer_id || null;
+        if (!dealerId) {
+            return res.status(400).json({ message: 'Switch to a dealer profile before applying a dealer theme.' });
+        }
+
+        const themeKey = normalizeThemeKey(req.body.theme_key);
+        const result = await pool.query(
+            `
+            UPDATE dealers
+            SET theme_key = $1,
+                updated_at = NOW()
+            WHERE id = $2
+            RETURNING id, dealer_name, theme_key
+            `,
+            [themeKey, dealerId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Dealer profile not found.' });
+        }
+
+        return res.status(200).json({
+            message: `${result.rows[0].dealer_name || 'Dealer'} theme applied for all users.`,
+            dealer_id: result.rows[0].id,
+            theme_key: result.rows[0].theme_key,
+        });
+    } catch (error) {
+        console.error('Theme settings update error:', error.message);
+        return res.status(500).json({ message: 'Failed to update theme settings.', error: error.message });
     }
 };
 

@@ -864,6 +864,7 @@ const buildGeneratedVehicleSerial = ({ brand, color, model, chassis_number, engi
 };
 const DASHBOARD_THEME_STORAGE_KEY = 'dashboard_theme';
 const dashboardThemes = [
+    { key: 'ooredoo-red', label: 'Ooredoo Red' },
     { key: 'sandstone', label: 'Sandstone Pro' },
     { key: 'crimson-navy', label: 'Crimson Navy' },
     { key: 'emerald-ledger', label: 'Emerald Ledger' },
@@ -1899,6 +1900,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [dashboardTheme, setDashboardTheme] = useState(() => localStorage.getItem(DASHBOARD_THEME_STORAGE_KEY) || 'sandstone');
     const [pendingDashboardTheme, setPendingDashboardTheme] = useState(() => localStorage.getItem(DASHBOARD_THEME_STORAGE_KEY) || 'sandstone');
     const [hasThemePreference, setHasThemePreference] = useState(() => Boolean(localStorage.getItem(DASHBOARD_THEME_STORAGE_KEY)));
+    const [themeMessage, setThemeMessage] = useState('');
+    const [savingTheme, setSavingTheme] = useState(false);
     const [roleAssignments, setRoleAssignments] = useState({});
     const [newVehicleType, setNewVehicleType] = useState('');
     const [editingSaleVehicle, setEditingSaleVehicle] = useState(null);
@@ -2562,6 +2565,49 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         canViewTransactionRegister,
         dashboardData.salesTransactions,
     ]);
+    const visibleTabsByKey = useMemo(
+        () => tabReferences.reduce((acc, tab) => {
+            if (tab.visible) {
+                acc[tab.key] = tab;
+            }
+            return acc;
+        }, {}),
+        [tabReferences]
+    );
+    const sidebarGroups = useMemo(() => ([
+        {
+            key: 'overview',
+            label: 'Overview',
+            items: ['dashboard', 'applications', 'workflow', 'user-tasks'],
+        },
+        {
+            key: 'business',
+            label: 'Business',
+            items: ['customers', 'sales', 'transactions', 'installments'],
+        },
+        {
+            key: 'inventory',
+            label: 'Inventory',
+            items: ['companies', 'stock', 'products'],
+        },
+        {
+            key: 'admin',
+            label: 'Administration',
+            items: ['employees', 'dealers', 'access'],
+        },
+        {
+            key: 'reports',
+            label: 'Reporting',
+            items: ['reports'],
+        },
+    ])
+        .map((group) => ({
+            ...group,
+            tabs: group.items.map((key) => visibleTabsByKey[key]).filter(Boolean),
+        }))
+        .filter((group) => group.tabs.length > 0),
+        [visibleTabsByKey]
+    );
 
     useEffect(() => {
         if (isReportPage) {
@@ -5032,6 +5078,46 @@ const selectedCustomer = useMemo(
     useEffect(() => {
         setPendingDashboardTheme(dashboardTheme);
     }, [dashboardTheme]);
+
+    const applyDashboardTheme = async () => {
+        const nextTheme = dashboardThemes.some((theme) => theme.key === pendingDashboardTheme)
+            ? pendingDashboardTheme
+            : 'sandstone';
+
+        try {
+            setSavingTheme(true);
+            setThemeMessage('');
+            const { data } = await API.put('/admin/theme', { theme_key: nextTheme });
+            const savedTheme = data.theme_key || nextTheme;
+
+            setHasThemePreference(false);
+            localStorage.removeItem(DASHBOARD_THEME_STORAGE_KEY);
+            setDashboardTheme(savedTheme);
+            setPendingDashboardTheme(savedTheme);
+            setDashboardData((current) => ({
+                ...current,
+                user: {
+                    ...(current.user || {}),
+                    theme_key: savedTheme,
+                },
+                dealers: (current.dealers || []).map((dealer) => (
+                    String(dealer.id || '') === String(data.dealer_id || currentProfileDealerId || user?.dealer_id || '')
+                        ? { ...dealer, theme_key: savedTheme }
+                        : dealer
+                )),
+            }));
+
+            const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+            if (storedUser) {
+                localStorage.setItem('user', JSON.stringify({ ...storedUser, theme_key: savedTheme }));
+            }
+            setThemeMessage(data.message || 'Theme applied for this dealer.');
+        } catch (err) {
+            setThemeMessage(err.response?.data?.message || 'Unable to apply theme globally.');
+        } finally {
+            setSavingTheme(false);
+        }
+    };
 
     useEffect(() => {
         if (!user) return;
@@ -10067,7 +10153,11 @@ const selectedCustomer = useMemo(
         <div className="dashboard-layout" data-theme={dashboardTheme}>
             <aside className="app-sidebar">
                 <nav className="side-nav">
-                    {tabReferences.filter((tab) => tab.visible).map((tab) => {
+                    {sidebarGroups.map((group) => (
+                        <section key={group.key} className={`nav-section nav-section-${group.key}`}>
+                            <div className="nav-section-title">{group.label}</div>
+                            <div className="nav-section-card">
+                                {group.tabs.map((tab) => {
                         if (tab.key === 'reports') {
                             return (
                                 <div key={tab.key} className={`nav-group ${isReportPage ? 'open' : ''}`}>
@@ -10117,7 +10207,10 @@ const selectedCustomer = useMemo(
                                 </span>
                             </button>
                         );
-                    })}
+                                })}
+                            </div>
+                        </section>
+                    ))}
                 </nav>
             </aside>
 
@@ -10175,14 +10268,12 @@ const selectedCustomer = useMemo(
                             <button
                                 type="button"
                                 className="primary-btn theme-apply-btn"
-                                onClick={() => {
-                                    setHasThemePreference(true);
-                                    setDashboardTheme(pendingDashboardTheme);
-                                }}
-                                disabled={pendingDashboardTheme === dashboardTheme}
+                                onClick={applyDashboardTheme}
+                                disabled={savingTheme || pendingDashboardTheme === dashboardTheme}
                             >
-                                Apply Theme
+                                {savingTheme ? 'Applying...' : 'Apply Theme'}
                             </button>
+                            {themeMessage ? <small className="theme-status">{themeMessage}</small> : null}
                         </label>
                     ) : null}
                     <div className="agent-strip">

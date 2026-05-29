@@ -9,7 +9,7 @@ const buildSlug = (value) =>
         .replace(/^-+|-+$/g, '')
         .slice(0, 60);
 
-const ALLOWED_THEME_KEYS = ['sandstone', 'crimson-navy', 'emerald-ledger'];
+const ALLOWED_THEME_KEYS = ['ooredoo-red', 'sandstone', 'crimson-navy', 'emerald-ledger', 'navin-blue'];
 
 const normalizeThemeKey = (value) => {
     const normalized = String(value || '').trim().toLowerCase();

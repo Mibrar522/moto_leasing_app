@@ -101,6 +101,42 @@ body,
     --dash-avatar-end: #2563eb;
 }
 
+.dashboard-layout[data-theme="ooredoo-red"] {
+    --dash-bg: #fff5f5;
+    --dash-layout-glow: rgba(226, 0, 26, 0.18);
+    --dash-layout-start: #fff7f7;
+    --dash-layout-end: #ffe6e8;
+    --dash-sidebar-start: rgba(180, 0, 20, 0.99);
+    --dash-sidebar-middle: rgba(210, 0, 30, 0.99);
+    --dash-sidebar-end: rgba(235, 28, 45, 0.99);
+    --dash-sidebar-panel: rgba(255, 255, 255, 0.12);
+    --dash-sidebar-text: rgba(255, 245, 245, 0.82);
+    --dash-sidebar-text-active: #ffffff;
+    --dash-sidebar-active-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(10, 10, 10, 0.18));
+    --dash-brand-text: #ffffff;
+    --dash-logo-start: #111111;
+    --dash-logo-end: #2b2b2b;
+    --dash-logo-text: #ffffff;
+    --dash-header-bg: rgba(255, 247, 247, 0.86);
+    --dash-header-border: rgba(226, 0, 26, 0.24);
+    --dash-header-card-bg: rgba(255, 255, 255, 0.98);
+    --dash-header-card-border: rgba(226, 0, 26, 0.14);
+    --dash-glass-soft: rgba(255, 250, 250, 0.84);
+    --dash-glass-strong: rgba(255, 255, 255, 0.99);
+    --dash-glass-hover: rgba(255, 255, 255, 1);
+    --dash-accent-outline: rgba(226, 0, 26, 0.24);
+    --dash-page-glow: rgba(226, 0, 26, 0.14);
+    --dash-page-panel: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 239, 240, 0.96));
+    --dash-accent: #e2001a;
+    --dash-accent-strong: #b80016;
+    --dash-accent-soft: rgba(226, 0, 26, 0.12);
+    --dash-primary-start: #111111;
+    --dash-primary-end: #e2001a;
+    --dash-primary-text: #ffffff;
+    --dash-avatar-start: #111111;
+    --dash-avatar-end: #e2001a;
+}
+
 .dashboard-layout[data-theme="emerald-ledger"] {
     --dash-layout-glow: rgba(16, 185, 129, 0.14);
     --dash-layout-start: #eff8f4;
@@ -219,14 +255,42 @@ body,
 
 .side-nav {
     display: grid;
-    gap: 6px;
+    gap: 9px;
     position: relative;
     z-index: 1;
 }
 
+.nav-section {
+    display: grid;
+    gap: 5px;
+}
+
+.nav-section-title {
+    padding: 0 7px;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.58rem;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.nav-section-card {
+    display: grid;
+    gap: 4px;
+    padding: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 13px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 12px 24px rgba(3, 12, 32, 0.12);
+}
+
 .nav-group {
     display: grid;
-    gap: 6px;
+    gap: 4px;
 }
 
 .nav-btn {
@@ -235,7 +299,7 @@ body,
     background: transparent;
     color: var(--dash-sidebar-text);
     text-align: left;
-    padding: 7px 9px;
+    padding: 6px 7px;
     border-radius: 10px;
     cursor: pointer;
     font-weight: 700;
@@ -246,7 +310,7 @@ body,
 .nav-btn-content {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
     min-width: 0;
 }
 
@@ -255,12 +319,12 @@ body,
 }
 
 .nav-btn-icon {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 24px;
+    flex: 0 0 22px;
     border-radius: 8px;
     background:
         radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.3), transparent 38%),
@@ -372,6 +436,27 @@ body,
         linear-gradient(145deg, #64748b, #334155);
 }
 
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-dashboard,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-customers,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-employees,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-dealers,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-access,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-applications,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-workflow,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-sales,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-transactions,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-reports,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-installments,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-companies,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-stock,
+.dashboard-layout[data-theme="ooredoo-red"] .nav-btn-icon-inventory {
+    color: #ffffff;
+    background: #111111;
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: none;
+}
+
 .nav-btn-parent {
     display: flex;
     align-items: center;
@@ -407,8 +492,8 @@ body,
 
 .nav-submenu {
     display: grid;
-    gap: 6px;
-    padding-left: 12px;
+    gap: 4px;
+    padding: 2px 0 3px 13px;
 }
 
 .nav-sub-btn {
@@ -417,10 +502,10 @@ body,
     background: rgba(255, 255, 255, 0.04);
     color: rgba(244, 238, 227, 0.76);
     text-align: left;
-    padding: 11px 14px;
-    border-radius: 14px;
+    padding: 8px 10px;
+    border-radius: 10px;
     font-weight: 700;
-    font-size: 0.85rem;
+    font-size: 0.7rem;
     transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
@@ -2093,6 +2178,14 @@ body,
     padding: 0 12px;
     border-radius: 10px;
     width: 100%;
+}
+
+.theme-status {
+    color: var(--dash-text-soft);
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1.25;
+    text-align: center;
 }
 
 .secondary-btn,
