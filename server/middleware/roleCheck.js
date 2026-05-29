@@ -59,7 +59,7 @@ exports.protect = async (req, res, next) => {
                     WHERE rp.role_id = ctx.role_id
                       AND NOT EXISTS (
                           SELECT 1
-                          FROM dealer_role_permissions configured
+                          FROM dealer_role_permission_overrides configured
                           WHERE configured.dealer_id = ctx.dealer_id
                             AND configured.role_id = ctx.role_id
                       )

@@ -189,7 +189,7 @@ const getRolePermissions = async ({ dealerId = null, includeSuperAdmin = true } 
             `
             WITH dealer_configured_roles AS (
                 SELECT DISTINCT role_id
-                FROM dealer_role_permissions
+                FROM dealer_role_permission_overrides
                 WHERE dealer_id = $1
             ),
             effective_permissions AS (
@@ -1969,9 +1969,26 @@ exports.updateRolePermissions = async (req, res) => {
                     PRIMARY KEY (dealer_id, role_id, feature_id)
                 )
             `);
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS dealer_role_permission_overrides (
+                    dealer_id UUID NOT NULL,
+                    role_id INTEGER NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    PRIMARY KEY (dealer_id, role_id)
+                )
+            `);
 
             await client.query(
                 'DELETE FROM dealer_role_permissions WHERE dealer_id = $1 AND role_id = $2',
+                [dealerId, roleId]
+            );
+            await client.query(
+                `
+                INSERT INTO dealer_role_permission_overrides (dealer_id, role_id, updated_at)
+                VALUES ($1, $2, NOW())
+                ON CONFLICT (dealer_id, role_id)
+                DO UPDATE SET updated_at = EXCLUDED.updated_at
+                `,
                 [dealerId, roleId]
             );
 

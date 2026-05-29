@@ -359,7 +359,7 @@ const ACCESS_PAGE_GROUPS = [
         key: 'applications',
         label: 'Applications',
         description: 'Lease application viewing and related workflow access.',
-        featureKeys: ['FEAT_APPLICATIONS_LIST'],
+        featureKeys: ['FEAT_APPLICATIONS_VIEW', 'FEAT_APPLICATIONS_LIST'],
     },
     {
         key: 'workflow',

@@ -223,7 +223,7 @@ const getUserAccessProfile = async (identifierField, identifierValue) => {
             WHERE rp.role_id = u.role_id
               AND NOT EXISTS (
                   SELECT 1
-                  FROM dealer_role_permissions configured
+                  FROM dealer_role_permission_overrides configured
                   WHERE configured.dealer_id = COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id)
                     AND configured.role_id = u.role_id
               )
@@ -343,7 +343,7 @@ const getUserAccessProfileForMobileLogin = async (identifierValue, dealerIdentif
             WHERE rp.role_id = u.role_id
               AND NOT EXISTS (
                   SELECT 1
-                  FROM dealer_role_permissions configured
+                  FROM dealer_role_permission_overrides configured
                   WHERE configured.dealer_id = COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id)
                     AND configured.role_id = u.role_id
               )

@@ -714,6 +714,15 @@ exports.syncAccessControlDefaults = async () => {
         `);
 
         await client.query(`
+            CREATE TABLE IF NOT EXISTS dealer_role_permission_overrides (
+                dealer_id UUID NOT NULL,
+                role_id INTEGER NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (dealer_id, role_id)
+            )
+        `);
+
+        await client.query(`
             CREATE TABLE IF NOT EXISTS product_catalog (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 brand VARCHAR(120) NOT NULL,
@@ -1262,6 +1271,14 @@ exports.syncAccessRuntimeTables = async () => {
             feature_id INTEGER NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             PRIMARY KEY (dealer_id, role_id, feature_id)
+        )
+    `);
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS dealer_role_permission_overrides (
+            dealer_id UUID NOT NULL,
+            role_id INTEGER NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (dealer_id, role_id)
         )
     `);
 };
