@@ -2111,18 +2111,73 @@ body,
     border-radius: 22px;
 }
 
+.sales-form-modal {
+    width: min(1380px, calc(100vw - 36px));
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+    gap: 16px;
+    align-items: start;
+}
+
 .sales-workspace-modal .section-header:first-child {
     position: sticky;
     top: -24px;
     z-index: 3;
+    grid-column: 1 / -1;
     margin: -24px -24px 16px;
     padding: 18px 24px 14px;
     background: var(--dash-surface-strong);
     border-bottom: 1px solid color-mix(in srgb, var(--dash-border) 76%, transparent);
 }
 
+.sales-form-modal .notice-banner {
+    grid-column: 1 / -1;
+}
+
 .sales-form-modal .form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sales-live-summary {
+    position: sticky;
+    top: 72px;
+    display: grid;
+    gap: 14px;
+    max-height: calc(100vh - 150px);
+    overflow: auto;
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, var(--dash-accent-outline) 46%, transparent);
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at top right, color-mix(in srgb, var(--dash-accent-soft) 62%, transparent), transparent 42%),
+        var(--dash-glass-strong);
+}
+
+.sales-live-summary-head {
+    display: grid;
+    gap: 4px;
+}
+
+.sales-live-summary-head span {
+    color: var(--dash-text-soft);
+    font-size: 0.66rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.sales-live-summary-head strong {
+    color: var(--dash-text);
+    font-size: 1rem;
+}
+
+.sales-live-summary-grid,
+.sales-live-documents {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sales-live-documents .view-btn {
+    width: 100%;
 }
 
 .sales-form-modal .full-span,
@@ -3556,6 +3611,15 @@ body,
 
     .sales-form-modal .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .sales-form-modal {
+        grid-template-columns: 1fr;
+    }
+
+    .sales-live-summary {
+        position: static;
+        max-height: none;
     }
 
     .sales-donut {

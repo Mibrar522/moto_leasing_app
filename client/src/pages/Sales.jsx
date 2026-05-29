@@ -167,12 +167,6 @@ if (!canCreateSales) {
                                     <strong>Create or update sale</strong>
                                 </button>
                             ) : null}
-                            {canViewSalesAgreementSummary ? (
-                                <button type="button" className="sales-workspace-action-card sales-workspace-action-card-soft" onClick={() => setSalesSummaryModalOpen(true)}>
-                                    <span>Agreement Summary</span>
-                                    <strong>Preview selected sale</strong>
-                                </button>
-                            ) : null}
                         </div>
 
                         {canViewSalesAgreementForm && salesFormModalOpen ? (
@@ -359,6 +353,74 @@ if (!canCreateSales) {
                                     </div>
                                 ) : null}
                                 </fieldset>
+                                {canViewSalesAgreementSummary ? (
+                                    <aside className="sales-live-summary">
+                                        <div className="sales-live-summary-head">
+                                            <span>Live Preview</span>
+                                            <strong>Agreement Summary</strong>
+                                        </div>
+                                        <div className="detail-grid sales-live-summary-grid">
+                                            <div><span className="meta-label">Customer</span><p className="meta-value">{selectedSaleCustomer?.full_name || 'Select customer'}</p></div>
+                                            <div><span className="meta-label">Customer CNIC</span><p className="meta-value">{selectedSaleCustomer?.cnic_passport_number || 'Select customer'}</p></div>
+                                            <div><span className="meta-label">Dealer</span><p className="meta-value">{editingSaleRecord?.dealer_name || user?.dealer_name || 'Not set'}{editingSaleRecord?.dealer_code ? ` / ${editingSaleRecord.dealer_code}` : ''}</p></div>
+                                            <div><span className="meta-label">Vehicle</span><p className="meta-value">{selectedSaleVehicle ? `${selectedSaleVehicle.brand} ${selectedSaleVehicle.model}` : 'Select vehicle'}</p></div>
+                                            <div><span className="meta-label">Chassis Number</span><p className="meta-value">{selectedSaleVehicle?.chassis_number || 'Select vehicle'}</p></div>
+                                            <div><span className="meta-label">Engine Number</span><p className="meta-value">{selectedSaleVehicle?.engine_number || 'Select vehicle'}</p></div>
+                                            <div><span className="meta-label">Actual Price</span><p className="meta-value">{formatCurrency(actualVehiclePrice)}</p></div>
+                                            <div><span className="meta-label">{saleForm.sale_mode === 'CASH' ? 'Selling Price' : 'Total Price'}</span><p className="meta-value">{formatCurrency(saleForm.vehicle_price)}</p></div>
+                                            {saleForm.sale_mode === 'INSTALLMENT' ? (
+                                                <>
+                                                    <div><span className="meta-label">Down Payment</span><p className="meta-value">{formatCurrency(saleForm.down_payment)}</p></div>
+                                                    <div><span className="meta-label">Monthly Installment</span><p className="meta-value">{formatCurrency(saleForm.monthly_installment)}</p></div>
+                                                </>
+                                            ) : null}
+                                        </div>
+                                        <div className="detail-grid sale-document-grid sales-live-documents">
+                                            <div>
+                                                <span className="meta-label">Dealer Signature</span>
+                                                <div className="employee-document-preview">
+                                                    {renderAssetPreview(saleDealerSignatureUrl, 'Dealer signature not available.', 'Dealer Signature')}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <span className="meta-label">Customer Photo</span>
+                                                <div className="employee-document-preview">
+                                                    {renderAssetPreview(selectedSaleCustomerPassportPhotoUrl, 'Customer photo not available.', 'Customer Photo')}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <span className="meta-label">Agreement PDF</span>
+                                                {saleForm.agreement_pdf_url ? (
+                                                    <a className="view-btn" href={buildAssetUrl(saleForm.agreement_pdf_url)} target="_blank" rel="noreferrer">
+                                                        {getDocumentDisplayName(saleForm.agreement_pdf_url, 'agreement.pdf')}
+                                                    </a>
+                                                ) : (
+                                                    <div className="employee-document-empty">Agreement not uploaded.</div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <span className="meta-label">Bank Check</span>
+                                                {saleForm.bank_check_url ? (
+                                                    <a className="view-btn" href={buildAssetUrl(saleForm.bank_check_url)} target="_blank" rel="noreferrer">
+                                                        {getDocumentDisplayName(saleForm.bank_check_url, 'bank-check.pdf')}
+                                                    </a>
+                                                ) : (
+                                                    <div className="employee-document-empty">Bank check not uploaded.</div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <span className="meta-label">Misc Document</span>
+                                                {saleForm.misc_document_url ? (
+                                                    <a className="view-btn" href={buildAssetUrl(saleForm.misc_document_url)} target="_blank" rel="noreferrer">
+                                                        {getDocumentDisplayName(saleForm.misc_document_url, 'misc-document')}
+                                                    </a>
+                                                ) : (
+                                                    <div className="employee-document-empty">Misc document not uploaded.</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </aside>
+                                ) : null}
                             </form>
                             </div>
                             ) : null}
