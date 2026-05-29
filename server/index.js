@@ -39,7 +39,11 @@ const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5172',
     'https://moto-leasing-app.vercel.app',
-    'https://moto-leasing-app-git-main-mibrar522s-projects.vercel.app'
+    'https://moto-leasing-app-git-main-mibrar522s-projects.vercel.app',
+    'https://test.motoleasingapp.online',
+    'https://api-test.motoleasingapp.online',
+    'https://motoleasingapp.online',
+    'https://www.motoleasingapp.online'
 ];
 
 app.use(cors({
@@ -47,8 +51,9 @@ app.use(cors({
         // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
         
-        const isAllowed = allowedOrigins.includes(origin) || 
-                         origin.endsWith('.vercel.app') || 
+        const isAllowed = allowedOrigins.includes(origin) ||
+                         origin.endsWith('.vercel.app') ||
+                         origin.endsWith('.motoleasingapp.online') ||
                          origin.includes('localhost');
 
         if (isAllowed) {
