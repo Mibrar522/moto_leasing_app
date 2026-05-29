@@ -480,7 +480,7 @@ const ACCESS_PAGE_GROUPS = [
         key: 'access',
         label: 'Access Control',
         description: 'Role permissions and access-control administration.',
-        featureKeys: ['FEAT_ACCESS_CONTROL'],
+        featureKeys: ['FEAT_ACCESS_CONTROL', 'FEAT_THEME_MGMT'],
     },
 ];
 
