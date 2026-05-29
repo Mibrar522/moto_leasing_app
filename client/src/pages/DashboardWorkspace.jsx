@@ -5087,6 +5087,15 @@ const selectedCustomer = useMemo(
             ? pendingDashboardTheme
             : 'sandstone';
 
+        if (!realIsSuperAdmin) {
+            setHasThemePreference(true);
+            localStorage.setItem(DASHBOARD_THEME_STORAGE_KEY, nextTheme);
+            setDashboardTheme(nextTheme);
+            setPendingDashboardTheme(nextTheme);
+            setThemeMessage('Theme saved for your login on this browser only.');
+            return;
+        }
+
         try {
             setSavingTheme(true);
             setThemeMessage('');

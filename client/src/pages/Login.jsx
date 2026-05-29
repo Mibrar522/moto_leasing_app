@@ -22,13 +22,20 @@ const Login = () => {
 
   useEffect(() => {
     let mounted = true;
+    const personalTheme = localStorage.getItem(DASHBOARD_THEME_STORAGE_KEY);
+
+    if (personalTheme) {
+      setLoginTheme(personalTheme);
+      return () => {
+        mounted = false;
+      };
+    }
 
     API.get('/app/settings')
       .then(({ data }) => {
         const theme = data?.settings?.dashboardTheme || 'sandstone';
         if (mounted) {
           setLoginTheme(theme);
-          localStorage.setItem(DASHBOARD_THEME_STORAGE_KEY, theme);
         }
       })
       .catch(() => {
