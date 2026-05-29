@@ -374,6 +374,12 @@ const ACCESS_PAGE_GROUPS = [
         featureKeys: ['FEAT_PROFILE_SWITCH'],
     },
     {
+        key: 'theme-controls',
+        label: 'Theme Controls',
+        description: 'Allow users to change dashboard and login page themes from the header.',
+        featureKeys: ['FEAT_THEME_MGMT'],
+    },
+    {
         key: 'user-tasks',
         label: 'User Tasks',
         description: 'Approval queue where managers and application admins review customer, vehicle, and attachment details.',
@@ -1038,7 +1044,7 @@ const getUniqueFeatures = (features = []) => {
 
 const FEATURE_ACCESS_LABELS = {
     FEAT_DASHBOARD_VIEW: 'Open Dashboard Page',
-    FEAT_THEME_MGMT: 'Theme Controls',
+    FEAT_THEME_MGMT: 'Change Themes',
     FEAT_ADS_MGMT: 'Advertisement Controls',
     FEAT_APPLICATIONS_VIEW: 'Open Applications Page',
     FEAT_PRODUCT_MGMT: 'Open Products Page',

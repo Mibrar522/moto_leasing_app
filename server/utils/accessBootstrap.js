@@ -65,7 +65,7 @@ const CUSTOMER_FIELD_FEATURE_KEYS = CUSTOMER_FIELD_ACCESS.map(([featureKey]) => 
 const SALES_FIELD_FEATURE_KEYS = SALES_FIELD_ACCESS.map(([featureKey]) => featureKey);
 const FEATURE_DEFINITIONS = [
     ['FEAT_DASHBOARD_VIEW', 'Open Dashboard Page'],
-    ['FEAT_THEME_MGMT', 'Theme Controls'],
+    ['FEAT_THEME_MGMT', 'Change Themes'],
     ['FEAT_PROFILE_SWITCH', 'Profile Switch'],
     ['FEAT_APPLICATIONS_VIEW', 'Open Applications Page'],
     ['FEAT_WORKFLOW_VIEW', 'Workflow Access'],
