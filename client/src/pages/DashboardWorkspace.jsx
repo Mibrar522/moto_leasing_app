@@ -1886,6 +1886,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         },
         settings: {
             dashboardDefaultDateFrom: '',
+            dashboardTheme: 'sandstone',
         },
     });
     const [customerForm, setCustomerForm] = useState(emptyCustomerForm);
@@ -5068,12 +5069,14 @@ const selectedCustomer = useMemo(
 
         const dealerTheme = dashboardThemes.some((theme) => theme.key === user?.theme_key)
             ? user.theme_key
-            : 'sandstone';
+            : dashboardThemes.some((theme) => theme.key === dashboardData.settings?.dashboardTheme)
+                ? dashboardData.settings.dashboardTheme
+                : 'sandstone';
 
         if (dealerTheme !== dashboardTheme) {
             setDashboardTheme(dealerTheme);
         }
-    }, [dashboardTheme, hasThemePreference, user?.theme_key]);
+    }, [dashboardData.settings?.dashboardTheme, dashboardTheme, hasThemePreference, user?.theme_key]);
 
     useEffect(() => {
         setPendingDashboardTheme(dashboardTheme);
@@ -5099,6 +5102,10 @@ const selectedCustomer = useMemo(
                 user: {
                     ...(current.user || {}),
                     theme_key: savedTheme,
+                },
+                settings: {
+                    ...(current.settings || {}),
+                    dashboardTheme: data.scope === 'global' ? savedTheme : current.settings?.dashboardTheme,
                 },
                 dealers: (current.dealers || []).map((dealer) => (
                     data.scope === 'global' || String(dealer.id || '') === String(data.dealer_id || currentProfileDealerId || user?.dealer_id || '')

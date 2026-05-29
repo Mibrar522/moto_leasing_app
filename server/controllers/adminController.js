@@ -209,6 +209,25 @@ const getDashboardDefaultDateFrom = async () => {
     }
 };
 
+const getGlobalThemeKey = async () => {
+    try {
+        const result = await pool.query(
+            `
+            SELECT setting_value
+            FROM app_settings
+            WHERE setting_key = 'global_theme_key'
+            LIMIT 1
+            `
+        );
+        return normalizeThemeKey(result.rows[0]?.setting_value);
+    } catch (error) {
+        if (error.code === '42P01') {
+            return 'sandstone';
+        }
+        throw error;
+    }
+};
+
 const getRolePermissions = async ({ dealerId = null, includeSuperAdmin = true } = {}) => {
     const superAdminClause = includeSuperAdmin
         ? ''
@@ -510,7 +529,10 @@ exports.getDashboardData = async (req, res) => {
 
         const requestedPage = String(req.query.page || 'dashboard').trim().toLowerCase();
         const shouldLoadReportPreview = ['1', 'true', 'yes'].includes(String(req.query.preview || '').trim().toLowerCase());
-        const globalDashboardDefaultDateFrom = await getDashboardDefaultDateFrom();
+        const [globalDashboardDefaultDateFrom, globalThemeKey] = await Promise.all([
+            getDashboardDefaultDateFrom(),
+            getGlobalThemeKey(),
+        ]);
         const dashboardDateFrom = normalizeDashboardDateFilter(req.query.dashboardDateFrom) || globalDashboardDefaultDateFrom;
         const dashboardDateTo = normalizeDashboardDateFilter(req.query.dashboardDateTo);
         const reportPreviewGroupsByPage = {
@@ -1864,6 +1886,7 @@ exports.getDashboardData = async (req, res) => {
             metrics,
             settings: {
                 dashboardDefaultDateFrom: globalDashboardDefaultDateFrom,
+                dashboardTheme: globalThemeKey,
             },
             employeeSales,
             applications: applicationsResult.rows,
@@ -1998,6 +2021,28 @@ exports.updateThemeSettings = async (req, res) => {
             if (!isRealSuperAdminSession(req.user)) {
                 return res.status(400).json({ message: 'Dealer scope is required before applying a theme.' });
             }
+
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    setting_key VARCHAR(120) PRIMARY KEY,
+                    setting_value TEXT,
+                    updated_by UUID,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            `);
+
+            await pool.query(
+                `
+                INSERT INTO app_settings (setting_key, setting_value, updated_by, updated_at)
+                VALUES ('global_theme_key', $1, $2, NOW())
+                ON CONFLICT (setting_key)
+                DO UPDATE
+                SET setting_value = EXCLUDED.setting_value,
+                    updated_by = EXCLUDED.updated_by,
+                    updated_at = EXCLUDED.updated_at
+                `,
+                [themeKey, req.user.id]
+            );
 
             await pool.query(
                 `

@@ -20,6 +20,36 @@ const computeCashPrice = (basePrice, percent, value) => {
     return computePercentPrice(base, percent);
 };
 
+const ALLOWED_THEME_KEYS = ['ooredoo-red', 'sandstone', 'crimson-navy', 'emerald-ledger', 'navin-blue'];
+const normalizeThemeKey = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    return ALLOWED_THEME_KEYS.includes(normalized) ? normalized : 'sandstone';
+};
+
+exports.getSettings = async (_req, res) => {
+    try {
+        const result = await pool.query(
+            `
+            SELECT setting_value
+            FROM app_settings
+            WHERE setting_key = 'global_theme_key'
+            LIMIT 1
+            `
+        );
+
+        return res.status(200).json({
+            settings: {
+                dashboardTheme: normalizeThemeKey(result.rows[0]?.setting_value),
+            },
+        });
+    } catch (error) {
+        if (error.code === '42P01') {
+            return res.status(200).json({ settings: { dashboardTheme: 'sandstone' } });
+        }
+        return res.status(500).json({ message: 'Failed to load app settings', error: error.message });
+    }
+};
+
 exports.listDealers = async (_req, res) => {
     try {
         const result = await pool.query(

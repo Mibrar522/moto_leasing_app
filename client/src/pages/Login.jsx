@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Fingerprint, ShieldCheck, UserCog } from 'lucide-react';
 import API from '../api/axios';
@@ -17,8 +17,30 @@ const Login = () => {
     return sessionMessage || '';
   });
   const [loading, setLoading] = useState(false);
-  const [loginTheme] = useState(() => localStorage.getItem(DASHBOARD_THEME_STORAGE_KEY) || 'sandstone');
+  const [loginTheme, setLoginTheme] = useState(() => localStorage.getItem(DASHBOARD_THEME_STORAGE_KEY) || 'sandstone');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let mounted = true;
+
+    API.get('/app/settings')
+      .then(({ data }) => {
+        const theme = data?.settings?.dashboardTheme || 'sandstone';
+        if (mounted) {
+          setLoginTheme(theme);
+          localStorage.setItem(DASHBOARD_THEME_STORAGE_KEY, theme);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setLoginTheme(localStorage.getItem(DASHBOARD_THEME_STORAGE_KEY) || 'sandstone');
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const appPublicController = require('../controllers/appPublicController');
 
+router.get('/settings', appPublicController.getSettings);
 router.get('/dealers', appPublicController.listDealers);
 router.get('/ads', appPublicController.listAds);
 router.get('/products', appPublicController.listProducts);

@@ -46,6 +46,27 @@
     --auth-button-shadow: 0 18px 30px rgba(37, 99, 235, 0.18);
 }
 
+.auth-container[data-theme="ooredoo-red"] {
+    --auth-bg-start: #fff7f7;
+    --auth-bg-end: #ffe6e8;
+    --auth-glow-top: rgba(226, 0, 26, 0.18);
+    --auth-glow-bottom: rgba(17, 17, 17, 0.14);
+    --auth-shell-bg: rgba(255, 250, 250, 0.86);
+    --auth-shell-border: rgba(226, 0, 26, 0.14);
+    --auth-shell-shadow: 0 28px 80px rgba(184, 0, 22, 0.14);
+    --auth-showcase-start: rgba(17, 17, 17, 0.97);
+    --auth-showcase-middle: rgba(184, 0, 22, 0.95);
+    --auth-showcase-end: rgba(226, 0, 26, 0.92);
+    --auth-panel-kicker-bg: rgba(226, 0, 26, 0.12);
+    --auth-panel-kicker-text: #b80016;
+    --auth-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 241, 242, 0.94) 100%);
+    --auth-focus: rgba(226, 0, 26, 0.5);
+    --auth-focus-shadow: rgba(226, 0, 26, 0.12);
+    --auth-button-start: #111111;
+    --auth-button-end: #e2001a;
+    --auth-button-shadow: 0 18px 30px rgba(184, 0, 22, 0.18);
+}
+
 .auth-container[data-theme="emerald-ledger"] {
     --auth-bg-start: #eff8f4;
     --auth-bg-end: #e3f0ea;
