@@ -1952,6 +1952,8 @@ exports.updateRolePermissions = async (req, res) => {
 
         if (isGlobalAccessManager) {
             await client.query('DELETE FROM role_permissions WHERE role_id = $1', [roleId]);
+            await client.query('DELETE FROM dealer_role_permissions WHERE role_id = $1', [roleId]);
+            await client.query('DELETE FROM dealer_role_permission_overrides WHERE role_id = $1', [roleId]);
 
             for (const featureId of featureIds) {
                 await client.query(
