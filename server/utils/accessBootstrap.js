@@ -705,9 +705,9 @@ exports.syncAccessControlDefaults = async () => {
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS dealer_role_permissions (
-                dealer_id UUID NOT NULL REFERENCES dealers(id) ON DELETE CASCADE,
-                role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-                feature_id INTEGER NOT NULL REFERENCES features(id) ON DELETE CASCADE,
+                dealer_id UUID NOT NULL,
+                role_id INTEGER NOT NULL,
+                feature_id INTEGER NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 PRIMARY KEY (dealer_id, role_id, feature_id)
             )
@@ -1257,9 +1257,9 @@ exports.syncAccessControlDefaults = async () => {
 exports.syncAccessRuntimeTables = async () => {
     await pool.query(`
         CREATE TABLE IF NOT EXISTS dealer_role_permissions (
-            dealer_id UUID NOT NULL REFERENCES dealers(id) ON DELETE CASCADE,
-            role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-            feature_id INTEGER NOT NULL REFERENCES features(id) ON DELETE CASCADE,
+            dealer_id UUID NOT NULL,
+            role_id INTEGER NOT NULL,
+            feature_id INTEGER NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             PRIMARY KEY (dealer_id, role_id, feature_id)
         )
