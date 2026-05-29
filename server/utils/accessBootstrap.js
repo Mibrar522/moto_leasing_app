@@ -723,6 +723,15 @@ exports.syncAccessControlDefaults = async () => {
         `);
 
         await client.query(`
+            CREATE TABLE IF NOT EXISTS app_settings (
+                setting_key VARCHAR(120) PRIMARY KEY,
+                setting_value TEXT,
+                updated_by UUID,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        `);
+
+        await client.query(`
             CREATE TABLE IF NOT EXISTS product_catalog (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 brand VARCHAR(120) NOT NULL,
@@ -1279,6 +1288,14 @@ exports.syncAccessRuntimeTables = async () => {
             role_id INTEGER NOT NULL,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             PRIMARY KEY (dealer_id, role_id)
+        )
+    `);
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS app_settings (
+            setting_key VARCHAR(120) PRIMARY KEY,
+            setting_value TEXT,
+            updated_by UUID,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     `);
 };

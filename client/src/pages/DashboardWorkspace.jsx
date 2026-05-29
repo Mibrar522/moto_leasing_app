@@ -1802,6 +1802,7 @@ const mapEmployeeFromApi = (employee) => ({
 });
 
 const DASHBOARD_DATE_FROM_STORAGE_KEY = 'motolease.dashboardDateFrom';
+const DASHBOARD_DATE_FROM_SOURCE_KEY = 'motolease.dashboardDateFromSource';
 
 const Dashboard = ({ pageKey, PageComponent }) => {
     const navigate = useNavigate();
@@ -1881,6 +1882,9 @@ const Dashboard = ({ pageKey, PageComponent }) => {
             pendingValue: 0,
             overdueFollowups: 0,
             scope: 'all',
+        },
+        settings: {
+            dashboardDefaultDateFrom: '',
         },
     });
     const [customerForm, setCustomerForm] = useState(emptyCustomerForm);
@@ -2010,6 +2014,14 @@ const Dashboard = ({ pageKey, PageComponent }) => {
                 return;
             }
             setDashboardData(data);
+            const serverDefaultDateFrom = normalizeDashboardDateFrom(data.settings?.dashboardDefaultDateFrom);
+            const storedDateSource = localStorage.getItem(DASHBOARD_DATE_FROM_SOURCE_KEY);
+            const storedDateFrom = localStorage.getItem(DASHBOARD_DATE_FROM_STORAGE_KEY);
+            if (serverDefaultDateFrom && (storedDateSource !== 'manual' || !storedDateFrom)) {
+                setDashboardDateFrom(serverDefaultDateFrom);
+                localStorage.setItem(DASHBOARD_DATE_FROM_STORAGE_KEY, serverDefaultDateFrom);
+                localStorage.setItem(DASHBOARD_DATE_FROM_SOURCE_KEY, 'global');
+            }
             initialDashboardLoadedRef.current = true;
             localStorage.setItem('user', JSON.stringify(data.user));
             setReadNotificationKeys(data.notificationReadKeys || []);
@@ -8720,6 +8732,42 @@ const selectedCustomer = useMemo(
         const nextDateFrom = normalizeDashboardDateFrom(event.target.value);
         setDashboardDateFrom(nextDateFrom);
         localStorage.setItem(DASHBOARD_DATE_FROM_STORAGE_KEY, nextDateFrom);
+        localStorage.setItem(DASHBOARD_DATE_FROM_SOURCE_KEY, 'manual');
+    };
+
+    const handleSaveGlobalDashboardDateFrom = async () => {
+        if (!realIsSuperAdmin) {
+            setError('Only the super admin can update the global dashboard default date.');
+            return;
+        }
+
+        const committedDateFrom = normalizeDashboardDateFrom(dashboardDateFrom);
+        try {
+            setQueryLoading(true);
+            const { data } = await API.put('/admin/dashboard/settings', {
+                dashboard_default_date_from: committedDateFrom,
+            });
+            const savedDateFrom = normalizeDashboardDateFrom(data.settings?.dashboardDefaultDateFrom || committedDateFrom);
+            setDashboardDateFrom(savedDateFrom);
+            localStorage.setItem(DASHBOARD_DATE_FROM_STORAGE_KEY, savedDateFrom);
+            localStorage.setItem(DASHBOARD_DATE_FROM_SOURCE_KEY, 'global');
+            setDashboardData((current) => ({
+                ...current,
+                settings: {
+                    ...(current.settings || {}),
+                    dashboardDefaultDateFrom: savedDateFrom,
+                },
+            }));
+            await loadDashboard({
+                page: 'dashboard',
+                dashboardDateFrom: savedDateFrom,
+                dashboardDateTo,
+            });
+        } catch (err) {
+            setError(err.response?.data?.message || 'Unable to update global dashboard date.');
+        } finally {
+            setQueryLoading(false);
+        }
     };
 
     const handleRefreshDashboardMetrics = () => {
@@ -9757,6 +9805,11 @@ const selectedCustomer = useMemo(
                                 <button type="button" className="secondary-btn" onClick={handleRefreshDashboardMetrics} disabled={queryLoading}>
                                     Refresh Cards
                                 </button>
+                                {realIsSuperAdmin ? (
+                                    <button type="button" className="primary-btn" onClick={handleSaveGlobalDashboardDateFrom} disabled={queryLoading}>
+                                        Save Global Default
+                                    </button>
+                                ) : null}
                             </div>
                         </div>
                         ) : null}

@@ -179,6 +179,30 @@ const normalizeRoleName = (roleName = '') => String(roleName || '').trim().toUpp
 const isRealSuperAdminSession = (user = {}) =>
     normalizeRoleName(user.real_role_name || user.role_name) === 'SUPER_ADMIN';
 
+const normalizeDashboardDateFilter = (value) => {
+    const raw = String(value || '').trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
+};
+
+const getDashboardDefaultDateFrom = async () => {
+    try {
+        const result = await pool.query(
+            `
+            SELECT setting_value
+            FROM app_settings
+            WHERE setting_key = 'dashboard_default_date_from'
+            LIMIT 1
+            `
+        );
+        return normalizeDashboardDateFilter(result.rows[0]?.setting_value);
+    } catch (error) {
+        if (error.code === '42P01') {
+            return '';
+        }
+        throw error;
+    }
+};
+
 const getRolePermissions = async ({ dealerId = null, includeSuperAdmin = true } = {}) => {
     const superAdminClause = includeSuperAdmin
         ? ''
@@ -480,11 +504,8 @@ exports.getDashboardData = async (req, res) => {
 
         const requestedPage = String(req.query.page || 'dashboard').trim().toLowerCase();
         const shouldLoadReportPreview = ['1', 'true', 'yes'].includes(String(req.query.preview || '').trim().toLowerCase());
-        const normalizeDashboardDateFilter = (value) => {
-            const raw = String(value || '').trim();
-            return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
-        };
-        const dashboardDateFrom = normalizeDashboardDateFilter(req.query.dashboardDateFrom);
+        const globalDashboardDefaultDateFrom = await getDashboardDefaultDateFrom();
+        const dashboardDateFrom = normalizeDashboardDateFilter(req.query.dashboardDateFrom) || globalDashboardDefaultDateFrom;
         const dashboardDateTo = normalizeDashboardDateFilter(req.query.dashboardDateTo);
         const reportPreviewGroupsByPage = {
             'report-stock-inventory': ['stockOrders', 'inventory', 'salesTransactions', 'dealers'],
@@ -1835,6 +1856,9 @@ exports.getDashboardData = async (req, res) => {
         res.status(200).json({
             user: userResult.rows[0],
             metrics,
+            settings: {
+                dashboardDefaultDateFrom: globalDashboardDefaultDateFrom,
+            },
             employeeSales,
             applications: applicationsResult.rows,
             products: productsResult.rows,
@@ -1912,6 +1936,51 @@ exports.markNotificationsRead = async (req, res) => {
     } catch (error) {
         console.error('Mark notifications read error:', error.message);
         return res.status(500).json({ message: 'Failed to mark notifications as read.', error: error.message });
+    }
+};
+
+exports.updateDashboardSettings = async (req, res) => {
+    try {
+        if (!isRealSuperAdminSession(req.user)) {
+            return res.status(403).json({ message: 'Only the super admin can update global dashboard defaults.' });
+        }
+
+        const dashboardDefaultDateFrom = normalizeDashboardDateFilter(req.body.dashboard_default_date_from);
+        if (!dashboardDefaultDateFrom) {
+            return res.status(400).json({ message: 'Select a valid dashboard start date.' });
+        }
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS app_settings (
+                setting_key VARCHAR(120) PRIMARY KEY,
+                setting_value TEXT,
+                updated_by UUID,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        `);
+
+        await pool.query(
+            `
+            INSERT INTO app_settings (setting_key, setting_value, updated_by, updated_at)
+            VALUES ('dashboard_default_date_from', $1, $2, NOW())
+            ON CONFLICT (setting_key)
+            DO UPDATE
+            SET setting_value = EXCLUDED.setting_value,
+                updated_by = EXCLUDED.updated_by,
+                updated_at = EXCLUDED.updated_at
+            `,
+            [dashboardDefaultDateFrom, req.user.id]
+        );
+
+        return res.status(200).json({
+            message: 'Global dashboard default date updated.',
+            settings: {
+                dashboardDefaultDateFrom,
+            },
+        });
+    } catch (error) {
+        console.error('Dashboard settings update error:', error.message);
+        return res.status(500).json({ message: 'Failed to update dashboard settings.', error: error.message });
     }
 };
 

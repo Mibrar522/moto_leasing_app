@@ -7,6 +7,7 @@ const { protect, restrictTo, restrictToFeature, requireDealerScope } = require('
 const uploadAdImage = require('../middleware/uploadAdImage');
 
 router.get('/dashboard', protect, requireDealerScope, restrictToFeature('FEAT_DASHBOARD_VIEW'), adminController.getDashboardData);
+router.put('/dashboard/settings', protect, restrictToFeature('FEAT_DASHBOARD_VIEW'), adminController.updateDashboardSettings);
 router.put('/access/roles/:roleId', protect, restrictToFeature('FEAT_ACCESS_CONTROL'), adminController.updateRolePermissions);
 router.post('/notifications/read', protect, restrictToFeature('FEAT_DASHBOARD_VIEW'), adminController.markNotificationsRead);
 router.get('/ads', protect, requireDealerScope, restrictToFeature('FEAT_ADS_MGMT'), adsController.listAds);
