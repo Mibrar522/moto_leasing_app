@@ -212,8 +212,23 @@ const getUserAccessProfile = async (identifierField, identifierValue) => {
         LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u.id
         LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u.email)
         LEFT JOIN dealers d ON d.id = COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id)
-        LEFT JOIN role_permissions rp ON rp.role_id = u.role_id
-        LEFT JOIN features rf ON rf.id = rp.feature_id
+        LEFT JOIN LATERAL (
+            SELECT drp.feature_id
+            FROM dealer_role_permissions drp
+            WHERE drp.dealer_id = COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id)
+              AND drp.role_id = u.role_id
+            UNION ALL
+            SELECT rp.feature_id
+            FROM role_permissions rp
+            WHERE rp.role_id = u.role_id
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM dealer_role_permissions configured
+                  WHERE configured.dealer_id = COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id)
+                    AND configured.role_id = u.role_id
+              )
+        ) role_access ON true
+        LEFT JOIN features rf ON rf.id = role_access.feature_id
         LEFT JOIN employee_features efm ON efm.employee_id = e.id
         LEFT JOIN features ef ON ef.id = efm.feature_id
         LEFT JOIN employee_feature_overrides efo ON efo.employee_id = e.id AND efo.access_mode = 'DENY'
@@ -317,8 +332,23 @@ const getUserAccessProfileForMobileLogin = async (identifierValue, dealerIdentif
         LEFT JOIN dealers admin_dealer ON admin_dealer.admin_user_id = u.id
         LEFT JOIN dealers email_dealer ON LOWER(email_dealer.contact_email) = LOWER(u.email)
         LEFT JOIN dealers d ON d.id = COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id)
-        LEFT JOIN role_permissions rp ON rp.role_id = u.role_id
-        LEFT JOIN features rf ON rf.id = rp.feature_id
+        LEFT JOIN LATERAL (
+            SELECT drp.feature_id
+            FROM dealer_role_permissions drp
+            WHERE drp.dealer_id = COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id)
+              AND drp.role_id = u.role_id
+            UNION ALL
+            SELECT rp.feature_id
+            FROM role_permissions rp
+            WHERE rp.role_id = u.role_id
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM dealer_role_permissions configured
+                  WHERE configured.dealer_id = COALESCE(u.dealer_id, e.dealer_id, admin_dealer.id, email_dealer.id)
+                    AND configured.role_id = u.role_id
+              )
+        ) role_access ON true
+        LEFT JOIN features rf ON rf.id = role_access.feature_id
         LEFT JOIN employee_features efm ON efm.employee_id = e.id
         LEFT JOIN features ef ON ef.id = efm.feature_id
         LEFT JOIN employee_feature_overrides efo ON efo.employee_id = e.id AND efo.access_mode = 'DENY'

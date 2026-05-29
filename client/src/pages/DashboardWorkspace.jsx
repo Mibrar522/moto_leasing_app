@@ -2210,9 +2210,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const canManageDealers = hasAnyFeature(user, ['FEAT_DEALER_MGMT']) && realIsSuperAdmin;
     const canManageUsers = hasAnyFeature(user, ['FEAT_USER_MGMT']);
     const canManageAds = realIsSuperAdmin || hasAnyFeature(user, ['FEAT_ADS_MGMT']);
-    const canManageAccessControl = hasAnyFeature(user, ['FEAT_ACCESS_CONTROL', 'FEAT_USER_MGMT']);
     const canManageEmployees = (isSuperAdmin || effectiveIsApplicationAdmin) && canManageUsers;
-    const canManageAccess = realIsSuperAdmin && canManageAccessControl;
+    const canManageAccess = realIsSuperAdmin || hasAnyFeature(user, ['FEAT_ACCESS_CONTROL']);
     const canManageThemes = hasAnyFeature(user, ['FEAT_THEME_MGMT']);
     const adPreviewUrl = useMemo(() => buildAssetUrl(adForm.image_url), [adForm.image_url]);
 
@@ -5756,7 +5755,7 @@ const selectedCustomer = useMemo(
 
     const handleSaveRolePermissions = async (roleId) => {
         if (!canManageAccess) {
-            setAccessMessage('Only the super admin can assign roles and features.');
+            setAccessMessage('Access Control permission is required to assign role features.');
             return false;
         }
 
@@ -9688,6 +9687,7 @@ const selectedCustomer = useMemo(
             case 'access':
                 return <AccessControl
                     canManageAccess={canManageAccess}
+                    isGlobalAccessManager={realIsSuperAdmin}
                     accessMessage={accessMessage}
                     dashboardData={dashboardData}
                     savingAccess={savingAccess}

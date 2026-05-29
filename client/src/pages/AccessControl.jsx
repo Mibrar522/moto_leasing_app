@@ -1,5 +1,6 @@
 export default function AccessControl({
   canManageAccess,
+  isGlobalAccessManager,
   accessMessage,
   dashboardData,
   savingAccess,
@@ -15,11 +16,13 @@ export default function AccessControl({
     <>
       <div className="page-heading">
         <h1>Roles and Features</h1>
-        <p>Only the super admin can assign role permissions and control which features managers and employees can use.</p>
+        <p>{isGlobalAccessManager
+          ? 'Super admin changes update the global default permissions for every dealer.'
+          : 'Dealer access changes apply only to this dealer and cannot modify Super Admin permissions.'}</p>
       </div>
 
       {!canManageAccess ? (
-        <div className="feedback-card error">Only the super admin can manage access control.</div>
+        <div className="feedback-card error">Access Control permission is required to manage role features.</div>
       ) : null}
 
       {accessMessage ? <div className="notice-banner">{accessMessage}</div> : null}

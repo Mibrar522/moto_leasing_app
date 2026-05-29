@@ -48,8 +48,23 @@ exports.protect = async (req, res, next) => {
             allowed AS (
                 SELECT f.feature_key
                 FROM ctx
-                JOIN role_permissions rp ON rp.role_id = ctx.role_id
-                JOIN features f ON f.id = rp.feature_id
+                JOIN LATERAL (
+                    SELECT drp.feature_id
+                    FROM dealer_role_permissions drp
+                    WHERE drp.dealer_id = ctx.dealer_id
+                      AND drp.role_id = ctx.role_id
+                    UNION ALL
+                    SELECT rp.feature_id
+                    FROM role_permissions rp
+                    WHERE rp.role_id = ctx.role_id
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM dealer_role_permissions configured
+                          WHERE configured.dealer_id = ctx.dealer_id
+                            AND configured.role_id = ctx.role_id
+                      )
+                ) role_access ON true
+                JOIN features f ON f.id = role_access.feature_id
                 UNION
                 SELECT f.feature_key
                 FROM ctx

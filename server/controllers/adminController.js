@@ -174,9 +174,66 @@ const stockOrderDealerScopeClause = (dealerParamIndex = 1, userParamIndex = 2) =
     )
 `;
 
-const getRolePermissions = async () => {
+const normalizeRoleName = (roleName = '') => String(roleName || '').trim().toUpperCase();
+
+const isRealSuperAdminSession = (user = {}) =>
+    normalizeRoleName(user.real_role_name || user.role_name) === 'SUPER_ADMIN';
+
+const getRolePermissions = async ({ dealerId = null, includeSuperAdmin = true } = {}) => {
+    const superAdminClause = includeSuperAdmin
+        ? ''
+        : "WHERE normalize_role.role_name <> 'SUPER_ADMIN'";
+
+    if (dealerId) {
+        const rolePermissionsResult = await pool.query(
+            `
+            WITH dealer_configured_roles AS (
+                SELECT DISTINCT role_id
+                FROM dealer_role_permissions
+                WHERE dealer_id = $1
+            ),
+            effective_permissions AS (
+                SELECT rp.role_id, rp.feature_id
+                FROM role_permissions rp
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM dealer_configured_roles configured
+                    WHERE configured.role_id = rp.role_id
+                )
+                UNION ALL
+                SELECT drp.role_id, drp.feature_id
+                FROM dealer_role_permissions drp
+                WHERE drp.dealer_id = $1
+            ),
+            normalize_role AS (
+                SELECT id, UPPER(COALESCE(role_name, name, '')) AS role_name
+                FROM roles
+            )
+            SELECT
+                ep.role_id,
+                ep.feature_id,
+                COALESCE(r.role_name, r.name) AS role_name,
+                f.feature_key,
+                f.display_name
+            FROM effective_permissions ep
+            JOIN roles r ON r.id = ep.role_id
+            JOIN normalize_role ON normalize_role.id = r.id
+            JOIN features f ON f.id = ep.feature_id
+            ${superAdminClause}
+            ORDER BY ep.role_id, ep.feature_id
+            `,
+            [dealerId]
+        );
+
+        return rolePermissionsResult.rows;
+    }
+
     const rolePermissionsResult = await pool.query(
         `
+        WITH normalize_role AS (
+            SELECT id, UPPER(COALESCE(role_name, name, '')) AS role_name
+            FROM roles
+        )
         SELECT
             rp.role_id,
             rp.feature_id,
@@ -185,7 +242,9 @@ const getRolePermissions = async () => {
             f.display_name
         FROM role_permissions rp
         JOIN roles r ON r.id = rp.role_id
+        JOIN normalize_role ON normalize_role.id = r.id
         JOIN features f ON f.id = rp.feature_id
+        ${superAdminClause}
         ORDER BY rp.role_id, rp.feature_id
         `
     );
@@ -1226,7 +1285,14 @@ exports.getDashboardData = async (req, res) => {
             dealerStaffScopeParams
         ) : { rows: [] };
 
-        const rolesResult = wantsGroup('roles') ? await pool.query('SELECT id, COALESCE(role_name, name) AS role_name FROM roles ORDER BY id') : { rows: [] };
+        const rolesResult = wantsGroup('roles') ? await pool.query(
+            `
+            SELECT id, COALESCE(role_name, name) AS role_name
+            FROM roles
+            ${hasGlobalScope ? '' : "WHERE UPPER(COALESCE(role_name, name, '')) <> 'SUPER_ADMIN'"}
+            ORDER BY id
+            `
+        ) : { rows: [] };
         const featuresResult = wantsGroup('features') ? await pool.query('SELECT id, feature_key, display_name FROM features ORDER BY id') : { rows: [] };
         const workflowDefinitionScopeClause = hasGlobalScope ? '' : 'WHERE wd.dealer_id = $1';
         const workflowDefinitionScopeParams = hasGlobalScope ? [] : [effectiveDealerId || null];
@@ -1473,7 +1539,12 @@ exports.getDashboardData = async (req, res) => {
             ORDER BY sort_order ASC, display_name ASC
             `
         ) : { rows: [] };
-        const rolePermissions = wantsGroup('rolePermissions') ? await getRolePermissions() : [];
+        const rolePermissions = wantsGroup('rolePermissions')
+            ? await getRolePermissions({
+                dealerId: hasGlobalScope ? null : effectiveDealerId,
+                includeSuperAdmin: hasGlobalScope,
+            })
+            : [];
         const stockOrdersResult = wantsGroup('stockOrders') ? await safeDashboardQuery(
             () => pool.query(
             `
@@ -1850,21 +1921,80 @@ exports.updateRolePermissions = async (req, res) => {
     try {
         const roleId = Number(req.params.roleId);
         const featureIds = [...new Set((req.body.feature_ids || []).map(Number).filter(Boolean))];
+        const isGlobalAccessManager = isRealSuperAdminSession(req.user);
+        const dealerId = req.user.effective_dealer_id || req.user.dealer_id || null;
+
+        if (!roleId) {
+            return res.status(400).json({ message: 'Invalid role selected.' });
+        }
+
+        const roleResult = await client.query(
+            'SELECT id, COALESCE(role_name, name) AS role_name FROM roles WHERE id = $1',
+            [roleId]
+        );
+        const role = roleResult.rows[0];
+
+        if (!role) {
+            return res.status(404).json({ message: 'Role not found.' });
+        }
+
+        const roleName = normalizeRoleName(role.role_name);
+
+        if (!isGlobalAccessManager && roleName === 'SUPER_ADMIN') {
+            return res.status(403).json({ message: 'Dealer admins cannot manage the Super Admin role.' });
+        }
+
+        if (!isGlobalAccessManager && !dealerId) {
+            return res.status(403).json({ message: 'Dealer scope is required before managing access control.' });
+        }
 
         await client.query('BEGIN');
-        await client.query('DELETE FROM role_permissions WHERE role_id = $1', [roleId]);
 
-        for (const featureId of featureIds) {
+        if (isGlobalAccessManager) {
+            await client.query('DELETE FROM role_permissions WHERE role_id = $1', [roleId]);
+
+            for (const featureId of featureIds) {
+                await client.query(
+                    'INSERT INTO role_permissions (role_id, feature_id) VALUES ($1, $2)',
+                    [roleId, featureId]
+                );
+            }
+        } else {
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS dealer_role_permissions (
+                    dealer_id UUID NOT NULL REFERENCES dealers(id) ON DELETE CASCADE,
+                    role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+                    feature_id INTEGER NOT NULL REFERENCES features(id) ON DELETE CASCADE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    PRIMARY KEY (dealer_id, role_id, feature_id)
+                )
+            `);
+
             await client.query(
-                'INSERT INTO role_permissions (role_id, feature_id) VALUES ($1, $2)',
-                [roleId, featureId]
+                'DELETE FROM dealer_role_permissions WHERE dealer_id = $1 AND role_id = $2',
+                [dealerId, roleId]
             );
+
+            for (const featureId of featureIds) {
+                await client.query(
+                    'INSERT INTO dealer_role_permissions (dealer_id, role_id, feature_id) VALUES ($1, $2, $3)',
+                    [dealerId, roleId, featureId]
+                );
+            }
         }
 
         await client.query('COMMIT');
 
-        const rolePermissions = await getRolePermissions();
-        res.status(200).json({ message: 'Role permissions updated', rolePermissions });
+        const rolePermissions = await getRolePermissions({
+            dealerId: isGlobalAccessManager ? null : dealerId,
+            includeSuperAdmin: isGlobalAccessManager,
+        });
+        res.status(200).json({
+            message: isGlobalAccessManager
+                ? 'Global role permissions updated.'
+                : 'Dealer role permissions updated.',
+            rolePermissions,
+        });
     } catch (error) {
         await client.query('ROLLBACK');
         res.status(500).json({ message: 'Failed to update role permissions', error: error.message });
