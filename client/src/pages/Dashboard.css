@@ -2507,6 +2507,52 @@ body,
     align-self: start;
 }
 
+.customer-workspace-actions {
+    margin-bottom: 12px;
+}
+
+.receive-modal.customer-workspace-modal {
+    width: min(1480px, calc(100vw - 24px));
+    max-height: calc(100vh - 28px);
+    padding: 18px;
+    border-radius: 22px;
+}
+
+.customer-workspace-modal > .customer-workspace-modal-header {
+    position: sticky;
+    top: -18px;
+    z-index: 3;
+    margin: -18px -18px 12px;
+    padding: 14px 18px 12px;
+    background: var(--dash-surface-strong);
+    border-bottom: 1px solid color-mix(in srgb, var(--dash-border) 76%, transparent);
+}
+
+.customer-modal-grid {
+    grid-template-columns: minmax(0, 1.08fr) minmax(380px, 0.72fr);
+    align-items: start;
+    margin-bottom: 0;
+}
+
+.customer-modal-grid > * {
+    max-height: calc(100vh - 134px);
+    overflow: auto;
+}
+
+.customer-modal-grid .table-card {
+    margin: 0;
+}
+
+.customer-modal-grid .form-grid,
+.customer-modal-grid .scan-preview,
+.customer-modal-grid .detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.customer-modal-grid .full-span {
+    grid-column: 1 / -1;
+}
+
 .field {
     display: flex;
     flex-direction: column;
@@ -3659,6 +3705,7 @@ body,
     .sales-mix-content,
     .dashboard-split,
     .customers-grid,
+    .customer-modal-grid,
     .form-grid,
     .detail-grid,
     .scan-preview,
@@ -3667,6 +3714,10 @@ body,
     .invoice-grid,
     .invoice-summary-strip {
         grid-template-columns: 1fr;
+    }
+
+    .customer-modal-grid > * {
+        max-height: none;
     }
 
     .installment-hero-image-wrap {

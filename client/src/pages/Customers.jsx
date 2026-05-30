@@ -46,6 +46,7 @@ export default function Customers({ ctx }) {
   } = ctx;
 
   const [customerRegisterOpen, setCustomerRegisterOpen] = useState(false);
+  const [customerWorkspaceOpen, setCustomerWorkspaceOpen] = useState(false);
   const [customerRegistrySearchOpen, setCustomerRegistrySearchOpen] = useState(false);
   const [customerRegistrySearch, setCustomerRegistrySearch] = useState('');
   const [customerRegistrySearchField, setCustomerRegistrySearchField] = useState('full_name');
@@ -88,6 +89,22 @@ export default function Customers({ ctx }) {
     return [...startsWithMatches, ...containsMatches];
   }, [customerRegistrySearch, customerRegistrySearchField, filteredCustomers]);
   const customerRegisterRows = customerRegisterOpen ? customerRegistryFilteredCustomers : customerRegistryFilteredCustomers.slice(0, 5);
+
+  const openNewCustomerWorkspace = () => {
+    resetCustomerForm();
+    setCustomerWorkspaceOpen(true);
+  };
+
+  const openCustomerViewWorkspace = (customer) => {
+    setSelectedCustomerId(customer.id);
+    setCustomerWorkspaceOpen(true);
+  };
+
+  const openCustomerEditWorkspace = (customer) => {
+    setSelectedCustomerId(customer.id);
+    handleEditCustomer(customer);
+    setCustomerWorkspaceOpen(true);
+  };
 
   const getCustomerCreatedByLabel = (customer = {}) => {
     const isCurrentUserCreator =
@@ -156,9 +173,48 @@ if (!canOpenCustomers) {
                             <p>Create, update, delete, view, and enrich customer profiles with OCR and fingerprint intake metadata.</p>
                         </div>
 
-                        <div className="customers-grid">
+                        {canViewCustomerForm ? (
+                        <div className="sales-workspace-actions customer-workspace-actions">
+                            <button type="button" className="sales-workspace-action-card" onClick={openNewCustomerWorkspace}>
+                                <span>Customer intake</span>
+                                <strong>Create or update customer profile</strong>
+                            </button>
+                            <button
+                                type="button"
+                                className="sales-workspace-action-card sales-workspace-action-card-soft"
+                                onClick={() => setCustomerWorkspaceOpen(true)}
+                            >
+                                <span>Profile preview</span>
+                                <strong>Open customer OCR and biometric view</strong>
+                            </button>
+                        </div>
+                        ) : null}
+
+                        {customerWorkspaceOpen ? (
+                        <div className="receive-modal-backdrop sales-modal-backdrop customer-modal-backdrop" role="presentation">
+                            <div className="receive-modal sales-workspace-modal customer-workspace-modal" role="dialog" aria-modal="true" aria-label="Customer profile workspace">
+                                <div className="section-header customer-workspace-modal-header">
+                                    <h3>{customerForm.id ? 'Update Customer Profile' : 'Customer Profile Creation'}</h3>
+                                    <div className="inline-actions">
+                                        {canViewCustomerForm ? (
+                                            <button type="button" className="view-btn" onClick={resetCustomerForm}>
+                                                Clear
+                                            </button>
+                                        ) : null}
+                                        <button type="button" className="view-btn" onClick={() => setCustomerWorkspaceOpen(false)}>
+                                            Close
+                                        </button>
+                                        {canViewCustomerForm ? (
+                                            <button type="submit" form="customer-intake-form" className="primary-btn" disabled={savingCustomer}>
+                                                {savingCustomer ? 'Saving...' : customerForm.id ? 'Update Customer' : 'Create Customer'}
+                                            </button>
+                                        ) : null}
+                                    </div>
+                                </div>
+
+                                <div className="customers-grid customer-modal-grid">
                             {canViewCustomerForm ? (
-                            <form className="table-card customer-form-card" onSubmit={handleCustomerSubmit}>
+                            <form id="customer-intake-form" className="table-card customer-form-card" onSubmit={handleCustomerSubmit}>
                                 <div className="section-header">
                                     <h3>{customerForm.id ? 'Update Customer' : 'New Customer Intake'}</h3>
                                     <div className="inline-actions">
@@ -466,6 +522,9 @@ if (!canOpenCustomers) {
 
                             {renderCustomerDetails()}
                         </div>
+                            </div>
+                        </div>
+                        ) : null}
 
                         {canViewCustomerRegister ? (
                         <div className="table-card">
@@ -572,10 +631,10 @@ if (!canOpenCustomers) {
                                                     <td>
                                                         <div className="table-actions">
                                                             {canViewCustomerRecord ? (
-                                                                <button type="button" className="view-btn" onClick={() => setSelectedCustomerId(customer.id)}>View</button>
+                                                                <button type="button" className="view-btn" onClick={() => openCustomerViewWorkspace(customer)}>View</button>
                                                             ) : null}
                                                             {canEditCustomerRecord ? (
-                                                                <button type="button" className="view-btn" onClick={() => handleEditCustomer(customer)}>Edit</button>
+                                                                <button type="button" className="view-btn" onClick={() => openCustomerEditWorkspace(customer)}>Edit</button>
                                                             ) : null}
                                                             {canDeleteCustomerRecord ? (
                                                                 <button type="button" className="danger-btn" onClick={() => handleDeleteCustomer(customer)}>Delete</button>
