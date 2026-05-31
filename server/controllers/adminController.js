@@ -1599,6 +1599,10 @@ exports.getDashboardData = async (req, res) => {
             `
             SELECT
                 so.*,
+                COALESCE(received_vehicle.registration_number, so.registration_number) AS registration_number,
+                COALESCE(received_vehicle.chassis_number, so.chassis_number) AS chassis_number,
+                COALESCE(received_vehicle.engine_number, so.engine_number) AS engine_number,
+                COALESCE(so.received_at, received_vehicle.created_at) AS received_at,
                 cp.company_name AS profile_company_name,
                 cp.company_email AS profile_company_email,
                 pc.image_url AS product_image_url,
@@ -1628,6 +1632,17 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN roles ordered_employee_role ON ordered_employee_role.id = ordered_employee.role_id
             LEFT JOIN dealers ordered_admin_dealer ON ordered_admin_dealer.admin_user_id = u.id
             LEFT JOIN dealers ordered_email_dealer ON LOWER(ordered_email_dealer.contact_email) = LOWER(u.email)
+            LEFT JOIN LATERAL (
+                SELECT
+                    v.registration_number,
+                    v.chassis_number,
+                    v.engine_number,
+                    v.created_at
+                FROM vehicles v
+                WHERE v.source_stock_order_id = so.id
+                ORDER BY v.created_at DESC
+                LIMIT 1
+            ) received_vehicle ON true
             LEFT JOIN LATERAL (
                 SELECT
                     COALESCE(
