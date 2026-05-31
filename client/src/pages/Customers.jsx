@@ -44,7 +44,7 @@ export default function Customers({ ctx }) {
     user,
   } = ctx;
 
-  const [customerRegisterOpen, setCustomerRegisterOpen] = useState(false);
+  const [customerRegisterPage, setCustomerRegisterPage] = useState(1);
   const [customerWorkspaceOpen, setCustomerWorkspaceOpen] = useState(false);
   const [customerWorkspaceMode, setCustomerWorkspaceMode] = useState('form');
   const [customerRegistrySearchOpen, setCustomerRegistrySearchOpen] = useState(false);
@@ -88,7 +88,16 @@ export default function Customers({ ctx }) {
 
     return [...startsWithMatches, ...containsMatches];
   }, [customerRegistrySearch, customerRegistrySearchField, filteredCustomers]);
-  const customerRegisterRows = customerRegisterOpen ? customerRegistryFilteredCustomers : customerRegistryFilteredCustomers.slice(0, 5);
+  const customerRegisterPageSize = 20;
+  const customerRegisterTotalPages = Math.max(1, Math.ceil(customerRegistryFilteredCustomers.length / customerRegisterPageSize));
+  const customerRegisterSafePage = Math.min(customerRegisterPage, customerRegisterTotalPages);
+  const customerRegisterStartIndex = (customerRegisterSafePage - 1) * customerRegisterPageSize;
+  const customerRegisterRows = customerRegistryFilteredCustomers.slice(
+    customerRegisterStartIndex,
+    customerRegisterStartIndex + customerRegisterPageSize,
+  );
+  const customerRegisterFirstRow = customerRegistryFilteredCustomers.length === 0 ? 0 : customerRegisterStartIndex + 1;
+  const customerRegisterLastRow = Math.min(customerRegisterStartIndex + customerRegisterRows.length, customerRegistryFilteredCustomers.length);
 
   const openNewCustomerWorkspace = () => {
     resetCustomerForm();
@@ -720,7 +729,10 @@ if (!canOpenCustomers) {
                                                 <input
                                                     type="search"
                                                     value={customerRegistrySearch}
-                                                    onChange={(event) => setCustomerRegistrySearch(event.target.value)}
+                                                    onChange={(event) => {
+                                                        setCustomerRegistrySearch(event.target.value);
+                                                        setCustomerRegisterPage(1);
+                                                    }}
                                                     placeholder={`Live search by ${customerRegistrySearchFieldLabel}`}
                                                     autoFocus
                                                 />
@@ -729,6 +741,7 @@ if (!canOpenCustomers) {
                                                     onChange={(event) => {
                                                         setCustomerRegistrySearchField(event.target.value);
                                                         setCustomerRegistrySearch('');
+                                                        setCustomerRegisterPage(1);
                                                     }}
                                                 >
                                                     {customerRegistrySearchFields.map((field) => (
@@ -817,15 +830,48 @@ if (!canOpenCustomers) {
                                         })}
                                     </tbody>
                                 </table>
-                                {customerRegistryFilteredCustomers.length > 5 ? (
-                                    <div className="inline-actions spaced-top">
-                                        <button
-                                            type="button"
-                                            className="view-btn"
-                                            onClick={() => setCustomerRegisterOpen((current) => !current)}
-                                        >
-                                            {customerRegisterOpen ? 'View less' : 'View more'}
-                                        </button>
+                                {customerRegistryFilteredCustomers.length > customerRegisterPageSize ? (
+                                    <div className="table-pagination">
+                                        <span className="table-pagination-summary">
+                                            Showing {customerRegisterFirstRow}-{customerRegisterLastRow} of {customerRegistryFilteredCustomers.length} customers
+                                        </span>
+                                        <div className="table-pagination-actions">
+                                            <button
+                                                type="button"
+                                                className="view-btn"
+                                                onClick={() => setCustomerRegisterPage(1)}
+                                                disabled={customerRegisterSafePage === 1}
+                                            >
+                                                &lt;&lt; First
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="view-btn"
+                                                onClick={() => setCustomerRegisterPage((current) => Math.max(1, current - 1))}
+                                                disabled={customerRegisterSafePage === 1}
+                                            >
+                                                &lt; Prev
+                                            </button>
+                                            <span className="table-pagination-current">
+                                                Page {customerRegisterSafePage} of {customerRegisterTotalPages}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                className="view-btn"
+                                                onClick={() => setCustomerRegisterPage((current) => Math.min(customerRegisterTotalPages, current + 1))}
+                                                disabled={customerRegisterSafePage === customerRegisterTotalPages}
+                                            >
+                                                Next &gt;
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="view-btn"
+                                                onClick={() => setCustomerRegisterPage(customerRegisterTotalPages)}
+                                                disabled={customerRegisterSafePage === customerRegisterTotalPages}
+                                            >
+                                                Last &gt;&gt;
+                                            </button>
+                                        </div>
                                     </div>
                                 ) : null}
                                 </>
