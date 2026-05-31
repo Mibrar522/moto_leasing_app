@@ -43,8 +43,14 @@ export default function Products({
   buildAssetUrl,
   handleEditProduct,
 }) {
-  const [productRegisterOpen, setProductRegisterOpen] = useState(false);
-  const productRegisterRows = productRegisterOpen ? filteredInventory : filteredInventory.slice(0, 5);
+  const [productRegisterPage, setProductRegisterPage] = useState(1);
+  const productRegisterPageSize = 10;
+  const productRegisterTotalPages = Math.max(1, Math.ceil(filteredInventory.length / productRegisterPageSize));
+  const safeProductRegisterPage = Math.min(productRegisterPage, productRegisterTotalPages);
+  const productRegisterStartIndex = (safeProductRegisterPage - 1) * productRegisterPageSize;
+  const productRegisterRows = filteredInventory.slice(productRegisterStartIndex, productRegisterStartIndex + productRegisterPageSize);
+  const productRegisterFirstRow = filteredInventory.length === 0 ? 0 : productRegisterStartIndex + 1;
+  const productRegisterLastRow = Math.min(productRegisterStartIndex + productRegisterRows.length, filteredInventory.length);
 
   if (!canManageProducts) {
     return <div className="feedback-card error">Your account does not have product management access.</div>;
@@ -127,41 +133,65 @@ export default function Products({
         {filteredInventory.length === 0 ? (
           renderEmptyState('No product masters match the current search.')
         ) : (
-          <table className="pro-table">
-            <thead>
-            <tr>
-              <th>Image</th>
-              <th>Product Vehicle</th>
-              <th>Type</th>
-              <th>Color</th>
-              <th>Description</th>
-              <th>Pricing</th>
-              <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {productRegisterRows.map((vehicle) => (
-                <tr key={vehicle.id}>
-                  <td>
-                    <ProductImage
-                      src={vehicle.image_url}
-                      alt={`${vehicle.brand} ${vehicle.model}`.trim() || 'Product image'}
-                      buildAssetUrl={buildAssetUrl}
-                    />
-                  </td>
-                  <td>{[vehicle.brand, vehicle.model].filter(Boolean).join(' ')}</td>
-                  <td>{vehicle.vehicle_type || 'Not set'}</td>
-                  <td>{vehicle.color || 'Not set'}</td>
-                  <td>{vehicle.description || 'No description'}</td>
-                  <td>
-                    Actual: {formatCurrency(vehicle.purchase_price)}<br />
-                    Cash: {formatCurrency(Number(vehicle.purchase_price || 0) + (Number(vehicle.cash_markup_value || 0) > 0 ? Number(vehicle.cash_markup_value || 0) : (Number(vehicle.purchase_price || 0) * (Number(vehicle.cash_markup_percent || 0) / 100))))}
-                  </td>
-                  <td><button type="button" className="view-btn" onClick={() => handleEditProduct(vehicle)}>Edit</button></td>
+          <>
+            <table className="pro-table">
+              <thead>
+              <tr>
+                <th>Image</th>
+                <th>Product Vehicle</th>
+                <th>Type</th>
+                <th>Color</th>
+                <th>Description</th>
+                <th>Pricing</th>
+                <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {productRegisterRows.map((vehicle) => (
+                  <tr key={vehicle.id}>
+                    <td>
+                      <ProductImage
+                        src={vehicle.image_url}
+                        alt={`${vehicle.brand} ${vehicle.model}`.trim() || 'Product image'}
+                        buildAssetUrl={buildAssetUrl}
+                      />
+                    </td>
+                    <td>{[vehicle.brand, vehicle.model].filter(Boolean).join(' ')}</td>
+                    <td>{vehicle.vehicle_type || 'Not set'}</td>
+                    <td>{vehicle.color || 'Not set'}</td>
+                    <td>{vehicle.description || 'No description'}</td>
+                    <td>
+                      Actual: {formatCurrency(vehicle.purchase_price)}<br />
+                      Cash: {formatCurrency(Number(vehicle.purchase_price || 0) + (Number(vehicle.cash_markup_value || 0) > 0 ? Number(vehicle.cash_markup_value || 0) : (Number(vehicle.purchase_price || 0) * (Number(vehicle.cash_markup_percent || 0) / 100))))}
+                    </td>
+                    <td><button type="button" className="view-btn" onClick={() => handleEditProduct(vehicle)}>Edit</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="table-pagination">
+              <span className="table-pagination-summary">
+                Showing {productRegisterFirstRow}-{productRegisterLastRow} of {filteredInventory.length} products
+              </span>
+              <div className="table-pagination-actions">
+                <button type="button" className="view-btn" onClick={() => setProductRegisterPage(1)} disabled={safeProductRegisterPage === 1}>
+                  &lt;&lt; First
+                </button>
+                <button type="button" className="view-btn" onClick={() => setProductRegisterPage((current) => Math.max(1, current - 1))} disabled={safeProductRegisterPage === 1}>
+                  &lt; Prev
+                </button>
+                <span className="table-pagination-current">
+                  Page {safeProductRegisterPage} of {productRegisterTotalPages}
+                </span>
+                <button type="button" className="view-btn" onClick={() => setProductRegisterPage((current) => Math.min(productRegisterTotalPages, current + 1))} disabled={safeProductRegisterPage === productRegisterTotalPages}>
+                  Next &gt;
+                </button>
+                <button type="button" className="view-btn" onClick={() => setProductRegisterPage(productRegisterTotalPages)} disabled={safeProductRegisterPage === productRegisterTotalPages}>
+                  Last &gt;&gt;
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
       ) : null}
