@@ -140,7 +140,6 @@ export default function Customers({ ctx }) {
   const showCustomerCnicFront = canEditCustomerField('CNIC Front Upload');
   const showCustomerCnicBack = canEditCustomerField('CNIC Back Upload');
   const showCustomerOcrExtractedName = canEditCustomerOcrFields && canEditCustomerField('OCR Extracted Name');
-  const showCustomerOcrScanText = canEditCustomerOcrFields && canEditCustomerField('OCR Scan Text');
   const showCustomerFingerprintScannerOutput = canEditCustomerFingerprintFields && canEditCustomerField('Fingerprint Scanner Output');
   const showCustomerScannerDevice = canEditCustomerFingerprintFields && canEditCustomerField('Scanner Device');
   const showCustomerScanQuality = canEditCustomerFingerprintFields && canEditCustomerField('Scan Quality');
@@ -311,7 +310,7 @@ export default function Customers({ ctx }) {
           <span className="feature-pill">{liveCustomer.biometric_hash || liveFingerprint.thumb_image_url ? 'Fingerprint Ready' : 'Fingerprint Pending'}</span>
         </div>
 
-        <div className="detail-grid sales-live-documents">
+        <div className="detail-grid sales-live-documents customer-live-documents">
           <div className="full-span">
             <span className="meta-label">OCR Extracted Name</span>
             <p className="meta-value">{liveCustomer.extracted_name || 'Not extracted yet'}</p>
@@ -489,94 +488,22 @@ if (!canOpenCustomers) {
                                         />
                                     </label>
                                     {showCustomerCnicFront ? (
-                                    <>
                                     <label className="field">
                                         <span>CNIC Front Upload</span>
                                         <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_url', 'CNIC front', 'CNIC_FRONT')} disabled={uploadingCustomerAsset} />
                                     </label>
-                                    <div className="field full-span">
-                                        <span className="meta-label">CNIC Front Preview</span>
-                                        <div className="employee-document-preview">
-                                            {customerForm.identity_doc_url ? (
-                                                isPreviewableImage(customerForm.identity_doc_url) ? (
-                                                    <img
-                                                        src={buildAssetUrl(customerForm.identity_doc_url)}
-                                                        alt="Customer CNIC front"
-                                                        className="employee-document-image"
-                                                    />
-                                                ) : isPreviewablePdf(customerForm.identity_doc_url) ? (
-                                                    <iframe
-                                                        src={buildAssetUrl(customerForm.identity_doc_url)}
-                                                        title="Customer CNIC front PDF"
-                                                        className="employee-document-frame"
-                                                    />
-                                                ) : (
-                                                    <a href={buildAssetUrl(customerForm.identity_doc_url)} target="_blank" rel="noreferrer" className="view-btn">
-                                                        Open CNIC Front
-                                                    </a>
-                                                )
-                                            ) : (
-                                                <div className="employee-document-empty">No CNIC front uploaded</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    </>
                                     ) : null}
                                     {showCustomerCnicBack ? (
-                                    <>
                                     <label className="field">
                                         <span>CNIC Back Upload</span>
                                         <input type="file" accept="*/*" onChange={(event) => handleCustomerAssetUpload(event, 'identity_doc_back_url', 'CNIC back', 'CNIC_BACK')} disabled={uploadingCustomerAsset} />
                                     </label>
-                                    <div className="field full-span">
-                                        <span className="meta-label">CNIC Back Preview</span>
-                                        <div className="employee-document-preview">
-                                            {customerForm.identity_doc_back_url ? (
-                                                isPreviewableImage(customerForm.identity_doc_back_url) ? (
-                                                    <img
-                                                        src={buildAssetUrl(customerForm.identity_doc_back_url)}
-                                                        alt="Customer CNIC back"
-                                                        className="employee-document-image"
-                                                    />
-                                                ) : isPreviewablePdf(customerForm.identity_doc_back_url) ? (
-                                                    <iframe
-                                                        src={buildAssetUrl(customerForm.identity_doc_back_url)}
-                                                        title="Customer CNIC back PDF"
-                                                        className="employee-document-frame"
-                                                    />
-                                                ) : (
-                                                    <a href={buildAssetUrl(customerForm.identity_doc_back_url)} target="_blank" rel="noreferrer" className="view-btn">
-                                                        Open CNIC Back
-                                                    </a>
-                                                )
-                                            ) : (
-                                                <div className="employee-document-empty">No CNIC back uploaded</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    </>
                                     ) : null}
                                     {showCustomerPassportPhoto ? (
-                                    <>
                                     <label className="field">
                                         <span>Customer Photo</span>
                                         <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'passport_photo_url', 'Passport size photo', 'PASSPORT_PHOTO')} disabled={uploadingCustomerAsset} />
                                     </label>
-                                    <div className="field full-span">
-                                        <span className="meta-label">Customer Photo Preview</span>
-                                        <div className="employee-document-preview">
-                                            {customerForm.passport_photo_url ? (
-                                                <img
-                                                    src={buildAssetUrl(customerForm.passport_photo_url)}
-                                                    alt="Customer photo"
-                                                    className="employee-document-image"
-                                                />
-                                            ) : (
-                                                <div className="employee-document-empty">No customer photo uploaded</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    </>
                                     ) : null}
                                     <label className="field" hidden={!canEditCustomerField('Contact Email')}>
                                         <span>Contact Email</span>
@@ -598,12 +525,6 @@ if (!canOpenCustomers) {
                                     <label className="field full-span">
                                         <span>OCR Extracted Name</span>
                                         <input name="extracted_name" value={customerForm.extracted_name} onChange={handleCustomerChange} placeholder="Autofilled from OCR or entered manually" />
-                                    </label>
-                                    ) : null}
-                                    {showCustomerOcrScanText ? (
-                                    <label className="field full-span">
-                                        <span>OCR Scan Text</span>
-                                        <textarea name="raw_ocr_text" value={customerForm.raw_ocr_text} onChange={handleCustomerChange} rows="7" placeholder="Paste OCR text from the CNIC image here, then click Process OCR." />
                                     </label>
                                     ) : null}
                                 </div>
@@ -655,38 +576,10 @@ if (!canOpenCustomers) {
                                         <span>Thumb Upload</span>
                                             <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'fingerprint_thumb_url', 'Thumb image', 'THUMB')} disabled={!canEditCustomerFingerprintFields || uploadingCustomerAsset} />
                                         </label>
-                                        <div className="field full-span" hidden={!canEditCustomerFingerprintFields || !canEditCustomerField('Thumb Upload')}>
-                                            <span className="meta-label">Thumb Preview</span>
-                                            <div className="employee-document-preview">
-                                                {customerForm.fingerprint_thumb_url ? (
-                                                    <img
-                                                        src={buildAssetUrl(customerForm.fingerprint_thumb_url)}
-                                                        alt="Customer thumb"
-                                                        className="employee-document-image"
-                                                    />
-                                                ) : (
-                                                    <div className="employee-document-empty">No thumb image uploaded</div>
-                                                )}
-                                            </div>
-                                        </div>
                                         <label className="field full-span" hidden={!canEditCustomerField('Signature Upload')}>
                                         <span>Signature Upload</span>
                                             <input type="file" accept="image/*" onChange={(event) => handleCustomerAssetUpload(event, 'signature_image_url', 'Signature', 'SIGNATURE')} disabled={!canViewCustomerForm || uploadingCustomerAsset} />
                                         </label>
-                                        <div className="field full-span" hidden={!canEditCustomerField('Signature Upload')}>
-                                            <span className="meta-label">Signature Preview</span>
-                                            <div className="employee-document-preview">
-                                                {customerForm.signature_image_url ? (
-                                                    <img
-                                                        src={buildAssetUrl(customerForm.signature_image_url)}
-                                                        alt="Customer signature"
-                                                        className="employee-document-image"
-                                                    />
-                                                ) : (
-                                                    <div className="employee-document-empty">No signature uploaded</div>
-                                                )}
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
                                 ) : null}

@@ -2543,6 +2543,56 @@ body,
     max-height: none;
 }
 
+.customer-live-summary {
+    padding: 16px;
+    gap: 14px;
+}
+
+.customer-live-summary .sales-live-summary-grid {
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--dash-border) 76%, transparent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--dash-surface-strong) 88%, transparent);
+}
+
+.customer-live-summary .feature-list {
+    gap: 8px;
+}
+
+.customer-live-documents {
+    gap: 12px;
+}
+
+.customer-live-documents > div {
+    padding: 10px;
+    border: 1px solid color-mix(in srgb, var(--dash-border) 72%, transparent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--dash-surface-strong) 86%, transparent);
+}
+
+.customer-live-documents > .full-span {
+    padding: 12px;
+}
+
+.customer-live-documents .employee-document-preview {
+    min-height: 132px;
+    max-height: 170px;
+    margin-top: 7px;
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--dash-surface-strong) 78%, transparent);
+}
+
+.customer-live-documents .employee-document-preview img,
+.customer-live-documents .employee-document-preview iframe {
+    max-height: 148px;
+}
+
+.customer-live-documents .scan-box {
+    max-height: 170px;
+    overflow: auto;
+}
+
 .customer-modal-grid > * {
     max-height: calc(100vh - 134px);
     overflow: auto;
