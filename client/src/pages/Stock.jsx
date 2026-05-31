@@ -62,6 +62,12 @@ export default function Stock({
   const renderReceivedIdentity = (value) => value || 'Not set';
   const getReceivedIdentity = (order, receivedKey, legacyKey) => order[receivedKey] || order[legacyKey];
   const getReceivedDate = (order) => order.effective_received_at || order.received_at;
+  const formatStockDate = (value) => {
+    if (!value) return 'Not set';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+    return date.toLocaleDateString('en-PK');
+  };
 
   const renderPagination = ({ totalRows, pageSize, pagination, setPage, label, alwaysShow = false }) => {
     if (!alwaysShow && totalRows <= pageSize) return null;
@@ -189,10 +195,13 @@ export default function Stock({
               <tbody>
                 {stockRegisterRows.map((order) => (
                   <tr key={order.id}>
-                    <td>{order.company_name}<br />{order.company_email || 'No email'}</td>
+                    <td>
+                      <span className="stock-cell-strong">{order.company_name}</span>
+                      <span className="stock-cell-muted">{order.company_email || 'No email'}</span>
+                    </td>
                     <td>{renderVehicleCell(order)}</td>
                     <td>{formatCurrency(order.total_amount)}</td>
-                    <td>{order.expected_delivery_date || 'Not set'}</td>
+                    <td>{formatStockDate(order.expected_delivery_date)}</td>
                     <td>{order.bank_slip_url ? <a href={buildAssetUrl(order.bank_slip_url)} target="_blank" rel="noreferrer">View Slip</a> : 'No slip'}</td>
                     <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>
                     <td>

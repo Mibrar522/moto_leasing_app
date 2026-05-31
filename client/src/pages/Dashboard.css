@@ -2633,6 +2633,10 @@ body,
     table-layout: fixed;
 }
 
+.stock-register-table {
+    min-width: 0;
+}
+
 .stock-received-table {
     min-width: 1040px;
 }
@@ -2642,18 +2646,20 @@ body,
 .stock-received-table th,
 .stock-received-table td {
     vertical-align: top;
+    overflow-wrap: anywhere;
+    word-break: normal;
 }
 
 .stock-col-company {
-    width: 19%;
+    width: 17%;
 }
 
 .stock-col-vehicle {
-    width: 34%;
+    width: 26%;
 }
 
 .stock-col-amount {
-    width: 14%;
+    width: 13%;
 }
 
 .stock-col-date {
@@ -2661,7 +2667,7 @@ body,
 }
 
 .stock-col-slip {
-    width: 9%;
+    width: 8%;
 }
 
 .stock-col-status {
@@ -2674,6 +2680,57 @@ body,
 
 .stock-col-received {
     width: 13%;
+}
+
+.stock-register-table th,
+.stock-register-table td {
+    padding: 8px 9px;
+    font-size: 0.74rem;
+    line-height: 1.35;
+}
+
+.stock-register-table thead th {
+    font-size: 0.56rem;
+    letter-spacing: 0.07em;
+}
+
+.stock-register-table .pill-neutral,
+.stock-register-table .pill-active,
+.stock-register-table .pill-warning,
+.stock-register-table .pill-danger,
+.stock-register-table .feature-pill {
+    max-width: 100%;
+    padding: 5px 8px;
+    font-size: 0.62rem;
+    white-space: normal;
+}
+
+.stock-register-table .inline-actions {
+    gap: 6px;
+}
+
+.stock-register-table .view-btn,
+.stock-register-table .danger-btn {
+    min-height: 30px;
+    padding: 7px 8px;
+    font-size: 0.68rem;
+    white-space: normal;
+}
+
+.stock-cell-strong,
+.stock-cell-muted {
+    display: block;
+}
+
+.stock-cell-strong {
+    font-weight: 800;
+    color: var(--dash-text);
+}
+
+.stock-cell-muted {
+    margin-top: 2px;
+    color: var(--dash-text-soft);
+    font-size: 0.7rem;
 }
 
 .stock-col-identity {
