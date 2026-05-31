@@ -20,7 +20,6 @@ export default function Stock({
   formatCurrency,
   buildAssetUrl,
   openStockReceiveModal,
-  handleResendStockOrderEmail,
   canReceiveStock,
   canUpdateStockOrder,
   canDeleteStockOrder,
@@ -104,23 +103,6 @@ export default function Stock({
     );
   };
 
-  const getStockEmailStatus = (order) => {
-    if (order.email_sent) {
-      return 'Sent';
-    }
-
-    const message = String(order.email_error || '').trim();
-    if (!message) {
-      return 'Pending email send';
-    }
-
-    if (message.toLowerCase().includes('resend email failed (403)')) {
-      return 'Previous email failed. Click Resend Email after Render redeploy.';
-    }
-
-    return message;
-  };
-
   if (!canManageStock) {
     return <div className="feedback-card error">Your account does not have stock and fleet management access.</div>;
   }
@@ -132,9 +114,9 @@ export default function Stock({
         <p>Order stock against product masters, attach the bank online slip, email the supplier, and track what has been received.</p>
       </div>
 
-      <div className="customers-grid">
+      <div className="customers-grid stock-page-grid">
         {canViewStockOrderForm ? (
-        <form className="table-card customer-form-card" onSubmit={handleStockOrderSubmit}>
+        <form className="table-card customer-form-card stock-order-form-card" onSubmit={handleStockOrderSubmit}>
           <div className="section-header">
             <h3>{stockOrderForm.id ? 'Update Stock Order' : 'Order Stock'}</h3>
             <button type="submit" className="primary-btn" disabled={savingStock}>
@@ -186,20 +168,29 @@ export default function Stock({
         ) : null}
 
         {canViewStockRegister ? (
-        <div className="table-card">
+        <div className="table-card stock-register-card">
           <h3>Stock Ordering Register</h3>
           {pendingStockOrders.length === 0 ? (
             renderEmptyState('No stock orders have been created yet.')
           ) : (
             <>
-            <table className="pro-table">
+            <div className="stock-table-wrap">
+            <table className="pro-table stock-register-table">
+              <colgroup>
+                <col className="stock-col-company" />
+                <col className="stock-col-vehicle" />
+                <col className="stock-col-amount" />
+                <col className="stock-col-date" />
+                <col className="stock-col-slip" />
+                <col className="stock-col-status" />
+                <col className="stock-col-action" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Company</th>
                   <th>Vehicle</th>
                   <th>Amount</th>
                   <th>Order Date</th>
-                  <th>Email</th>
                   <th>Slip</th>
                   <th>Status</th>
                   <th>Action</th>
@@ -212,14 +203,6 @@ export default function Stock({
                     <td>{renderVehicleCell(order)}</td>
                     <td>{formatCurrency(order.total_amount)}</td>
                     <td>{order.expected_delivery_date || 'Not set'}</td>
-                    <td>
-                      <div>{getStockEmailStatus(order)}</div>
-                      {!order.email_sent && handleResendStockOrderEmail ? (
-                        <button type="button" className="view-btn compact-action" onClick={() => handleResendStockOrderEmail(order.id)} disabled={savingStock}>
-                          Resend Email
-                        </button>
-                      ) : null}
-                    </td>
                     <td>{order.bank_slip_url ? <a href={buildAssetUrl(order.bank_slip_url)} target="_blank" rel="noreferrer">View Slip</a> : 'No slip'}</td>
                     <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>
                     <td>
@@ -235,6 +218,7 @@ export default function Stock({
                 ))}
               </tbody>
             </table>
+            </div>
             {renderPagination({
               totalRows: pendingStockOrders.length,
               pageSize: registerPageSize,
@@ -249,13 +233,22 @@ export default function Stock({
       </div>
 
       {canViewStockReceived ? (
-      <div className="table-card">
+      <div className="table-card stock-register-card">
         <h3>Stock Received From Company</h3>
         {receivedStockOrders.length === 0 ? (
           renderEmptyState('No stock has been marked as received yet.')
         ) : (
           <>
-          <table className="pro-table">
+          <div className="stock-table-wrap">
+          <table className="pro-table stock-received-table">
+            <colgroup>
+              <col className="stock-col-company" />
+              <col className="stock-col-vehicle" />
+              <col className="stock-col-received" />
+              <col className="stock-col-date" />
+              <col className="stock-col-status" />
+              <col className="stock-col-action" />
+            </colgroup>
             <thead>
               <tr>
                 <th>Company</th>
@@ -288,6 +281,7 @@ export default function Stock({
               ))}
             </tbody>
           </table>
+          </div>
           {renderPagination({
             totalRows: receivedStockOrders.length,
             pageSize: 10,

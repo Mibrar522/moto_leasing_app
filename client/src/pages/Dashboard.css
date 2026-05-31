@@ -2595,7 +2595,8 @@ body,
 
 .stock-identity-list {
     display: grid;
-    gap: 3px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 10px;
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid color-mix(in srgb, var(--dash-border) 78%, transparent);
@@ -2614,6 +2615,66 @@ body,
 
 .stock-identity-list .is-empty {
     opacity: 0.72;
+}
+
+.stock-page-grid {
+    grid-template-columns: minmax(460px, 0.9fr) minmax(620px, 1.1fr);
+    align-items: start;
+}
+
+.stock-order-form-card,
+.stock-register-card {
+    min-width: 0;
+}
+
+.stock-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.stock-register-table,
+.stock-received-table {
+    min-width: 760px;
+    table-layout: fixed;
+}
+
+.stock-register-table th,
+.stock-register-table td,
+.stock-received-table th,
+.stock-received-table td {
+    vertical-align: top;
+}
+
+.stock-col-company {
+    width: 19%;
+}
+
+.stock-col-vehicle {
+    width: 34%;
+}
+
+.stock-col-amount {
+    width: 14%;
+}
+
+.stock-col-date {
+    width: 14%;
+}
+
+.stock-col-slip {
+    width: 9%;
+}
+
+.stock-col-status {
+    width: 10%;
+}
+
+.stock-col-action {
+    width: 12%;
+}
+
+.stock-col-received {
+    width: 13%;
 }
 
 .customer-modal-grid > * {
@@ -3806,6 +3867,7 @@ body,
     .dashboard-split,
     .customers-grid,
     .customer-modal-grid,
+    .stock-page-grid,
     .form-grid,
     .detail-grid,
     .scan-preview,
