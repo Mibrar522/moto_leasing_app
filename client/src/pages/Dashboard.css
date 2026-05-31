@@ -2534,6 +2534,15 @@ body,
     margin-bottom: 0;
 }
 
+.customer-modal-grid.is-view-only {
+    display: block;
+}
+
+.customer-modal-grid.is-view-only .customer-live-summary {
+    position: static;
+    max-height: none;
+}
+
 .customer-modal-grid > * {
     max-height: calc(100vh - 134px);
     overflow: auto;
@@ -2776,6 +2785,24 @@ body,
 
 .customer-registry-header {
     align-items: flex-start;
+}
+
+.customer-registry-title-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.customer-registry-title-actions h3 {
+    margin: 0;
+}
+
+.customer-registry-new-btn {
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 12px;
+    white-space: nowrap;
 }
 
 .customer-registry-search-area {

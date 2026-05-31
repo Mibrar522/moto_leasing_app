@@ -46,6 +46,7 @@ export default function Customers({ ctx }) {
 
   const [customerRegisterOpen, setCustomerRegisterOpen] = useState(false);
   const [customerWorkspaceOpen, setCustomerWorkspaceOpen] = useState(false);
+  const [customerWorkspaceMode, setCustomerWorkspaceMode] = useState('form');
   const [customerRegistrySearchOpen, setCustomerRegistrySearchOpen] = useState(false);
   const [customerRegistrySearch, setCustomerRegistrySearch] = useState('');
   const [customerRegistrySearchField, setCustomerRegistrySearchField] = useState('full_name');
@@ -92,17 +93,20 @@ export default function Customers({ ctx }) {
   const openNewCustomerWorkspace = () => {
     resetCustomerForm();
     setSelectedCustomerId('');
+    setCustomerWorkspaceMode('form');
     setCustomerWorkspaceOpen(true);
   };
 
   const openCustomerViewWorkspace = (customer) => {
     setSelectedCustomerId(customer.id);
+    setCustomerWorkspaceMode('view');
     setCustomerWorkspaceOpen(true);
   };
 
   const openCustomerEditWorkspace = (customer) => {
     setSelectedCustomerId(customer.id);
     handleEditCustomer(customer);
+    setCustomerWorkspaceMode('form');
     setCustomerWorkspaceOpen(true);
   };
 
@@ -163,9 +167,9 @@ export default function Customers({ ctx }) {
     ? '12345-1234567-1'
     : 'Passport number';
 
-  const getLiveCustomerValue = (field, fallback = '') => {
+  const getLiveCustomerValue = (field, fallback = '', useFormValue = true) => {
     const formValue = customerForm[field];
-    if (formValue !== undefined && formValue !== null && String(formValue).trim() !== '') {
+    if (useFormValue && formValue !== undefined && formValue !== null && String(formValue).trim() !== '') {
       return formValue;
     }
     return selectedCustomer?.[field] || fallback;
@@ -190,32 +194,34 @@ export default function Customers({ ctx }) {
   );
 
   const renderCustomerLivePreview = () => {
+    const isViewOnly = customerWorkspaceMode === 'view';
+    const useFormPreview = !isViewOnly;
     const selectedOcrDetails = selectedCustomer?.ocr_details || {};
     const selectedFingerprint = selectedOcrDetails.fingerprint || {};
     const liveFingerprint = {
-      status: getLiveCustomerValue('fingerprint_status', selectedFingerprint.status || 'NOT_CAPTURED'),
-      device: getLiveCustomerValue('fingerprint_device', selectedFingerprint.device || ''),
-      quality: getLiveCustomerValue('fingerprint_quality', selectedFingerprint.quality || ''),
-      thumb_image_url: getLiveCustomerValue('fingerprint_thumb_url', selectedFingerprint.thumb_image_url || ''),
+      status: getLiveCustomerValue('fingerprint_status', selectedFingerprint.status || 'NOT_CAPTURED', useFormPreview),
+      device: getLiveCustomerValue('fingerprint_device', selectedFingerprint.device || '', useFormPreview),
+      quality: getLiveCustomerValue('fingerprint_quality', selectedFingerprint.quality || '', useFormPreview),
+      thumb_image_url: getLiveCustomerValue('fingerprint_thumb_url', selectedFingerprint.thumb_image_url || '', useFormPreview),
     };
     const liveCustomer = {
-      full_name: getLiveCustomerValue('full_name'),
-      father_name: getLiveCustomerValue('father_name', selectedOcrDetails.father_name || ''),
-      date_of_birth: toDateInputValue(getLiveCustomerValue('date_of_birth', selectedOcrDetails.date_of_birth || '')),
-      gender: toGenderSelectValue(getLiveCustomerValue('gender', selectedOcrDetails.gender || '')),
-      document_type: getLiveCustomerValue('document_type', selectedOcrDetails.document_type || 'CNIC'),
-      cnic_passport_number: getLiveCustomerValue('cnic_passport_number'),
-      contact_email: getLiveCustomerValue('contact_email', selectedOcrDetails.contact_email || ''),
-      contact_phone: getLiveCustomerValue('contact_phone', selectedOcrDetails.contact_phone || ''),
-      country: getLiveCustomerValue('country', selectedOcrDetails.country || ''),
-      address: getLiveCustomerValue('address', selectedOcrDetails.address || ''),
-      extracted_name: getLiveCustomerValue('extracted_name', selectedOcrDetails.extracted_name || ''),
-      raw_ocr_text: getLiveCustomerValue('raw_ocr_text', selectedOcrDetails.raw_ocr_text || ''),
-      biometric_hash: getLiveCustomerValue('biometric_hash', selectedCustomer?.biometric_hash || ''),
-      identity_doc_url: getLiveCustomerValue('identity_doc_url', selectedCustomer?.identity_doc_url || ''),
-      identity_doc_back_url: getLiveCustomerValue('identity_doc_back_url', selectedOcrDetails.identity_doc_back_url || ''),
-      passport_photo_url: getLiveCustomerValue('passport_photo_url', selectedOcrDetails.passport_photo_url || selectedCustomer?.passport_photo_url || ''),
-      signature_image_url: getLiveCustomerValue('signature_image_url', selectedOcrDetails.signature_image_url || selectedCustomer?.signature_image_url || ''),
+      full_name: getLiveCustomerValue('full_name', '', useFormPreview),
+      father_name: getLiveCustomerValue('father_name', selectedOcrDetails.father_name || '', useFormPreview),
+      date_of_birth: toDateInputValue(getLiveCustomerValue('date_of_birth', selectedOcrDetails.date_of_birth || '', useFormPreview)),
+      gender: toGenderSelectValue(getLiveCustomerValue('gender', selectedOcrDetails.gender || '', useFormPreview)),
+      document_type: getLiveCustomerValue('document_type', selectedOcrDetails.document_type || 'CNIC', useFormPreview),
+      cnic_passport_number: getLiveCustomerValue('cnic_passport_number', '', useFormPreview),
+      contact_email: getLiveCustomerValue('contact_email', selectedOcrDetails.contact_email || '', useFormPreview),
+      contact_phone: getLiveCustomerValue('contact_phone', selectedOcrDetails.contact_phone || '', useFormPreview),
+      country: getLiveCustomerValue('country', selectedOcrDetails.country || '', useFormPreview),
+      address: getLiveCustomerValue('address', selectedOcrDetails.address || '', useFormPreview),
+      extracted_name: getLiveCustomerValue('extracted_name', selectedOcrDetails.extracted_name || '', useFormPreview),
+      raw_ocr_text: getLiveCustomerValue('raw_ocr_text', selectedOcrDetails.raw_ocr_text || '', useFormPreview),
+      biometric_hash: getLiveCustomerValue('biometric_hash', selectedCustomer?.biometric_hash || '', useFormPreview),
+      identity_doc_url: getLiveCustomerValue('identity_doc_url', selectedCustomer?.identity_doc_url || '', useFormPreview),
+      identity_doc_back_url: getLiveCustomerValue('identity_doc_back_url', selectedOcrDetails.identity_doc_back_url || '', useFormPreview),
+      passport_photo_url: getLiveCustomerValue('passport_photo_url', selectedOcrDetails.passport_photo_url || selectedCustomer?.passport_photo_url || '', useFormPreview),
+      signature_image_url: getLiveCustomerValue('signature_image_url', selectedOcrDetails.signature_image_url || selectedCustomer?.signature_image_url || '', useFormPreview),
     };
     const hasAnyLiveData = [
       liveCustomer.full_name,
@@ -232,11 +238,11 @@ export default function Customers({ ctx }) {
     return (
       <aside className="sales-live-summary customer-live-summary">
         <div className="sales-live-summary-head">
-          <span>Live customer preview</span>
+          <span>{isViewOnly ? 'Customer profile preview' : 'Live customer preview'}</span>
           <strong>{liveCustomer.full_name || selectedCustomer?.full_name || 'Customer intake preview'}</strong>
         </div>
 
-        {!hasAnyLiveData ? (
+        {!hasAnyLiveData && !isViewOnly ? (
           <div className="employee-document-empty">Start typing or upload documents to build the customer preview.</div>
         ) : null}
 
@@ -356,22 +362,13 @@ if (!canOpenCustomers) {
                             <p>Create, update, delete, view, and enrich customer profiles with OCR and fingerprint intake metadata.</p>
                         </div>
 
-                        {canViewCustomerForm ? (
-                        <div className="sales-workspace-actions customer-workspace-actions">
-                            <button type="button" className="sales-workspace-action-card" onClick={openNewCustomerWorkspace}>
-                                <span>Customer intake</span>
-                                <strong>Create or update customer profile</strong>
-                            </button>
-                        </div>
-                        ) : null}
-
                         {customerWorkspaceOpen ? (
                         <div className="receive-modal-backdrop sales-modal-backdrop customer-modal-backdrop" role="presentation">
                             <div className="receive-modal sales-workspace-modal customer-workspace-modal" role="dialog" aria-modal="true" aria-label="Customer profile workspace">
                                 <div className="section-header customer-workspace-modal-header">
-                                    <h3>{customerForm.id ? 'Update Customer Profile' : 'Customer Profile Creation'}</h3>
+                                    <h3>{customerWorkspaceMode === 'view' ? 'Customer Profile Preview' : customerForm.id ? 'Update Customer Profile' : 'Customer Profile Creation'}</h3>
                                     <div className="inline-actions">
-                                        {canViewCustomerForm ? (
+                                        {canViewCustomerForm && customerWorkspaceMode !== 'view' ? (
                                             <button type="button" className="view-btn" onClick={resetCustomerForm}>
                                                 Clear
                                             </button>
@@ -379,7 +376,7 @@ if (!canOpenCustomers) {
                                         <button type="button" className="view-btn" onClick={() => setCustomerWorkspaceOpen(false)}>
                                             Close
                                         </button>
-                                        {canViewCustomerForm ? (
+                                        {canViewCustomerForm && customerWorkspaceMode !== 'view' ? (
                                             <button type="submit" form="customer-intake-form" className="primary-btn" disabled={savingCustomer}>
                                                 {savingCustomer ? 'Saving...' : customerForm.id ? 'Update Customer' : 'Create Customer'}
                                             </button>
@@ -387,8 +384,8 @@ if (!canOpenCustomers) {
                                     </div>
                                 </div>
 
-                                <div className="customers-grid customer-modal-grid">
-                            {canViewCustomerForm ? (
+                                <div className={`customers-grid customer-modal-grid ${customerWorkspaceMode === 'view' ? 'is-view-only' : ''}`}>
+                            {canViewCustomerForm && customerWorkspaceMode !== 'view' ? (
                             <form id="customer-intake-form" className="table-card customer-form-card" onSubmit={handleCustomerSubmit}>
                                 <div className="section-header">
                                     <h3>{customerForm.id ? 'Update Customer' : 'New Customer Intake'}</h3>
@@ -696,7 +693,14 @@ if (!canOpenCustomers) {
                         {canViewCustomerRegister ? (
                         <div className="table-card">
                             <div className="section-header customer-registry-header">
-                                <h3>Customer Registry</h3>
+                                <div className="customer-registry-title-actions">
+                                    <h3>Customer Registry</h3>
+                                    {canViewCustomerForm ? (
+                                        <button type="button" className="primary-btn customer-registry-new-btn" onClick={openNewCustomerWorkspace}>
+                                            New Customer
+                                        </button>
+                                    ) : null}
+                                </div>
                                 <div className="customer-registry-search-area">
                                     <span className="customer-registry-search-label">Customer Registry Search</span>
                                     <div className={`customer-registry-search-controls ${customerRegistrySearchOpen ? 'is-open' : ''}`}>
