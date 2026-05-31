@@ -63,8 +63,9 @@ export default function Stock({
   const getReceivedIdentity = (order, receivedKey, legacyKey) => order[receivedKey] || order[legacyKey];
   const getReceivedDate = (order) => order.effective_received_at || order.received_at;
 
-  const renderPagination = ({ totalRows, pageSize, pagination, setPage, label }) => {
-    if (totalRows <= pageSize) return null;
+  const renderPagination = ({ totalRows, pageSize, pagination, setPage, label, alwaysShow = false }) => {
+    if (!alwaysShow && totalRows <= pageSize) return null;
+    if (totalRows === 0) return null;
 
     return (
       <div className="table-pagination">
@@ -214,6 +215,7 @@ export default function Stock({
               pagination: stockPagination,
               setPage: setStockRegisterPage,
               label: 'orders',
+              alwaysShow: true,
             })}
             </>
           )}
@@ -286,6 +288,7 @@ export default function Stock({
             pagination: receivedPagination,
             setPage: setReceivedRegisterPage,
             label: 'received records',
+            alwaysShow: true,
           })}
           </>
         )}
