@@ -30,10 +30,56 @@ export default function Stock({
   handleDeleteStockOrder,
   resetStockOrderForm,
 }) {
-  const [receivedRegisterOpen, setReceivedRegisterOpen] = useState(false);
-  const [stockRegisterOpen, setStockRegisterOpen] = useState(false);
-  const receivedRegisterRows = receivedRegisterOpen ? receivedStockOrders : receivedStockOrders.slice(0, 5);
-  const stockRegisterRows = stockRegisterOpen ? pendingStockOrders : pendingStockOrders.slice(0, 5);
+  const [receivedRegisterPage, setReceivedRegisterPage] = useState(1);
+  const [stockRegisterPage, setStockRegisterPage] = useState(1);
+  const registerPageSize = 10;
+  const paginateRows = (rows = [], page = 1, pageSize = registerPageSize) => {
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const startIndex = (safePage - 1) * pageSize;
+    const pageRows = rows.slice(startIndex, startIndex + pageSize);
+
+    return {
+      pageRows,
+      totalPages,
+      safePage,
+      firstRow: rows.length === 0 ? 0 : startIndex + 1,
+      lastRow: Math.min(startIndex + pageRows.length, rows.length),
+    };
+  };
+  const receivedPagination = paginateRows(receivedStockOrders, receivedRegisterPage, 10);
+  const stockPagination = paginateRows(pendingStockOrders, stockRegisterPage, registerPageSize);
+  const receivedRegisterRows = receivedPagination.pageRows;
+  const stockRegisterRows = stockPagination.pageRows;
+
+  const renderPagination = ({ totalRows, pageSize, pagination, setPage, label }) => {
+    if (totalRows <= pageSize) return null;
+
+    return (
+      <div className="table-pagination">
+        <span className="table-pagination-summary">
+          Showing {pagination.firstRow}-{pagination.lastRow} of {totalRows} {label}
+        </span>
+        <div className="table-pagination-actions">
+          <button type="button" className="view-btn" onClick={() => setPage(1)} disabled={pagination.safePage === 1}>
+            &lt;&lt; First
+          </button>
+          <button type="button" className="view-btn" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={pagination.safePage === 1}>
+            &lt; Prev
+          </button>
+          <span className="table-pagination-current">
+            Page {pagination.safePage} of {pagination.totalPages}
+          </span>
+          <button type="button" className="view-btn" onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))} disabled={pagination.safePage === pagination.totalPages}>
+            Next &gt;
+          </button>
+          <button type="button" className="view-btn" onClick={() => setPage(pagination.totalPages)} disabled={pagination.safePage === pagination.totalPages}>
+            Last &gt;&gt;
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const getStockEmailStatus = (order) => {
     if (order.email_sent) {
@@ -116,38 +162,49 @@ export default function Stock({
         </form>
         ) : null}
 
-        {canViewStockReceived ? (
+        {canViewStockRegister ? (
         <div className="table-card">
-          <h3>Stock Received From Company</h3>
-          {receivedStockOrders.length === 0 ? (
-            renderEmptyState('No stock has been marked as received yet.')
+          <h3>Stock Ordering Register</h3>
+          {pendingStockOrders.length === 0 ? (
+            renderEmptyState('No stock orders have been created yet.')
           ) : (
+            <>
             <table className="pro-table">
               <thead>
                 <tr>
                   <th>Company</th>
                   <th>Vehicle</th>
-                  <th>Vehicle Received</th>
-                  <th>Received Date</th>
+                  <th>Amount</th>
+                  <th>Order Date</th>
+                  <th>Email</th>
+                  <th>Slip</th>
                   <th>Status</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {receivedRegisterRows.map((order) => (
+                {stockRegisterRows.map((order) => (
                   <tr key={order.id}>
-                    <td>{order.company_name}</td>
+                    <td>{order.company_name}<br />{order.company_email || 'No email'}</td>
                     <td>{order.brand} {order.model}<br />{order.vehicle_type}{order.product_color ? ` / ${order.product_color}` : ''}<br />{order.product_description || 'No description'}</td>
-                    <td>{Number(order.received_quantity || 0) > 0 ? 'Yes' : 'Pending'}</td>
-                    <td>{order.received_at ? new Date(order.received_at).toLocaleDateString('en-PK') : 'Pending'}</td>
+                    <td>{formatCurrency(order.total_amount)}</td>
+                    <td>{order.expected_delivery_date || 'Not set'}</td>
+                    <td>
+                      <div>{getStockEmailStatus(order)}</div>
+                      {!order.email_sent && handleResendStockOrderEmail ? (
+                        <button type="button" className="view-btn compact-action" onClick={() => handleResendStockOrderEmail(order.id)} disabled={savingStock}>
+                          Resend Email
+                        </button>
+                      ) : null}
+                    </td>
+                    <td>{order.bank_slip_url ? <a href={buildAssetUrl(order.bank_slip_url)} target="_blank" rel="noreferrer">View Slip</a> : 'No slip'}</td>
                     <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>
                     <td>
                       {order.is_locked_by_sale ? (
                         <span className="feature-pill">Locked after sale</span>
                       ) : (
                         <div className="inline-actions">
-                          {canUpdateReceivedStock ? <button type="button" className="view-btn" onClick={() => handleEditStockOrder(order)} disabled={savingStock}>Update</button> : null}
-                          {canDeleteReceivedStock ? <button type="button" className="danger-btn" onClick={() => handleDeleteStockOrder(order)} disabled={savingStock}>Delete</button> : null}
+                          {canReceiveStock ? <button type="button" className="view-btn" onClick={() => openStockReceiveModal(order)} disabled={savingStock}>Receive Stock</button> : null}
                         </div>
                       )}
                     </td>
@@ -155,53 +212,52 @@ export default function Stock({
                 ))}
               </tbody>
             </table>
+            {renderPagination({
+              totalRows: pendingStockOrders.length,
+              pageSize: registerPageSize,
+              pagination: stockPagination,
+              setPage: setStockRegisterPage,
+              label: 'orders',
+            })}
+            </>
           )}
         </div>
         ) : null}
       </div>
 
-      {canViewStockRegister ? (
+      {canViewStockReceived ? (
       <div className="table-card">
-        <h3>Stock Ordering Register</h3>
-        {pendingStockOrders.length === 0 ? (
-          renderEmptyState('No stock orders have been created yet.')
+        <h3>Stock Received From Company</h3>
+        {receivedStockOrders.length === 0 ? (
+          renderEmptyState('No stock has been marked as received yet.')
         ) : (
+          <>
           <table className="pro-table">
             <thead>
               <tr>
                 <th>Company</th>
                 <th>Vehicle</th>
-                <th>Amount</th>
-                <th>Order Date</th>
-                <th>Email</th>
-                <th>Slip</th>
+                <th>Vehicle Received</th>
+                <th>Received Date</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {stockRegisterRows.map((order) => (
+              {receivedRegisterRows.map((order) => (
                 <tr key={order.id}>
-                    <td>{order.company_name}<br />{order.company_email || 'No email'}</td>
+                  <td>{order.company_name}</td>
                   <td>{order.brand} {order.model}<br />{order.vehicle_type}{order.product_color ? ` / ${order.product_color}` : ''}<br />{order.product_description || 'No description'}</td>
-                  <td>{formatCurrency(order.total_amount)}</td>
-                  <td>{order.expected_delivery_date || 'Not set'}</td>
-                  <td>
-                    <div>{getStockEmailStatus(order)}</div>
-                    {!order.email_sent && handleResendStockOrderEmail ? (
-                      <button type="button" className="view-btn compact-action" onClick={() => handleResendStockOrderEmail(order.id)} disabled={savingStock}>
-                        Resend Email
-                      </button>
-                    ) : null}
-                  </td>
-                  <td>{order.bank_slip_url ? <a href={buildAssetUrl(order.bank_slip_url)} target="_blank" rel="noreferrer">View Slip</a> : 'No slip'}</td>
+                  <td>{Number(order.received_quantity || 0) > 0 ? 'Yes' : 'Pending'}</td>
+                  <td>{order.received_at ? new Date(order.received_at).toLocaleDateString('en-PK') : 'Pending'}</td>
                   <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>
                   <td>
                     {order.is_locked_by_sale ? (
                       <span className="feature-pill">Locked after sale</span>
                     ) : (
                       <div className="inline-actions">
-                        {canReceiveStock ? <button type="button" className="view-btn" onClick={() => openStockReceiveModal(order)} disabled={savingStock}>Receive Stock</button> : null}
+                        {canUpdateReceivedStock ? <button type="button" className="view-btn" onClick={() => handleEditStockOrder(order)} disabled={savingStock}>Update</button> : null}
+                        {canDeleteReceivedStock ? <button type="button" className="danger-btn" onClick={() => handleDeleteStockOrder(order)} disabled={savingStock}>Delete</button> : null}
                       </div>
                     )}
                   </td>
@@ -209,6 +265,14 @@ export default function Stock({
               ))}
             </tbody>
           </table>
+          {renderPagination({
+            totalRows: receivedStockOrders.length,
+            pageSize: 10,
+            pagination: receivedPagination,
+            setPage: setReceivedRegisterPage,
+            label: 'received records',
+          })}
+          </>
         )}
       </div>
       ) : null}
