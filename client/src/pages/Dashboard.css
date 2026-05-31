@@ -2603,9 +2603,28 @@ body,
     min-width: 0;
 }
 
+.stock-register-card {
+    overflow: hidden;
+}
+
 .stock-table-wrap {
     width: 100%;
     overflow-x: auto;
+    border: 1px solid color-mix(in srgb, var(--dash-border) 78%, transparent);
+    border-radius: 14px 14px 0 0;
+}
+
+.stock-table-wrap .pro-table {
+    margin: 0;
+}
+
+.stock-register-card .table-pagination {
+    margin-top: 0;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--dash-border) 78%, transparent);
+    border-top: 0;
+    border-radius: 0 0 14px 14px;
+    background: color-mix(in srgb, var(--dash-surface) 88%, transparent);
 }
 
 .stock-register-table,

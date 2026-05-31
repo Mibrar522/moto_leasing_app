@@ -60,6 +60,8 @@ export default function Stock({
     </>
   );
   const renderReceivedIdentity = (value) => value || 'Not set';
+  const getReceivedIdentity = (order, receivedKey, legacyKey) => order[receivedKey] || order[legacyKey];
+  const getReceivedDate = (order) => order.effective_received_at || order.received_at;
 
   const renderPagination = ({ totalRows, pageSize, pagination, setPage, label }) => {
     if (totalRows <= pageSize) return null;
@@ -258,10 +260,10 @@ export default function Stock({
                   <td>{order.company_name}</td>
                   <td>{renderVehicleCell(order)}</td>
                   <td>{Number(order.received_quantity || 0) > 0 ? 'Yes' : 'Pending'}</td>
-                  <td>{renderReceivedIdentity(order.registration_number)}</td>
-                  <td>{renderReceivedIdentity(order.chassis_number)}</td>
-                  <td>{renderReceivedIdentity(order.engine_number)}</td>
-                  <td>{order.received_at ? new Date(order.received_at).toLocaleDateString('en-PK') : 'Pending'}</td>
+                  <td>{renderReceivedIdentity(getReceivedIdentity(order, 'received_registration_number', 'registration_number'))}</td>
+                  <td>{renderReceivedIdentity(getReceivedIdentity(order, 'received_chassis_number', 'chassis_number'))}</td>
+                  <td>{renderReceivedIdentity(getReceivedIdentity(order, 'received_engine_number', 'engine_number'))}</td>
+                  <td>{getReceivedDate(order) ? new Date(getReceivedDate(order)).toLocaleDateString('en-PK') : 'Pending'}</td>
                   <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>
                   <td>
                     {order.is_locked_by_sale ? (

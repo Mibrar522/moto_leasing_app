@@ -1599,10 +1599,10 @@ exports.getDashboardData = async (req, res) => {
             `
             SELECT
                 so.*,
-                COALESCE(received_vehicle.registration_number, so.registration_number) AS registration_number,
-                COALESCE(received_vehicle.chassis_number, so.chassis_number) AS chassis_number,
-                COALESCE(received_vehicle.engine_number, so.engine_number) AS engine_number,
-                COALESCE(so.received_at, received_vehicle.created_at) AS received_at,
+                received_vehicle.registration_number AS received_registration_number,
+                received_vehicle.chassis_number AS received_chassis_number,
+                received_vehicle.engine_number AS received_engine_number,
+                COALESCE(so.received_at, received_vehicle.created_at) AS effective_received_at,
                 cp.company_name AS profile_company_name,
                 cp.company_email AS profile_company_email,
                 pc.image_url AS product_image_url,
