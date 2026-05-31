@@ -50,13 +50,6 @@ export default function Stock({
   const stockPagination = paginateRows(pendingStockOrders, stockRegisterPage, registerPageSize);
   const receivedRegisterRows = receivedPagination.pageRows;
   const stockRegisterRows = stockPagination.pageRows;
-  const getStockIdentityRows = (order) => [
-    ['Registration', order.registration_number],
-    ['Chassis', order.chassis_number],
-    ['Engine', order.engine_number],
-    ['Serial', order.serial_number || order.product_serial_number],
-  ];
-
   const renderVehicleCell = (order) => (
     <>
       {[order.brand || order.product_brand, order.model || order.product_model].filter(Boolean).join(' ') || 'Vehicle'}
@@ -64,15 +57,9 @@ export default function Stock({
       {order.vehicle_type || order.product_vehicle_type || 'No type'}{order.product_color ? ` / ${order.product_color}` : order.color ? ` / ${order.color}` : ''}
       <br />
       {order.product_description || 'No description'}
-      <div className="stock-identity-list">
-        {getStockIdentityRows(order).map(([label, value]) => (
-          <span key={`${order.id}-${label}`} className={!value ? 'is-empty' : ''}>
-            <strong>{label}:</strong> {value || 'Not set'}
-          </span>
-        ))}
-      </div>
     </>
   );
+  const renderReceivedIdentity = (value) => value || 'Not set';
 
   const renderPagination = ({ totalRows, pageSize, pagination, setPage, label }) => {
     if (totalRows <= pageSize) return null;
@@ -245,6 +232,9 @@ export default function Stock({
               <col className="stock-col-company" />
               <col className="stock-col-vehicle" />
               <col className="stock-col-received" />
+              <col className="stock-col-identity" />
+              <col className="stock-col-identity" />
+              <col className="stock-col-identity" />
               <col className="stock-col-date" />
               <col className="stock-col-status" />
               <col className="stock-col-action" />
@@ -254,6 +244,9 @@ export default function Stock({
                 <th>Company</th>
                 <th>Vehicle</th>
                 <th>Vehicle Received</th>
+                <th>Registration</th>
+                <th>Chassis</th>
+                <th>Engine</th>
                 <th>Received Date</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -265,6 +258,9 @@ export default function Stock({
                   <td>{order.company_name}</td>
                   <td>{renderVehicleCell(order)}</td>
                   <td>{Number(order.received_quantity || 0) > 0 ? 'Yes' : 'Pending'}</td>
+                  <td>{renderReceivedIdentity(order.registration_number)}</td>
+                  <td>{renderReceivedIdentity(order.chassis_number)}</td>
+                  <td>{renderReceivedIdentity(order.engine_number)}</td>
                   <td>{order.received_at ? new Date(order.received_at).toLocaleDateString('en-PK') : 'Pending'}</td>
                   <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>
                   <td>

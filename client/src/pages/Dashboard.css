@@ -2593,30 +2593,6 @@ body,
     overflow: auto;
 }
 
-.stock-identity-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px 10px;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid color-mix(in srgb, var(--dash-border) 78%, transparent);
-}
-
-.stock-identity-list span {
-    color: var(--dash-text-soft);
-    font-size: 0.68rem;
-    line-height: 1.35;
-}
-
-.stock-identity-list strong {
-    color: var(--dash-text);
-    font-weight: 900;
-}
-
-.stock-identity-list .is-empty {
-    opacity: 0.72;
-}
-
 .stock-page-grid {
     grid-template-columns: minmax(460px, 0.9fr) minmax(620px, 1.1fr);
     align-items: start;
@@ -2636,6 +2612,10 @@ body,
 .stock-received-table {
     min-width: 760px;
     table-layout: fixed;
+}
+
+.stock-received-table {
+    min-width: 1040px;
 }
 
 .stock-register-table th,
@@ -2675,6 +2655,34 @@ body,
 
 .stock-col-received {
     width: 13%;
+}
+
+.stock-col-identity {
+    width: 11%;
+}
+
+.stock-received-table .stock-col-company {
+    width: 15%;
+}
+
+.stock-received-table .stock-col-vehicle {
+    width: 22%;
+}
+
+.stock-received-table .stock-col-received {
+    width: 10%;
+}
+
+.stock-received-table .stock-col-date {
+    width: 11%;
+}
+
+.stock-received-table .stock-col-status {
+    width: 9%;
+}
+
+.stock-received-table .stock-col-action {
+    width: 11%;
 }
 
 .customer-modal-grid > * {
