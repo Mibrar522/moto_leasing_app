@@ -2595,7 +2595,7 @@ body,
 
 .stock-page-grid {
     grid-template-columns: minmax(460px, 0.9fr) minmax(620px, 1.1fr);
-    align-items: start;
+    align-items: stretch;
 }
 
 .stock-order-form-card,
@@ -2605,6 +2605,19 @@ body,
 
 .stock-register-card {
     overflow: hidden;
+}
+
+.stock-page-grid .stock-register-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.stock-page-grid .stock-table-wrap {
+    flex: 1;
+}
+
+.stock-page-grid .stock-register-card .table-pagination {
+    margin-top: auto;
 }
 
 .stock-table-wrap {
