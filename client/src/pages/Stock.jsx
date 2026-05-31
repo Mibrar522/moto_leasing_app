@@ -51,6 +51,29 @@ export default function Stock({
   const stockPagination = paginateRows(pendingStockOrders, stockRegisterPage, registerPageSize);
   const receivedRegisterRows = receivedPagination.pageRows;
   const stockRegisterRows = stockPagination.pageRows;
+  const getStockIdentityRows = (order) => [
+    ['Registration', order.registration_number],
+    ['Chassis', order.chassis_number],
+    ['Engine', order.engine_number],
+    ['Serial', order.serial_number || order.product_serial_number],
+  ];
+
+  const renderVehicleCell = (order) => (
+    <>
+      {[order.brand || order.product_brand, order.model || order.product_model].filter(Boolean).join(' ') || 'Vehicle'}
+      <br />
+      {order.vehicle_type || order.product_vehicle_type || 'No type'}{order.product_color ? ` / ${order.product_color}` : order.color ? ` / ${order.color}` : ''}
+      <br />
+      {order.product_description || 'No description'}
+      <div className="stock-identity-list">
+        {getStockIdentityRows(order).map(([label, value]) => (
+          <span key={`${order.id}-${label}`} className={!value ? 'is-empty' : ''}>
+            <strong>{label}:</strong> {value || 'Not set'}
+          </span>
+        ))}
+      </div>
+    </>
+  );
 
   const renderPagination = ({ totalRows, pageSize, pagination, setPage, label }) => {
     if (totalRows <= pageSize) return null;
@@ -186,7 +209,7 @@ export default function Stock({
                 {stockRegisterRows.map((order) => (
                   <tr key={order.id}>
                     <td>{order.company_name}<br />{order.company_email || 'No email'}</td>
-                    <td>{order.brand} {order.model}<br />{order.vehicle_type}{order.product_color ? ` / ${order.product_color}` : ''}<br />{order.product_description || 'No description'}</td>
+                    <td>{renderVehicleCell(order)}</td>
                     <td>{formatCurrency(order.total_amount)}</td>
                     <td>{order.expected_delivery_date || 'Not set'}</td>
                     <td>
@@ -247,7 +270,7 @@ export default function Stock({
               {receivedRegisterRows.map((order) => (
                 <tr key={order.id}>
                   <td>{order.company_name}</td>
-                  <td>{order.brand} {order.model}<br />{order.vehicle_type}{order.product_color ? ` / ${order.product_color}` : ''}<br />{order.product_description || 'No description'}</td>
+                  <td>{renderVehicleCell(order)}</td>
                   <td>{Number(order.received_quantity || 0) > 0 ? 'Yes' : 'Pending'}</td>
                   <td>{order.received_at ? new Date(order.received_at).toLocaleDateString('en-PK') : 'Pending'}</td>
                   <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>

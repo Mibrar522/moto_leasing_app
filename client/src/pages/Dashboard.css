@@ -2593,6 +2593,29 @@ body,
     overflow: auto;
 }
 
+.stock-identity-list {
+    display: grid;
+    gap: 3px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid color-mix(in srgb, var(--dash-border) 78%, transparent);
+}
+
+.stock-identity-list span {
+    color: var(--dash-text-soft);
+    font-size: 0.68rem;
+    line-height: 1.35;
+}
+
+.stock-identity-list strong {
+    color: var(--dash-text);
+    font-weight: 900;
+}
+
+.stock-identity-list .is-empty {
+    opacity: 0.72;
+}
+
 .customer-modal-grid > * {
     max-height: calc(100vh - 134px);
     overflow: auto;
