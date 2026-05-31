@@ -35,7 +35,6 @@ export default function Customers({ ctx }) {
     isPreviewableImage,
     isPreviewablePdf,
     isSuperAdmin,
-    renderCustomerDetails,
     renderEmptyState,
     resetCustomerForm,
     savingCustomer,
@@ -92,6 +91,7 @@ export default function Customers({ ctx }) {
 
   const openNewCustomerWorkspace = () => {
     resetCustomerForm();
+    setSelectedCustomerId('');
     setCustomerWorkspaceOpen(true);
   };
 
@@ -163,6 +163,189 @@ export default function Customers({ ctx }) {
     ? '12345-1234567-1'
     : 'Passport number';
 
+  const getLiveCustomerValue = (field, fallback = '') => {
+    const formValue = customerForm[field];
+    if (formValue !== undefined && formValue !== null && String(formValue).trim() !== '') {
+      return formValue;
+    }
+    return selectedCustomer?.[field] || fallback;
+  };
+
+  const renderLiveDocumentPreview = (url, label, emptyLabel) => (
+    <div className="employee-document-preview">
+      {url ? (
+        isPreviewableImage(url) ? (
+          <img src={buildAssetUrl(url)} alt={label} className="employee-document-image" />
+        ) : isPreviewablePdf(url) ? (
+          <iframe src={buildAssetUrl(url)} title={label} className="employee-document-frame" />
+        ) : (
+          <a href={buildAssetUrl(url)} target="_blank" rel="noreferrer" className="view-btn">
+            Open {label}
+          </a>
+        )
+      ) : (
+        <div className="employee-document-empty">{emptyLabel}</div>
+      )}
+    </div>
+  );
+
+  const renderCustomerLivePreview = () => {
+    const selectedOcrDetails = selectedCustomer?.ocr_details || {};
+    const selectedFingerprint = selectedOcrDetails.fingerprint || {};
+    const liveFingerprint = {
+      status: getLiveCustomerValue('fingerprint_status', selectedFingerprint.status || 'NOT_CAPTURED'),
+      device: getLiveCustomerValue('fingerprint_device', selectedFingerprint.device || ''),
+      quality: getLiveCustomerValue('fingerprint_quality', selectedFingerprint.quality || ''),
+      thumb_image_url: getLiveCustomerValue('fingerprint_thumb_url', selectedFingerprint.thumb_image_url || ''),
+    };
+    const liveCustomer = {
+      full_name: getLiveCustomerValue('full_name'),
+      father_name: getLiveCustomerValue('father_name', selectedOcrDetails.father_name || ''),
+      date_of_birth: toDateInputValue(getLiveCustomerValue('date_of_birth', selectedOcrDetails.date_of_birth || '')),
+      gender: toGenderSelectValue(getLiveCustomerValue('gender', selectedOcrDetails.gender || '')),
+      document_type: getLiveCustomerValue('document_type', selectedOcrDetails.document_type || 'CNIC'),
+      cnic_passport_number: getLiveCustomerValue('cnic_passport_number'),
+      contact_email: getLiveCustomerValue('contact_email', selectedOcrDetails.contact_email || ''),
+      contact_phone: getLiveCustomerValue('contact_phone', selectedOcrDetails.contact_phone || ''),
+      country: getLiveCustomerValue('country', selectedOcrDetails.country || ''),
+      address: getLiveCustomerValue('address', selectedOcrDetails.address || ''),
+      extracted_name: getLiveCustomerValue('extracted_name', selectedOcrDetails.extracted_name || ''),
+      raw_ocr_text: getLiveCustomerValue('raw_ocr_text', selectedOcrDetails.raw_ocr_text || ''),
+      biometric_hash: getLiveCustomerValue('biometric_hash', selectedCustomer?.biometric_hash || ''),
+      identity_doc_url: getLiveCustomerValue('identity_doc_url', selectedCustomer?.identity_doc_url || ''),
+      identity_doc_back_url: getLiveCustomerValue('identity_doc_back_url', selectedOcrDetails.identity_doc_back_url || ''),
+      passport_photo_url: getLiveCustomerValue('passport_photo_url', selectedOcrDetails.passport_photo_url || selectedCustomer?.passport_photo_url || ''),
+      signature_image_url: getLiveCustomerValue('signature_image_url', selectedOcrDetails.signature_image_url || selectedCustomer?.signature_image_url || ''),
+    };
+    const hasAnyLiveData = [
+      liveCustomer.full_name,
+      liveCustomer.cnic_passport_number,
+      liveCustomer.identity_doc_url,
+      liveCustomer.identity_doc_back_url,
+      liveCustomer.passport_photo_url,
+      liveCustomer.signature_image_url,
+      liveCustomer.raw_ocr_text,
+      liveCustomer.biometric_hash,
+      liveFingerprint.thumb_image_url,
+    ].some(Boolean);
+
+    return (
+      <aside className="sales-live-summary customer-live-summary">
+        <div className="sales-live-summary-head">
+          <span>Live customer preview</span>
+          <strong>{liveCustomer.full_name || selectedCustomer?.full_name || 'Customer intake preview'}</strong>
+        </div>
+
+        {!hasAnyLiveData ? (
+          <div className="employee-document-empty">Start typing or upload documents to build the customer preview.</div>
+        ) : null}
+
+        <div className="detail-grid sales-live-summary-grid">
+          <div>
+            <span className="meta-label">Full Name</span>
+            <p className="meta-value">{liveCustomer.full_name || 'Not set'}</p>
+          </div>
+          <div>
+            <span className="meta-label">Father Name</span>
+            <p className="meta-value">{liveCustomer.father_name || 'Not set'}</p>
+          </div>
+          <div>
+            <span className="meta-label">Date Of Birth</span>
+            <p className="meta-value">{liveCustomer.date_of_birth || 'Not set'}</p>
+          </div>
+          <div>
+            <span className="meta-label">Gender</span>
+            <p className="meta-value">{liveCustomer.gender || 'Not set'}</p>
+          </div>
+          <div>
+            <span className="meta-label">Document Type</span>
+            <p className="meta-value">{liveCustomer.document_type || 'Not set'}</p>
+          </div>
+          <div>
+            <span className="meta-label">CNIC / Passport</span>
+            <p className="meta-value">{liveCustomer.cnic_passport_number || 'Not set'}</p>
+          </div>
+          <div>
+            <span className="meta-label">Contact Email</span>
+            <p className="meta-value">{liveCustomer.contact_email || 'Not set'}</p>
+          </div>
+          <div>
+            <span className="meta-label">Contact Phone</span>
+            <p className="meta-value">{liveCustomer.contact_phone || 'Not set'}</p>
+          </div>
+          <div>
+            <span className="meta-label">Country</span>
+            <p className="meta-value">{liveCustomer.country || 'Not set'}</p>
+          </div>
+          <div>
+            <span className="meta-label">Assigned Dealer</span>
+            <p className="meta-value">{selectedCustomer?.dealer_name || user?.dealer_name || 'Current dealer'}</p>
+          </div>
+          <div className="full-span">
+            <span className="meta-label">Address</span>
+            <p className="meta-value">{liveCustomer.address || 'Not set'}</p>
+          </div>
+        </div>
+
+        <div className="feature-list">
+          <span className="feature-pill">{liveCustomer.raw_ocr_text ? 'OCR Ready' : 'OCR Pending'}</span>
+          <span className="feature-pill">{liveCustomer.identity_doc_url ? 'CNIC Front Ready' : 'CNIC Front Missing'}</span>
+          <span className="feature-pill">{liveCustomer.identity_doc_back_url ? 'CNIC Back Ready' : 'CNIC Back Missing'}</span>
+          <span className="feature-pill">{liveCustomer.passport_photo_url ? 'Photo Ready' : 'Photo Missing'}</span>
+          <span className="feature-pill">{liveCustomer.signature_image_url ? 'Signature Ready' : 'Signature Missing'}</span>
+          <span className="feature-pill">{liveCustomer.biometric_hash || liveFingerprint.thumb_image_url ? 'Fingerprint Ready' : 'Fingerprint Pending'}</span>
+        </div>
+
+        <div className="detail-grid sales-live-documents">
+          <div className="full-span">
+            <span className="meta-label">OCR Extracted Name</span>
+            <p className="meta-value">{liveCustomer.extracted_name || 'Not extracted yet'}</p>
+          </div>
+          <div>
+            <span className="meta-label">CNIC Front Preview</span>
+            {renderLiveDocumentPreview(liveCustomer.identity_doc_url, 'CNIC Front', 'No CNIC front uploaded')}
+          </div>
+          <div>
+            <span className="meta-label">CNIC Back Preview</span>
+            {renderLiveDocumentPreview(liveCustomer.identity_doc_back_url, 'CNIC Back', 'No CNIC back uploaded')}
+          </div>
+          <div>
+            <span className="meta-label">Customer Photo</span>
+            {renderLiveDocumentPreview(liveCustomer.passport_photo_url, 'Customer Photo', 'No customer photo uploaded')}
+          </div>
+          <div>
+            <span className="meta-label">Signature Preview</span>
+            {renderLiveDocumentPreview(liveCustomer.signature_image_url, 'Signature', 'No signature uploaded')}
+          </div>
+          <div>
+            <span className="meta-label">Thumb Preview</span>
+            {renderLiveDocumentPreview(liveFingerprint.thumb_image_url, 'Thumb Preview', 'No thumb image uploaded')}
+          </div>
+          <div>
+            <span className="meta-label">Fingerprint Status</span>
+            <p className="meta-value">{liveFingerprint.status || 'NOT_CAPTURED'}</p>
+          </div>
+          <div>
+            <span className="meta-label">Scanner Device</span>
+            <p className="meta-value">{liveFingerprint.device || 'Not recorded'}</p>
+          </div>
+          <div>
+            <span className="meta-label">Scan Quality</span>
+            <p className="meta-value">{liveFingerprint.quality || 'Not recorded'}</p>
+          </div>
+          <div className="full-span">
+            <span className="meta-label">OCR Text</span>
+            <pre className="scan-box">{liveCustomer.raw_ocr_text || 'No OCR text captured yet.'}</pre>
+          </div>
+          <div className="full-span">
+            <span className="meta-label">Biometric Hash</span>
+            <pre className="scan-box">{liveCustomer.biometric_hash || 'No fingerprint hash stored yet.'}</pre>
+          </div>
+        </div>
+      </aside>
+    );
+  };
+
 if (!canOpenCustomers) {
                     return <div className="feedback-card error">Your account does not have customer onboarding access.</div>;
                 }
@@ -178,14 +361,6 @@ if (!canOpenCustomers) {
                             <button type="button" className="sales-workspace-action-card" onClick={openNewCustomerWorkspace}>
                                 <span>Customer intake</span>
                                 <strong>Create or update customer profile</strong>
-                            </button>
-                            <button
-                                type="button"
-                                className="sales-workspace-action-card sales-workspace-action-card-soft"
-                                onClick={() => setCustomerWorkspaceOpen(true)}
-                            >
-                                <span>Profile preview</span>
-                                <strong>Open customer OCR and biometric view</strong>
                             </button>
                         </div>
                         ) : null}
@@ -217,14 +392,6 @@ if (!canOpenCustomers) {
                             <form id="customer-intake-form" className="table-card customer-form-card" onSubmit={handleCustomerSubmit}>
                                 <div className="section-header">
                                     <h3>{customerForm.id ? 'Update Customer' : 'New Customer Intake'}</h3>
-                                    <div className="inline-actions">
-                                        <button type="button" className="view-btn" onClick={resetCustomerForm}>
-                                            Clear
-                                        </button>
-                                        <button type="submit" className="primary-btn" disabled={savingCustomer}>
-                                            {savingCustomer ? 'Saving...' : customerForm.id ? 'Update Customer' : 'Create Customer'}
-                                        </button>
-                                    </div>
                                 </div>
 
                                 {customerForm.id ? (
@@ -520,7 +687,7 @@ if (!canOpenCustomers) {
                             </form>
                             ) : null}
 
-                            {renderCustomerDetails()}
+                            {renderCustomerLivePreview()}
                         </div>
                             </div>
                         </div>
