@@ -922,6 +922,177 @@ exports.createStockOrder = async (req, res) => {
     }
 };
 
+exports.receiveStockOrder = async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
+        await ensureStockScopedColumns();
+
+        const {
+            received_items = [],
+            received_at,
+            payment_amount,
+            payment_date,
+            notes,
+        } = req.body;
+
+        const receivedItems = Array.isArray(received_items) ? received_items : [];
+        if (receivedItems.length !== 1) {
+            return res.status(400).json({ message: 'Exactly one received vehicle must be submitted for this stock order.' });
+        }
+
+        await client.query('BEGIN');
+
+        const currentOrderResult = await client.query(
+            `
+            SELECT
+                so.*,
+                pc.image_url,
+                pc.monthly_rate,
+                pc.color,
+                pc.serial_number,
+                pc.description AS product_description
+            FROM stock_orders so
+            LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
+            LEFT JOIN users u ON u.id = so.ordered_by
+            WHERE so.id = $1
+              ${globalScope ? '' : stockOrderDealerScopeAndClause(2, 3)}
+            FOR UPDATE OF so
+            `,
+            globalScope ? [req.params.id] : [req.params.id, dealerId, req.user.id]
+        );
+
+        if (currentOrderResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Stock order not found' });
+        }
+
+        const currentOrder = currentOrderResult.rows[0];
+        const saleLock = await getStockOrderSaleLock(client, currentOrder.id);
+        if (saleLock) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ message: 'This stock order is locked because a customer transaction has already been created.' });
+        }
+
+        const existingVehicleResult = await client.query(
+            `
+            SELECT id, registration_number, chassis_number, engine_number
+            FROM vehicles
+            WHERE source_stock_order_id = $1
+            LIMIT 1
+            `,
+            [currentOrder.id]
+        );
+        if (existingVehicleResult.rows.length > 0) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ message: 'This stock order has already been received into inventory.' });
+        }
+
+        const totalAmount = roundMoney(currentOrder.total_amount || currentOrder.unit_price || 0);
+        const currentPaidAmount = roundMoney(currentOrder.paid_amount);
+        const currentRemainingAmount = calculateRemainingAmount(totalAmount, currentPaidAmount);
+        const paymentAmount = payment_amount === undefined || payment_amount === ''
+            ? 0
+            : roundMoney(payment_amount);
+
+        if (paymentAmount < 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Payment amount cannot be negative.' });
+        }
+
+        if (paymentAmount > currentRemainingAmount) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: `Payment amount cannot be greater than the remaining balance of ${currentRemainingAmount}.` });
+        }
+
+        await createReceivedInventoryVehicle(client, currentOrder, receivedItems[0], 1);
+
+        const nextPaidAmount = Math.min(roundMoney(currentPaidAmount + paymentAmount), totalAmount);
+        const nextRemainingAmount = calculateRemainingAmount(totalAmount, nextPaidAmount);
+        const receivedAt = received_at || new Date().toISOString();
+        const paidAt = paymentAmount > 0
+            ? (payment_date || receivedAt)
+            : (currentOrder.purchase_paid_at || null);
+
+        const updatedOrderResult = await client.query(
+            `
+            UPDATE stock_orders
+            SET
+                order_status = 'RECEIVED',
+                received_quantity = 1,
+                received_at = $2,
+                paid_amount = $3,
+                remaining_amount = $4,
+                purchase_paid_at = COALESCE($5, purchase_paid_at),
+                notes = COALESCE($6, notes),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            `,
+            [
+                currentOrder.id,
+                receivedAt,
+                nextPaidAmount,
+                nextRemainingAmount,
+                paidAt,
+                notes || null,
+            ]
+        );
+        const updatedOrder = updatedOrderResult.rows[0];
+
+        const vehicleResult = await client.query(
+            `
+            SELECT id, registration_number, chassis_number, engine_number
+            FROM vehicles
+            WHERE source_stock_order_id = $1
+            LIMIT 1
+            `,
+            [currentOrder.id]
+        );
+
+        if (vehicleResult.rows.length === 0 || updatedOrder.order_status !== 'RECEIVED' || Number(updatedOrder.received_quantity || 0) < 1) {
+            await client.query('ROLLBACK');
+            return res.status(500).json({ message: 'Stock receive did not complete. No inventory vehicle was created.' });
+        }
+
+        try {
+            await upsertPurchaseLedger(client, updatedOrder, req.user.id);
+        } catch (ledgerError) {
+            console.warn('Purchase ledger sync skipped after stock receive:', ledgerError.message);
+        }
+
+        await client.query('COMMIT');
+        res.status(200).json({ ...updatedOrder, received_vehicle: vehicleResult.rows[0] });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Stock receive error:', {
+            orderId: req.params.id,
+            message: error.message,
+            code: error.code,
+            constraint: error.constraint,
+            detail: error.detail,
+        });
+        if (error.message === 'Registration number, chassis number, and engine number are required for each received vehicle.') {
+            return res.status(400).json({ message: error.message });
+        }
+        if (error.statusCode === 409) {
+            return res.status(409).json({ message: error.message });
+        }
+        if (error.code === '23505') {
+            const uniquenessMessage = getVehicleUniqueConstraintMessage(error);
+            if (uniquenessMessage) {
+                return res.status(409).json({ message: uniquenessMessage });
+            }
+        }
+        res.status(500).json({ message: 'Failed to receive stock order', error: error.message, detail: error.detail || null, constraint: error.constraint || null });
+    } finally {
+        client.release();
+    }
+};
+
 exports.resendStockOrderEmail = async (req, res) => {
     try {
         const context = await getStockOrderEmailContext(req.params.id, req.user);

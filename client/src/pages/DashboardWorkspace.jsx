@@ -7829,16 +7829,15 @@ const selectedCustomer = useMemo(
         try {
             setSavingStock(true);
             const receivedDateTime = stockReceiveDate ? `${stockReceiveDate}T12:00:00.000Z` : new Date().toISOString();
-            await API.patch(`/stock/orders/${receivingStockOrder.id}`, {
+            const receiveResponse = await API.post(`/stock/orders/${receivingStockOrder.id}/receive`, {
                 received_items: stockReceiveItems,
-                received_quantity: 1,
-                order_status: 'RECEIVED',
                 received_at: receivedDateTime,
                 payment_amount: paymentAmount || undefined,
                 payment_date: paymentAmount > 0 && stockReceivePaidDate ? `${stockReceivePaidDate}T12:00:00.000Z` : undefined,
                 notes: receivingStockOrder.notes || '',
             });
-            setStockMessage(`Stock order ${receivingStockOrder.id} updated with the received vehicle details.`);
+            const savedStatus = receiveResponse.data?.order_status || 'RECEIVED';
+            setStockMessage(`Stock order ${receivingStockOrder.id} received successfully. Status: ${savedStatus}.`);
             await loadDashboard();
             closeStockReceiveModal(true);
         } catch (err) {
