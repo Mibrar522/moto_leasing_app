@@ -10563,7 +10563,7 @@ const selectedCustomer = useMemo(
                             </button>
                         </div>
 
-                        <form className="receive-modal-form" onSubmit={handleSubmitReceivedStock}>
+                        <form className="receive-modal-form" onSubmit={handleSubmitReceivedStock} noValidate>
                             {stockMessage ? <div className="notice-banner stock-receive-warning">{stockMessage}</div> : null}
                             <div className="form-grid">
                                 <label className="field">
