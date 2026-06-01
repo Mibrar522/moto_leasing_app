@@ -66,19 +66,29 @@ const stockOrderDealerScopeAndClause = (dealerParamIndex = 2, userParamIndex = 3
     )
 `;
 
+const runOptionalStockSchemaQuery = async (label, sql) => {
+    try {
+        await pool.query(sql);
+        return true;
+    } catch (error) {
+        console.warn(`Stock schema migration skipped (${label}):`, error.message);
+        return false;
+    }
+};
+
 const ensureStockScopedColumns = async () => {
-    await pool.query(`
+    await runOptionalStockSchemaQuery('stock order payment columns', `
         ALTER TABLE stock_orders
             ADD COLUMN IF NOT EXISTS dealer_id UUID,
             ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
             ADD COLUMN IF NOT EXISTS remaining_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
             ADD COLUMN IF NOT EXISTS purchase_paid_at TIMESTAMPTZ
     `);
-    await pool.query(`
+    await runOptionalStockSchemaQuery('vehicle dealer column', `
         ALTER TABLE vehicles
             ADD COLUMN IF NOT EXISTS dealer_id UUID
     `);
-    await pool.query(`
+    await runOptionalStockSchemaQuery('backfill stock dealer ownership', `
         WITH stock_owner AS (
             SELECT
                 so2.id,
@@ -95,17 +105,17 @@ const ensureStockScopedColumns = async () => {
         WHERE stock_owner.id = so.id
           AND so.dealer_id IS NULL
     `);
-    await pool.query(`
+    await runOptionalStockSchemaQuery('product catalog ownership columns', `
         ALTER TABLE product_catalog
             ADD COLUMN IF NOT EXISTS dealer_id UUID,
             ADD COLUMN IF NOT EXISTS created_by UUID
     `);
-    await pool.query(`
+    await runOptionalStockSchemaQuery('company ownership columns', `
         ALTER TABLE company_profiles
             ADD COLUMN IF NOT EXISTS dealer_id UUID,
             ADD COLUMN IF NOT EXISTS created_by UUID
     `);
-    await pool.query(`
+    await runOptionalStockSchemaQuery('purchase ledger table', `
         CREATE TABLE IF NOT EXISTS purchase_ledger (
             id UUID PRIMARY KEY DEFAULT (md5(random()::text || clock_timestamp()::text)::uuid),
             dealer_id UUID,
@@ -128,7 +138,7 @@ const ensureStockScopedColumns = async () => {
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     `);
-    await pool.query(`
+    await runOptionalStockSchemaQuery('purchase ledger optional columns', `
         ALTER TABLE purchase_ledger
             ADD COLUMN IF NOT EXISTS dealer_id UUID,
             ADD COLUMN IF NOT EXISTS vehicle_id UUID REFERENCES vehicles(id) ON DELETE SET NULL,
