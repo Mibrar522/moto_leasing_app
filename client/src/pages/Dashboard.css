@@ -2647,11 +2647,11 @@ body,
 }
 
 .stock-register-table {
-    min-width: 0;
+    min-width: 980px;
 }
 
 .stock-received-table {
-    min-width: 1040px;
+    min-width: 1250px;
 }
 
 .stock-register-table th,

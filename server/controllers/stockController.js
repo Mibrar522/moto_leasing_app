@@ -69,7 +69,10 @@ const stockOrderDealerScopeAndClause = (dealerParamIndex = 2, userParamIndex = 3
 const ensureStockScopedColumns = async () => {
     await pool.query(`
         ALTER TABLE stock_orders
-            ADD COLUMN IF NOT EXISTS dealer_id UUID
+            ADD COLUMN IF NOT EXISTS dealer_id UUID,
+            ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS remaining_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS purchase_paid_at TIMESTAMPTZ
     `);
     await pool.query(`
         ALTER TABLE vehicles
@@ -102,6 +105,114 @@ const ensureStockScopedColumns = async () => {
             ADD COLUMN IF NOT EXISTS dealer_id UUID,
             ADD COLUMN IF NOT EXISTS created_by UUID
     `);
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS purchase_ledger (
+            id UUID PRIMARY KEY DEFAULT (md5(random()::text || clock_timestamp()::text)::uuid),
+            dealer_id UUID,
+            stock_order_id UUID NOT NULL UNIQUE REFERENCES stock_orders(id) ON DELETE CASCADE,
+            company_profile_id UUID REFERENCES company_profiles(id) ON DELETE SET NULL,
+            vehicle_id UUID REFERENCES vehicles(id) ON DELETE SET NULL,
+            company_name VARCHAR(255) NOT NULL,
+            vehicle_label VARCHAR(255) NOT NULL,
+            color VARCHAR(120),
+            registration_number VARCHAR(120),
+            chassis_number VARCHAR(160),
+            engine_number VARCHAR(160),
+            purchase_date TIMESTAMPTZ,
+            paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+            remaining_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+            payment_date TIMESTAMPTZ,
+            notes TEXT,
+            created_by UUID,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    `);
+    await pool.query(`
+        ALTER TABLE purchase_ledger
+            ADD COLUMN IF NOT EXISTS dealer_id UUID,
+            ADD COLUMN IF NOT EXISTS vehicle_id UUID REFERENCES vehicles(id) ON DELETE SET NULL,
+            ADD COLUMN IF NOT EXISTS payment_date TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    `);
+};
+
+const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100;
+const calculateRemainingAmount = (totalAmount, paidAmount) =>
+    Math.max(roundMoney(totalAmount) - roundMoney(paidAmount), 0);
+
+const upsertPurchaseLedger = async (client, order, userId = null) => {
+    const vehicleResult = await client.query(
+        `
+        SELECT id, registration_number, chassis_number, engine_number, color, image_url
+        FROM vehicles
+        WHERE source_stock_order_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+        `,
+        [order.id]
+    );
+    const vehicle = vehicleResult.rows[0] || {};
+    const vehicleLabel = [order.brand, order.model, order.vehicle_type].filter(Boolean).join(' / ') || 'Vehicle';
+
+    await client.query(
+        `
+        INSERT INTO purchase_ledger (
+            dealer_id,
+            stock_order_id,
+            company_profile_id,
+            vehicle_id,
+            company_name,
+            vehicle_label,
+            color,
+            registration_number,
+            chassis_number,
+            engine_number,
+            purchase_date,
+            paid_amount,
+            remaining_amount,
+            payment_date,
+            notes,
+            created_by,
+            updated_at
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())
+        ON CONFLICT (stock_order_id) DO UPDATE SET
+            dealer_id = EXCLUDED.dealer_id,
+            company_profile_id = EXCLUDED.company_profile_id,
+            vehicle_id = EXCLUDED.vehicle_id,
+            company_name = EXCLUDED.company_name,
+            vehicle_label = EXCLUDED.vehicle_label,
+            color = EXCLUDED.color,
+            registration_number = EXCLUDED.registration_number,
+            chassis_number = EXCLUDED.chassis_number,
+            engine_number = EXCLUDED.engine_number,
+            purchase_date = EXCLUDED.purchase_date,
+            paid_amount = EXCLUDED.paid_amount,
+            remaining_amount = EXCLUDED.remaining_amount,
+            payment_date = EXCLUDED.payment_date,
+            notes = EXCLUDED.notes,
+            updated_at = NOW()
+        `,
+        [
+            order.dealer_id || null,
+            order.id,
+            order.company_profile_id || null,
+            vehicle.id || null,
+            order.company_name || 'Supplier',
+            vehicleLabel,
+            vehicle.color || order.color || null,
+            vehicle.registration_number || order.registration_number || null,
+            vehicle.chassis_number || order.chassis_number || null,
+            vehicle.engine_number || order.engine_number || null,
+            order.expected_delivery_date || order.created_at || null,
+            roundMoney(order.paid_amount),
+            roundMoney(order.remaining_amount),
+            order.purchase_paid_at || null,
+            order.notes || null,
+            userId,
+        ]
+    );
 };
 
 const normalizeStockOrderId = (orderId) => String(orderId || '').replace(/-/g, '').toUpperCase();
@@ -653,6 +764,7 @@ exports.createStockOrder = async (req, res) => {
             vehicle_type,
             chassis_number,
             engine_number,
+            paid_amount,
             unit_price,
             total_amount,
             expected_delivery_date,
@@ -717,15 +829,18 @@ exports.createStockOrder = async (req, res) => {
 
         const company = companyResult.rows[0];
         const product = productResult.rows[0];
+        const orderTotalAmount = roundMoney(total_amount || unit_price || product.purchase_price || 0);
+        const orderPaidAmount = Math.min(roundMoney(paid_amount), orderTotalAmount);
+        const orderRemainingAmount = calculateRemainingAmount(orderTotalAmount, orderPaidAmount);
 
         const result = await pool.query(
             `
             INSERT INTO stock_orders (
                 ordered_by, dealer_id, company_profile_id, company_name, company_email, product_id, vehicle_type, brand, model,
-                chassis_number, engine_number, serial_number, quantity, unit_price, total_amount, product_description,
+                chassis_number, engine_number, serial_number, quantity, unit_price, total_amount, paid_amount, remaining_amount, product_description,
                 expected_delivery_date, bank_slip_url, notes, order_status
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
             RETURNING *
             `,
             [
@@ -743,7 +858,9 @@ exports.createStockOrder = async (req, res) => {
                 product.serial_number || null,
                 1,
                 Number(unit_price || product.purchase_price || 0),
-                Number(total_amount || unit_price || product.purchase_price || 0),
+                orderTotalAmount,
+                orderPaidAmount,
+                orderRemainingAmount,
                 product.description || null,
                 expected_delivery_date || null,
                 bank_slip_url,
@@ -753,6 +870,12 @@ exports.createStockOrder = async (req, res) => {
         );
 
         const order = result.rows[0];
+        const ledgerClient = await pool.connect();
+        try {
+            await upsertPurchaseLedger(ledgerClient, order, req.user.id);
+        } finally {
+            ledgerClient.release();
+        }
         const emailPending = Boolean(company.company_email);
 
         sendStockOrderEmailInBackground({
@@ -832,6 +955,9 @@ exports.updateStockOrder = async (req, res) => {
             product_id,
             unit_price,
             total_amount,
+            paid_amount,
+            payment_amount,
+            payment_date,
             expected_delivery_date,
             bank_slip_url,
             notes,
@@ -974,6 +1100,33 @@ exports.updateStockOrder = async (req, res) => {
                 : nextReceivedQuantity > 0
                     ? 'PROCESSING'
                     : currentOrder.order_status);
+        const nextTotalAmount = total_amount === undefined || total_amount === ''
+            ? roundMoney(currentOrder.total_amount)
+            : roundMoney(total_amount);
+        const currentPaidAmount = roundMoney(currentOrder.paid_amount);
+        let nextPaidAmount = paid_amount === undefined || paid_amount === ''
+            ? currentPaidAmount
+            : roundMoney(paid_amount);
+        const paymentAmount = payment_amount === undefined || payment_amount === ''
+            ? 0
+            : roundMoney(payment_amount);
+        const currentRemainingAmount = calculateRemainingAmount(nextTotalAmount, nextPaidAmount);
+
+        if (paymentAmount > 0) {
+            if (paymentAmount < currentRemainingAmount) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: `Payment amount must be at least the remaining balance of ${currentRemainingAmount}.` });
+            }
+            nextPaidAmount = Math.min(roundMoney(nextPaidAmount + paymentAmount), nextTotalAmount);
+        }
+
+        if (nextPaidAmount > nextTotalAmount) {
+            nextPaidAmount = nextTotalAmount;
+        }
+        const nextRemainingAmount = calculateRemainingAmount(nextTotalAmount, nextPaidAmount);
+        const nextPaymentDate = paymentAmount > 0
+            ? (payment_date || new Date().toISOString())
+            : (currentOrder.purchase_paid_at || null);
 
         const result = await client.query(
             `
@@ -994,9 +1147,12 @@ exports.updateStockOrder = async (req, res) => {
                 serial_number = COALESCE($13, serial_number),
                 unit_price = COALESCE($14, unit_price),
                 total_amount = COALESCE($15, total_amount),
-                product_description = COALESCE($16, product_description),
-                expected_delivery_date = COALESCE($17, expected_delivery_date),
-                bank_slip_url = COALESCE($18, bank_slip_url)
+                paid_amount = $16,
+                remaining_amount = $17,
+                purchase_paid_at = COALESCE($18, purchase_paid_at),
+                product_description = COALESCE($19, product_description),
+                expected_delivery_date = COALESCE($20, expected_delivery_date),
+                bank_slip_url = COALESCE($21, bank_slip_url)
             WHERE id = $1
             RETURNING *
             `,
@@ -1015,7 +1171,10 @@ exports.updateStockOrder = async (req, res) => {
                 nextProduct.model || null,
                 nextProduct.serial_number || null,
                 unit_price === undefined || unit_price === '' ? null : Number(unit_price),
-                total_amount === undefined || total_amount === '' ? null : Number(total_amount),
+                nextTotalAmount,
+                nextPaidAmount,
+                nextRemainingAmount,
+                nextPaymentDate,
                 nextProduct.description || null,
                 expected_delivery_date || null,
                 bank_slip_url || null,
@@ -1067,6 +1226,7 @@ exports.updateStockOrder = async (req, res) => {
                 received_quantity: nextReceivedQuantity,
             });
         }
+        await upsertPurchaseLedger(client, updatedOrder, req.user.id);
 
         await client.query('COMMIT');
 
@@ -1146,3 +1306,4 @@ exports.deleteStockOrder = async (req, res) => {
     }
 };
 exports.reconcileReceivedStockOrders = reconcileReceivedStockOrders;
+exports.ensureStockScopedColumns = ensureStockScopedColumns;

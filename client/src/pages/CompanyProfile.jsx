@@ -15,9 +15,15 @@ export default function CompanyProfile({
   handleEditCompany,
   handleDeleteCompany,
 }) {
-  const [companyRegisterOpen, setCompanyRegisterOpen] = useState(false);
+  const [companyRegisterPage, setCompanyRegisterPage] = useState(1);
+  const companyRegisterPageSize = 10;
   const companyRows = dashboardData.companies || [];
-  const companyRegisterRows = companyRegisterOpen ? companyRows : companyRows.slice(0, 5);
+  const companyRegisterTotalPages = Math.max(1, Math.ceil(companyRows.length / companyRegisterPageSize));
+  const safeCompanyRegisterPage = Math.min(companyRegisterPage, companyRegisterTotalPages);
+  const companyRegisterStartIndex = (safeCompanyRegisterPage - 1) * companyRegisterPageSize;
+  const companyRegisterRows = companyRows.slice(companyRegisterStartIndex, companyRegisterStartIndex + companyRegisterPageSize);
+  const companyRegisterFirstRow = companyRows.length === 0 ? 0 : companyRegisterStartIndex + 1;
+  const companyRegisterLastRow = Math.min(companyRegisterStartIndex + companyRegisterRows.length, companyRows.length);
 
   if (!canManageStock) {
     return <div className="feedback-card error">Your account does not have company profile access.</div>;
@@ -60,31 +66,45 @@ export default function CompanyProfile({
             <span className="section-caption">{(dashboardData.companies || []).length} active companies</span>
           </div>
           {companyRows.length === 0 ? renderEmptyState('No company profiles created yet.') : (
-            <table className="pro-table">
-              <thead>
-                <tr>
-                  <th>Company</th>
-                  <th>Contact</th>
-                  <th>Address</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {companyRegisterRows.map((company) => (
-                  <tr key={company.id}>
-                    <td>{company.company_name}<br />{company.contact_person || 'No contact person'}</td>
-                    <td>{company.company_email || 'No email'}<br />{company.phone || 'No phone'}</td>
-                    <td>{company.address || 'No address'}</td>
-                    <td>
-                      <div className="table-actions">
-                        <button type="button" className="view-btn" onClick={() => handleEditCompany(company)}>Edit</button>
-                        <button type="button" className="danger-btn" onClick={() => handleDeleteCompany(company)}>Delete</button>
-                      </div>
-                    </td>
+            <>
+              <table className="pro-table">
+                <thead>
+                  <tr>
+                    <th>Company</th>
+                    <th>Contact</th>
+                    <th>Address</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {companyRegisterRows.map((company) => (
+                    <tr key={company.id}>
+                      <td>{company.company_name}<br />{company.contact_person || 'No contact person'}</td>
+                      <td>{company.company_email || 'No email'}<br />{company.phone || 'No phone'}</td>
+                      <td>{company.address || 'No address'}</td>
+                      <td>
+                        <div className="table-actions">
+                          <button type="button" className="view-btn" onClick={() => handleEditCompany(company)}>Edit</button>
+                          <button type="button" className="danger-btn" onClick={() => handleDeleteCompany(company)}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="table-pagination">
+                <span className="table-pagination-summary">
+                  Showing {companyRegisterFirstRow}-{companyRegisterLastRow} of {companyRows.length} companies
+                </span>
+                <div className="table-pagination-actions">
+                  <button type="button" className="view-btn" onClick={() => setCompanyRegisterPage(1)} disabled={safeCompanyRegisterPage === 1}>&lt;&lt; First</button>
+                  <button type="button" className="view-btn" onClick={() => setCompanyRegisterPage((current) => Math.max(1, current - 1))} disabled={safeCompanyRegisterPage === 1}>&lt; Prev</button>
+                  <span className="table-pagination-current">Page {safeCompanyRegisterPage} of {companyRegisterTotalPages}</span>
+                  <button type="button" className="view-btn" onClick={() => setCompanyRegisterPage((current) => Math.min(companyRegisterTotalPages, current + 1))} disabled={safeCompanyRegisterPage === companyRegisterTotalPages}>Next &gt;</button>
+                  <button type="button" className="view-btn" onClick={() => setCompanyRegisterPage(companyRegisterTotalPages)} disabled={safeCompanyRegisterPage === companyRegisterTotalPages}>Last &gt;&gt;</button>
+                </div>
+              </div>
+            </>
           )}
         </div>
         ) : null}

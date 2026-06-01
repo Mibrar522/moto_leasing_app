@@ -9,6 +9,7 @@ import Installments from './Installments';
 import Employees from './Employees';
 import Customers from './Customers';
 import Products from './Products';
+import PurchaseLedger from './PurchaseLedger';
 import Stock from './Stock';
 import UserTasks from './UserTasks';
 import Transactions from './Transactions';
@@ -192,6 +193,8 @@ const emptyStockOrderForm = {
     product_description: '',
     unit_price: '',
     total_amount: '',
+    paid_amount: '',
+    remaining_amount: '',
     expected_delivery_date: '',
     bank_slip_url: '',
     notes: '',
@@ -741,6 +744,11 @@ const sidebarTabIcons = {
             <path d="M4 20h16M6.5 20V6.5A1.5 1.5 0 0 1 8 5h4a1.5 1.5 0 0 1 1.5 1.5V20M13.5 20v-8.5A1.5 1.5 0 0 1 15 10h2.5a1.5 1.5 0 0 1 1.5 1.5V20M9 9.5h.01M9 13h.01" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     ),
+    'purchase-ledger': (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 3.5h10v17l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2-2 1.2v-17Zm3 5h4M10 12h4M10 15.5h2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    ),
     stock: (
         <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m4 8.5 8-4.5 8 4.5-8 4.5-8-4.5Zm0 4.8 8 4.5 8-4.5M4 13.3V8.5M20 13.3V8.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -897,6 +905,7 @@ const DASHBOARD_PAGE_TOKENS = {
     reports: 'n3y9',
     transactions: 'p4s6',
     companies: 'r5d7',
+    'purchase-ledger': 'pl9x',
     'report-stock-inventory': 's6h1',
     'report-daily-sales': 't7j2',
     'report-stock-received': 'u8k3',
@@ -956,6 +965,7 @@ const DASHBOARD_PAGE_PATHS = {
     reports: '/dashboard/reports',
     transactions: '/dashboard/transactions',
     companies: '/dashboard/companies',
+    'purchase-ledger': '/dashboard/purchase-ledger',
     'report-stock-inventory': '/dashboard/report-stock-inventory',
     'report-daily-sales': '/dashboard/report-daily-sales',
     'report-stock-received': '/dashboard/report-stock-received',
@@ -1867,6 +1877,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         ads: [],
         products: [],
         companies: [],
+        purchaseLedger: [],
         inventory: [],
         customers: [],
         employees: [],
@@ -1961,6 +1972,8 @@ const Dashboard = ({ pageKey, PageComponent }) => {
     const [receivingStockOrder, setReceivingStockOrder] = useState(null);
     const [stockReceiveItems, setStockReceiveItems] = useState([createEmptyReceiveItem()]);
     const [stockReceiveDate, setStockReceiveDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [stockReceivePaymentAmount, setStockReceivePaymentAmount] = useState('');
+    const [stockReceivePaidDate, setStockReceivePaidDate] = useState(() => new Date().toISOString().slice(0, 10));
     const [activeAccessPopup, setActiveAccessPopup] = useState(null);
     const [employeeAccessPopupOpen, setEmployeeAccessPopupOpen] = useState(false);
     const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -2552,6 +2565,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         { key: 'installments', label: 'Installments', visible: canOpenInstallmentWorkspace, featureRef: 'Installment function access' },
         { key: 'companies', label: 'Company Profile', visible: canManageStock, featureRef: 'FEAT_STOCK_MGMT / FEAT_FLEET_MGMT' },
         { key: 'stock', label: 'Stock', visible: canManageStock, featureRef: 'FEAT_STOCK_MGMT / FEAT_FLEET_MGMT' },
+        { key: 'purchase-ledger', label: 'Purchase Ledger', visible: canManageStock, featureRef: 'FEAT_STOCK_MGMT / FEAT_FLEET_MGMT' },
         { key: 'products', label: 'Products', visible: canManageProducts, featureRef: 'FEAT_PRODUCT_MGMT / FEAT_FLEET_MGMT' },
     ]), [
         canCreateSales,
@@ -2595,7 +2609,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
         {
             key: 'inventory',
             label: 'Inventory',
-            items: ['companies', 'stock', 'products'],
+            items: ['companies', 'stock', 'purchase-ledger', 'products'],
         },
         {
             key: 'admin',
@@ -2640,6 +2654,7 @@ const Dashboard = ({ pageKey, PageComponent }) => {
             installments: canOpenInstallmentWorkspace || installmentTabVisible,
             stock: canManageStock,
             companies: canManageStock,
+            'purchase-ledger': canManageStock,
             dealers: canManageDealers,
             sales: canOpenSalesWorkspace,
             customers: canOpenCustomers,
@@ -5612,14 +5627,23 @@ const selectedCustomer = useMemo(
                     product_description: selectedProduct?.description || '',
                     unit_price: nextUnitPrice ? String(nextUnitPrice) : '',
                     total_amount: nextUnitPrice > 0 ? String(nextUnitPrice) : '',
+                    paid_amount: '',
+                    remaining_amount: nextUnitPrice > 0 ? String(nextUnitPrice) : '',
                 };
             }
 
             const nextState = { ...current, [name]: value };
             const unitPrice = Number(nextState.unit_price || 0);
+            const totalAmount = Number(nextState.total_amount || 0);
+            const paidAmount = Number(nextState.paid_amount || 0);
 
             if (name === 'unit_price') {
                 nextState.total_amount = unitPrice > 0 ? String(unitPrice) : '';
+                nextState.remaining_amount = String(Math.max(unitPrice - paidAmount, 0));
+            }
+
+            if (name === 'paid_amount' || name === 'total_amount') {
+                nextState.remaining_amount = String(Math.max(totalAmount - paidAmount, 0));
             }
 
             return nextState;
@@ -7611,6 +7635,8 @@ const selectedCustomer = useMemo(
                 quantity: 1,
                 unit_price: Number(stockOrderForm.unit_price || 0),
                 total_amount: Number(stockOrderForm.total_amount || 0),
+                paid_amount: Number(stockOrderForm.paid_amount || 0),
+                remaining_amount: Number(stockOrderForm.remaining_amount || 0),
             };
 
             if (stockOrderForm.id) {
@@ -7649,6 +7675,8 @@ const selectedCustomer = useMemo(
             product_description: order.product_description || '',
             unit_price: order.unit_price || '',
             total_amount: order.total_amount || '',
+            paid_amount: order.paid_amount || '',
+            remaining_amount: order.remaining_amount || '',
             expected_delivery_date: order.expected_delivery_date || '',
             bank_slip_url: order.bank_slip_url || '',
             notes: order.notes || '',
@@ -7707,6 +7735,8 @@ const selectedCustomer = useMemo(
 
         setReceivingStockOrder(order);
         setStockReceiveDate(String(order.received_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10));
+        setStockReceivePaymentAmount('');
+        setStockReceivePaidDate(new Date().toISOString().slice(0, 10));
         setStockReceiveItems([createEmptyReceiveItem(order.product_color || order.color || '')]);
     };
 
@@ -7715,6 +7745,8 @@ const selectedCustomer = useMemo(
 
         setReceivingStockOrder(null);
         setStockReceiveDate(new Date().toISOString().slice(0, 10));
+        setStockReceivePaymentAmount('');
+        setStockReceivePaidDate(new Date().toISOString().slice(0, 10));
         setStockReceiveItems([createEmptyReceiveItem()]);
     };
 
@@ -7790,6 +7822,12 @@ const selectedCustomer = useMemo(
             setStockMessage(duplicateMessage);
             return;
         }
+        const remainingBalance = Number(receivingStockOrder.remaining_amount || 0);
+        const paymentAmount = Number(stockReceivePaymentAmount || 0);
+        if (paymentAmount > 0 && paymentAmount < remainingBalance) {
+            setStockMessage(`Payment amount must be at least the remaining balance of ${formatCurrency(remainingBalance)}.`);
+            return;
+        }
 
         try {
             setSavingStock(true);
@@ -7797,6 +7835,8 @@ const selectedCustomer = useMemo(
             await API.patch(`/stock/orders/${receivingStockOrder.id}`, {
                 received_items: stockReceiveItems,
                 received_at: receivedDateTime,
+                payment_amount: paymentAmount || undefined,
+                payment_date: paymentAmount > 0 && stockReceivePaidDate ? `${stockReceivePaidDate}T12:00:00.000Z` : undefined,
                 notes: receivingStockOrder.notes || '',
             });
             setStockMessage(`Stock order ${receivingStockOrder.id} updated with the received vehicle details.`);
@@ -9758,6 +9798,8 @@ const selectedCustomer = useMemo(
                     handleEditCompany={handleEditCompany}
                     handleDeleteCompany={handleDeleteCompany}
                 />;
+            case 'purchase-ledger':
+                return <PurchaseLedger ctx={workspaceContext} />;
 
             case 'workflow':
                 return <Workflow ctx={workspaceContext} />;
@@ -10540,6 +10582,25 @@ const selectedCustomer = useMemo(
                                 <label className="field">
                                     <span>Received Date</span>
                                     <input type="date" value={stockReceiveDate} onChange={(event) => setStockReceiveDate(event.target.value)} />
+                                </label>
+                                <label className="field">
+                                    <span>Remaining Balance</span>
+                                    <input value={formatCurrency(receivingStockOrder.remaining_amount || 0)} readOnly />
+                                </label>
+                                <label className="field">
+                                    <span>Payment Amount</span>
+                                    <input
+                                        type="number"
+                                        min={Number(receivingStockOrder.remaining_amount || 0)}
+                                        step="0.01"
+                                        value={stockReceivePaymentAmount}
+                                        onChange={(event) => setStockReceivePaymentAmount(event.target.value)}
+                                        placeholder="Enter full remaining payment"
+                                    />
+                                </label>
+                                <label className="field">
+                                    <span>Paid Date</span>
+                                    <input type="date" value={stockReceivePaidDate} onChange={(event) => setStockReceivePaidDate(event.target.value)} />
                                 </label>
                             </div>
 

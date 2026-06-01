@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const { reconcileReceivedStockOrders } = require('./stockController');
+const { reconcileReceivedStockOrders, ensureStockScopedColumns } = require('./stockController');
 const { syncAccessCatalogDefaults } = require('../utils/accessBootstrap');
 const { syncDealerOwnership, syncDealerOwnershipForRequest } = require('../utils/dealerOwnershipBootstrap');
 
@@ -562,7 +562,8 @@ exports.getDashboardData = async (req, res) => {
             'user-tasks': ['workflowTasks', 'salesTransactions'],
             products: ['products', 'vehicleTypes'],
             companies: ['companies'],
-            stock: ['stockOrders', 'products', 'companies', 'vehicleTypes'],
+            stock: ['stockOrders', 'products', 'companies', 'vehicleTypes', 'purchaseLedger'],
+            'purchase-ledger': ['purchaseLedger', 'companies', 'dealers'],
             sales: ['salesTransactions', 'customers', 'inventory', 'dealers', 'workflowDefinitions', 'roles', 'features', 'rolePermissions'],
             transactions: ['salesTransactions'],
             installments: ['salesTransactions', 'customers', 'inventory'],
@@ -580,8 +581,11 @@ exports.getDashboardData = async (req, res) => {
             wantsGroup('stockOrders') || wantsGroup('inventory'),
             wantsGroup('salesTransactions') || wantsGroup('workflowTasks')
         );
-        if (wantsGroup('products') || wantsGroup('companies') || wantsGroup('stockOrders') || wantsGroup('inventory') || wantsGroup('salesTransactions') || wantsGroup('customers')) {
+        if (wantsGroup('products') || wantsGroup('companies') || wantsGroup('stockOrders') || wantsGroup('purchaseLedger') || wantsGroup('inventory') || wantsGroup('salesTransactions') || wantsGroup('customers')) {
             await syncDealerOwnershipForRequest();
+        }
+        if (wantsGroup('stockOrders') || wantsGroup('purchaseLedger')) {
+            await ensureStockScopedColumns();
         }
         const buildDashboardSalesMetricScope = () => {
             const params = [];
@@ -1677,6 +1681,52 @@ exports.getDashboardData = async (req, res) => {
             'stock orders query',
             []
         ) : { rows: [] };
+        const purchaseLedgerResult = wantsGroup('purchaseLedger') ? await safeDashboardQuery(
+            () => pool.query(
+                `
+                SELECT
+                    COALESCE(pl.id, so.id) AS id,
+                    COALESCE(pl.dealer_id, so.dealer_id) AS dealer_id,
+                    so.id AS stock_order_id,
+                    so.company_profile_id,
+                    received_vehicle.id AS vehicle_id,
+                    COALESCE(pl.company_name, so.company_name, cp.company_name, 'Supplier') AS company_name,
+                    COALESCE(pl.vehicle_label, CONCAT_WS(' / ', so.brand, so.model, so.vehicle_type), 'Vehicle') AS vehicle_label,
+                    COALESCE(pl.color, received_vehicle.color) AS color,
+                    COALESCE(pl.registration_number, received_vehicle.registration_number, so.registration_number) AS registration_number,
+                    COALESCE(pl.chassis_number, received_vehicle.chassis_number, so.chassis_number) AS chassis_number,
+                    COALESCE(pl.engine_number, received_vehicle.engine_number, so.engine_number) AS engine_number,
+                    COALESCE(pl.purchase_date, so.expected_delivery_date, so.created_at) AS purchase_date,
+                    COALESCE(pl.paid_amount, so.paid_amount, 0) AS paid_amount,
+                    COALESCE(pl.remaining_amount, so.remaining_amount, GREATEST(COALESCE(so.total_amount, 0) - COALESCE(so.paid_amount, 0), 0)) AS remaining_amount,
+                    COALESCE(pl.payment_date, so.purchase_paid_at) AS payment_date,
+                    COALESCE(pl.notes, so.notes) AS notes,
+                    cp.contact_person,
+                    cp.company_email,
+                    cp.phone AS company_phone,
+                    cp.address AS company_address,
+                    received_vehicle.image_url AS vehicle_image_url,
+                    received_vehicle.serial_number,
+                    received_vehicle.status AS vehicle_status
+                FROM stock_orders so
+                LEFT JOIN purchase_ledger pl ON pl.stock_order_id = so.id
+                LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
+                LEFT JOIN LATERAL (
+                    SELECT id, registration_number, chassis_number, engine_number, color, image_url, serial_number, status
+                    FROM vehicles v
+                    WHERE v.source_stock_order_id = so.id
+                    ORDER BY v.created_at DESC
+                    LIMIT 1
+                ) received_vehicle ON true
+                ${hasGlobalScope ? '' : 'WHERE COALESCE(so.dealer_id, pl.dealer_id) = $1'}
+                ORDER BY COALESCE(pl.purchase_date, so.expected_delivery_date, so.created_at) DESC, COALESCE(pl.updated_at, so.updated_at, so.created_at) DESC
+                LIMIT 500
+                `,
+                hasGlobalScope ? [] : [effectiveDealerId]
+            ),
+            'purchase ledger query',
+            []
+        ) : { rows: [] };
         const adsScopeClause = effectiveDealerId ? 'AND dealer_id = $1' : '';
         const adsScopeParams = effectiveDealerId ? [effectiveDealerId] : [];
         let adsResult = { rows: [] };
@@ -1923,6 +1973,7 @@ exports.getDashboardData = async (req, res) => {
             employeePayrolls: employeePayrollsResult.rows,
             salesTransactions: salesResult.rows,
             stockOrders: stockOrdersResult.rows,
+            purchaseLedger: purchaseLedgerResult.rows,
             ads: adsResult.rows,
             notificationReadKeys: notificationReadsResult.rows.map((row) => row.notification_key),
         });
