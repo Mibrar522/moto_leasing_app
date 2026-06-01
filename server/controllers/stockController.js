@@ -1105,7 +1105,9 @@ exports.updateStockOrder = async (req, res) => {
         }
 
         const nextOrderStatus =
-            order_status ||
+            additionalReceivedCount > 0
+                ? 'RECEIVED'
+                : order_status ||
             (nextReceivedQuantity >= orderedQuantity && orderedQuantity > 0
                 ? 'RECEIVED'
                 : nextReceivedQuantity > 0

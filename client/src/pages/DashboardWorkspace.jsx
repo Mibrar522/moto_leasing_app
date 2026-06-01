@@ -7831,6 +7831,8 @@ const selectedCustomer = useMemo(
             const receivedDateTime = stockReceiveDate ? `${stockReceiveDate}T12:00:00.000Z` : new Date().toISOString();
             await API.patch(`/stock/orders/${receivingStockOrder.id}`, {
                 received_items: stockReceiveItems,
+                received_quantity: 1,
+                order_status: 'RECEIVED',
                 received_at: receivedDateTime,
                 payment_amount: paymentAmount || undefined,
                 payment_date: paymentAmount > 0 && stockReceivePaidDate ? `${stockReceivePaidDate}T12:00:00.000Z` : undefined,
