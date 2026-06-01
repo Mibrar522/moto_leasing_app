@@ -883,6 +883,8 @@ exports.createStockOrder = async (req, res) => {
         const ledgerClient = await pool.connect();
         try {
             await upsertPurchaseLedger(ledgerClient, order, req.user.id);
+        } catch (ledgerError) {
+            console.warn('Purchase ledger sync skipped after stock order create:', ledgerError.message);
         } finally {
             ledgerClient.release();
         }
@@ -1236,7 +1238,11 @@ exports.updateStockOrder = async (req, res) => {
                 received_quantity: nextReceivedQuantity,
             });
         }
-        await upsertPurchaseLedger(client, updatedOrder, req.user.id);
+        try {
+            await upsertPurchaseLedger(client, updatedOrder, req.user.id);
+        } catch (ledgerError) {
+            console.warn('Purchase ledger sync skipped after stock order update:', ledgerError.message);
+        }
 
         await client.query('COMMIT');
 
