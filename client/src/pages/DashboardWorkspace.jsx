@@ -4891,7 +4891,15 @@ const selectedCustomer = useMemo(
                 .some((value) => value.toLowerCase().includes(query))
         );
     }, [searchTerm, stockOrders]);
-    const isStockOrderReceived = (order) => Number(order.received_quantity || 0) > 0 || String(order.order_status || '').toUpperCase() === 'RECEIVED';
+    const isStockOrderReceived = (order) => {
+        const status = String(order.order_status || '').toUpperCase();
+        return (
+            Number(order.received_quantity || 0) > 0 ||
+            status === 'RECEIVED' ||
+            Boolean(order.received_at || order.effective_received_at) ||
+            Boolean(order.received_registration_number || order.received_chassis_number || order.received_engine_number)
+        );
+    };
     const receivedStockOrders = useMemo(
         () => filteredStockOrders.filter((order) => isStockOrderReceived(order)),
         [filteredStockOrders]
