@@ -193,8 +193,6 @@ const emptyStockOrderForm = {
     product_description: '',
     unit_price: '',
     total_amount: '',
-    paid_amount: '',
-    remaining_amount: '',
     expected_delivery_date: '',
     bank_slip_url: '',
     notes: '',
@@ -5635,23 +5633,14 @@ const selectedCustomer = useMemo(
                     product_description: selectedProduct?.description || '',
                     unit_price: nextUnitPrice ? String(nextUnitPrice) : '',
                     total_amount: nextUnitPrice > 0 ? String(nextUnitPrice) : '',
-                    paid_amount: '',
-                    remaining_amount: nextUnitPrice > 0 ? String(nextUnitPrice) : '',
                 };
             }
 
             const nextState = { ...current, [name]: value };
             const unitPrice = Number(nextState.unit_price || 0);
-            const totalAmount = Number(nextState.total_amount || 0);
-            const paidAmount = Number(nextState.paid_amount || 0);
 
             if (name === 'unit_price') {
                 nextState.total_amount = unitPrice > 0 ? String(unitPrice) : '';
-                nextState.remaining_amount = String(Math.max(unitPrice - paidAmount, 0));
-            }
-
-            if (name === 'paid_amount' || name === 'total_amount') {
-                nextState.remaining_amount = String(Math.max(totalAmount - paidAmount, 0));
             }
 
             return nextState;
@@ -7643,8 +7632,6 @@ const selectedCustomer = useMemo(
                 quantity: 1,
                 unit_price: Number(stockOrderForm.unit_price || 0),
                 total_amount: Number(stockOrderForm.total_amount || 0),
-                paid_amount: Number(stockOrderForm.paid_amount || 0),
-                remaining_amount: Number(stockOrderForm.remaining_amount || 0),
             };
 
             if (stockOrderForm.id) {
@@ -7683,8 +7670,6 @@ const selectedCustomer = useMemo(
             product_description: order.product_description || '',
             unit_price: order.unit_price || '',
             total_amount: order.total_amount || '',
-            paid_amount: order.paid_amount || '',
-            remaining_amount: order.remaining_amount || '',
             expected_delivery_date: order.expected_delivery_date || '',
             bank_slip_url: order.bank_slip_url || '',
             notes: order.notes || '',
@@ -7832,8 +7817,12 @@ const selectedCustomer = useMemo(
         }
         const remainingBalance = Number(receivingStockOrder.remaining_amount || 0);
         const paymentAmount = Number(stockReceivePaymentAmount || 0);
-        if (paymentAmount > 0 && paymentAmount < remainingBalance) {
-            setStockMessage(`Payment amount must be at least the remaining balance of ${formatCurrency(remainingBalance)}.`);
+        if (paymentAmount < 0) {
+            setStockMessage('Payment amount cannot be negative.');
+            return;
+        }
+        if (paymentAmount > remainingBalance) {
+            setStockMessage(`Payment amount cannot be greater than the remaining balance of ${formatCurrency(remainingBalance)}.`);
             return;
         }
 
@@ -10599,11 +10588,19 @@ const selectedCustomer = useMemo(
                                     <span>Payment Amount</span>
                                     <input
                                         type="number"
-                                        min={Number(receivingStockOrder.remaining_amount || 0)}
+                                        min="0"
+                                        max={Number(receivingStockOrder.remaining_amount || 0)}
                                         step="0.01"
                                         value={stockReceivePaymentAmount}
                                         onChange={(event) => setStockReceivePaymentAmount(event.target.value)}
-                                        placeholder="Enter full remaining payment"
+                                        placeholder="Enter payment amount"
+                                    />
+                                </label>
+                                <label className="field">
+                                    <span>Balance After Payment</span>
+                                    <input
+                                        value={formatCurrency(Math.max(Number(receivingStockOrder.remaining_amount || 0) - Number(stockReceivePaymentAmount || 0), 0))}
+                                        readOnly
                                     />
                                 </label>
                                 <label className="field">

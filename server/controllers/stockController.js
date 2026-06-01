@@ -774,7 +774,6 @@ exports.createStockOrder = async (req, res) => {
             vehicle_type,
             chassis_number,
             engine_number,
-            paid_amount,
             unit_price,
             total_amount,
             expected_delivery_date,
@@ -840,7 +839,7 @@ exports.createStockOrder = async (req, res) => {
         const company = companyResult.rows[0];
         const product = productResult.rows[0];
         const orderTotalAmount = roundMoney(total_amount || unit_price || product.purchase_price || 0);
-        const orderPaidAmount = Math.min(roundMoney(paid_amount), orderTotalAmount);
+        const orderPaidAmount = 0;
         const orderRemainingAmount = calculateRemainingAmount(orderTotalAmount, orderPaidAmount);
 
         const result = await pool.query(
@@ -1125,9 +1124,9 @@ exports.updateStockOrder = async (req, res) => {
         const currentRemainingAmount = calculateRemainingAmount(nextTotalAmount, nextPaidAmount);
 
         if (paymentAmount > 0) {
-            if (paymentAmount < currentRemainingAmount) {
+            if (paymentAmount > currentRemainingAmount) {
                 await client.query('ROLLBACK');
-                return res.status(400).json({ message: `Payment amount must be at least the remaining balance of ${currentRemainingAmount}.` });
+                return res.status(400).json({ message: `Payment amount cannot be greater than the remaining balance of ${currentRemainingAmount}.` });
             }
             nextPaidAmount = Math.min(roundMoney(nextPaidAmount + paymentAmount), nextTotalAmount);
         }

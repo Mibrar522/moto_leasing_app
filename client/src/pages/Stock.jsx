@@ -155,8 +155,6 @@ export default function Stock({
             <label className="field full-span"><span>Product Description</span><textarea name="product_description" value={stockOrderForm.product_description || ''} onChange={handleStockOrderChange} rows="3" readOnly /></label>
             <label className="field"><span>Unit Price</span><input type="number" min="0" step="0.01" name="unit_price" value={stockOrderForm.unit_price} onChange={handleStockOrderChange} /></label>
             <label className="field"><span>Total Amount</span><input type="number" min="0" step="0.01" name="total_amount" value={stockOrderForm.total_amount} onChange={handleStockOrderChange} readOnly /></label>
-            <label className="field"><span>Paid Amount</span><input type="number" min="0" step="0.01" name="paid_amount" value={stockOrderForm.paid_amount || ''} onChange={handleStockOrderChange} /></label>
-            <label className="field"><span>Remaining Amount</span><input type="number" min="0" step="0.01" name="remaining_amount" value={stockOrderForm.remaining_amount || ''} readOnly /></label>
             <label className="field"><span>Order Date</span><input type="date" name="expected_delivery_date" value={stockOrderForm.expected_delivery_date} onChange={handleStockOrderChange} /></label>
             <label className="field full-span"><span>Bank Online Slip</span><input type="file" accept="application/pdf,image/*" onChange={handleBankSlipUpload} /></label>
             <label className="field full-span"><span>Uploaded Slip URL</span><input name="bank_slip_url" value={stockOrderForm.bank_slip_url} onChange={handleStockOrderChange} readOnly={uploadingBankSlip} /></label>
@@ -178,8 +176,6 @@ export default function Stock({
                 <col className="stock-col-company" />
                 <col className="stock-col-vehicle" />
                 <col className="stock-col-amount" />
-                <col className="stock-col-amount" />
-                <col className="stock-col-amount" />
                 <col className="stock-col-date" />
                 <col className="stock-col-slip" />
                 <col className="stock-col-status" />
@@ -190,8 +186,6 @@ export default function Stock({
                   <th>Company</th>
                   <th>Vehicle</th>
                   <th>Amount</th>
-                  <th>Paid</th>
-                  <th>Remaining</th>
                   <th>Order Date</th>
                   <th>Slip</th>
                   <th>Status</th>
@@ -207,8 +201,6 @@ export default function Stock({
                     </td>
                     <td>{renderVehicleCell(order)}</td>
                     <td>{formatCurrency(order.total_amount)}</td>
-                    <td>{formatCurrency(order.paid_amount)}</td>
-                    <td>{formatCurrency(order.remaining_amount)}</td>
                     <td>{formatStockDate(order.expected_delivery_date)}</td>
                     <td>{order.bank_slip_url ? <a href={buildAssetUrl(order.bank_slip_url)} target="_blank" rel="noreferrer">View Slip</a> : 'No slip'}</td>
                     <td><span className={getStatusClass(order.order_status)}>{order.order_status}</span></td>
