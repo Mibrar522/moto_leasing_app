@@ -1603,6 +1603,18 @@ exports.getDashboardData = async (req, res) => {
             `
             SELECT
                 so.*,
+                CASE
+                    WHEN received_vehicle.id IS NOT NULL
+                      OR COALESCE(so.received_quantity, 0) > 0
+                      OR UPPER(COALESCE(so.order_status, '')) = 'RECEIVED'
+                    THEN 'RECEIVED'
+                    ELSE so.order_status
+                END AS order_status,
+                GREATEST(
+                    COALESCE(so.received_quantity, 0),
+                    CASE WHEN received_vehicle.id IS NOT NULL THEN 1 ELSE 0 END
+                ) AS received_quantity,
+                COALESCE(so.received_at, received_vehicle.created_at) AS received_at,
                 received_vehicle.registration_number AS received_registration_number,
                 received_vehicle.chassis_number AS received_chassis_number,
                 received_vehicle.engine_number AS received_engine_number,
@@ -1638,6 +1650,7 @@ exports.getDashboardData = async (req, res) => {
             LEFT JOIN dealers ordered_email_dealer ON LOWER(ordered_email_dealer.contact_email) = LOWER(u.email)
             LEFT JOIN LATERAL (
                 SELECT
+                    v.id,
                     v.registration_number,
                     v.chassis_number,
                     v.engine_number,
