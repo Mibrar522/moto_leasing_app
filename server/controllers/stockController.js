@@ -924,6 +924,7 @@ exports.createStockOrder = async (req, res) => {
 
 exports.receiveStockOrder = async (req, res) => {
     const client = await pool.connect();
+    let transactionStarted = false;
 
     try {
         const globalScope = hasGlobalScope(req.user);
@@ -944,6 +945,7 @@ exports.receiveStockOrder = async (req, res) => {
         }
 
         await client.query('BEGIN');
+        transactionStarted = true;
 
         const currentOrderResult = await client.query(
             `
@@ -1058,16 +1060,26 @@ exports.receiveStockOrder = async (req, res) => {
             return res.status(500).json({ message: 'Stock receive did not complete. No inventory vehicle was created.' });
         }
 
+        await client.query('COMMIT');
+        transactionStarted = false;
+
+        const ledgerClient = await pool.connect();
         try {
-            await upsertPurchaseLedger(client, updatedOrder, req.user.id);
+            await upsertPurchaseLedger(ledgerClient, updatedOrder, req.user.id);
         } catch (ledgerError) {
-            console.warn('Purchase ledger sync skipped after stock receive:', ledgerError.message);
+            console.warn('Purchase ledger sync skipped after stock receive:', {
+                orderId: currentOrder.id,
+                message: ledgerError.message,
+            });
+        } finally {
+            ledgerClient.release();
         }
 
-        await client.query('COMMIT');
         res.status(200).json({ ...updatedOrder, received_vehicle: vehicleResult.rows[0] });
     } catch (error) {
-        await client.query('ROLLBACK');
+        if (transactionStarted) {
+            await client.query('ROLLBACK');
+        }
         console.error('Stock receive error:', {
             orderId: req.params.id,
             message: error.message,
