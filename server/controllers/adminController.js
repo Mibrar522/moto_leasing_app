@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const { reconcileReceivedStockOrders, ensureStockScopedColumns } = require('./stockController');
 const { syncAccessCatalogDefaults } = require('../utils/accessBootstrap');
 const { syncDealerOwnership, syncDealerOwnershipForRequest } = require('../utils/dealerOwnershipBootstrap');
+const { syncPurchaseLedger } = require('../utils/purchaseLedgerBootstrap');
 
 const PENDING_APPLICATION_STATUSES = ['PENDING', 'SUBMITTED', 'UNDER_REVIEW'];
 const hasAnyFeature = (featureKeys = [], requiredKeys = []) => requiredKeys.some((featureKey) => featureKeys.includes(featureKey));
@@ -22,6 +23,7 @@ const runDashboardMaintenance = () => {
         syncAccessCatalogDefaults(),
         syncDealerOwnership(),
         reconcileReceivedStockOrders(),
+        syncPurchaseLedger(),
     ])
         .catch((error) => console.warn('Dashboard maintenance skipped:', error.message))
         .finally(() => {
@@ -586,6 +588,9 @@ exports.getDashboardData = async (req, res) => {
         }
         if (wantsGroup('stockOrders') || wantsGroup('purchaseLedger')) {
             await ensureStockScopedColumns();
+        }
+        if (wantsGroup('purchaseLedger')) {
+            await syncPurchaseLedger();
         }
         const buildDashboardSalesMetricScope = () => {
             const params = [];
