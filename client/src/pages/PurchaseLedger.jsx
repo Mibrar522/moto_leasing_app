@@ -12,18 +12,46 @@ export default function PurchaseLedger({ ctx }) {
     const [page, setPage] = useState(1);
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [searchField, setSearchField] = useState('company_name');
     const [paymentRow, setPaymentRow] = useState(null);
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
     const [paymentMessage, setPaymentMessage] = useState('');
     const [savingPayment, setSavingPayment] = useState(false);
     const rows = dashboardData.purchaseLedger || [];
+    const searchFields = [
+        { value: 'company_name', label: 'Company' },
+        { value: 'customer_name', label: 'Customer Name' },
+        { value: 'customer_mobile', label: 'Customer Mobile' },
+        { value: 'customer_cnic', label: 'Customer CNIC' },
+        { value: 'registration_number', label: 'Registration' },
+        { value: 'chassis_number', label: 'Chassis' },
+        { value: 'engine_number', label: 'Engine' },
+    ];
+    const sortedRows = useMemo(() => [...rows].sort((left, right) => {
+        const leftRemaining = Number(left.remaining_amount || 0);
+        const rightRemaining = Number(right.remaining_amount || 0);
+        if (leftRemaining > 0 && rightRemaining <= 0) return -1;
+        if (leftRemaining <= 0 && rightRemaining > 0) return 1;
+        return new Date(right.purchase_date || right.updated_at || 0) - new Date(left.purchase_date || left.updated_at || 0);
+    }), [rows]);
+    const getSearchValue = (row, field) => {
+        if (field === 'customer_mobile') return row.customer_mobile || '';
+        return row[field] || '';
+    };
     const filteredRows = useMemo(() => {
         const query = searchTerm.trim().toLowerCase();
-        if (!query) return rows;
-        return rows.filter((row) => [
+        if (!query) return sortedRows;
+        const startsWithMatches = [];
+        const containsMatches = [];
+        sortedRows.forEach((row) => {
+            const fieldValue = String(getSearchValue(row, searchField) || '').trim().toLowerCase();
+            const combinedValue = [
             row.vehicle_label,
             row.company_name,
+                row.customer_name,
+                row.customer_mobile,
+                row.customer_cnic,
             row.contact_person,
             row.company_phone,
             row.company_email,
@@ -32,8 +60,16 @@ export default function PurchaseLedger({ ctx }) {
             row.engine_number,
             row.paid_amount,
             row.remaining_amount,
-        ].filter(Boolean).join(' ').toLowerCase().includes(query));
-    }, [rows, searchTerm]);
+            ].filter(Boolean).join(' ').toLowerCase();
+
+            if (fieldValue.startsWith(query) || combinedValue.startsWith(query)) {
+                startsWithMatches.push(row);
+            } else if (fieldValue.includes(query) || combinedValue.includes(query)) {
+                containsMatches.push(row);
+            }
+        });
+        return [...startsWithMatches, ...containsMatches];
+    }, [sortedRows, searchTerm, searchField]);
     const pageSize = 10;
     const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
     const safePage = Math.min(page, totalPages);
@@ -105,16 +141,30 @@ export default function PurchaseLedger({ ctx }) {
                         &#128269;
                     </button>
                     {searchOpen ? (
-                        <input
-                            className="registry-search-input"
-                            value={searchTerm}
-                            onChange={(event) => {
-                                setSearchTerm(event.target.value);
-                                setPage(1);
-                            }}
-                            placeholder="Search company, vehicle, registration, chassis, engine, paid, remaining..."
-                            autoFocus
-                        />
+                        <div className="registry-search-controls">
+                            <select
+                                value={searchField}
+                                onChange={(event) => {
+                                    setSearchField(event.target.value);
+                                    setPage(1);
+                                }}
+                                aria-label="Search by"
+                            >
+                                {searchFields.map((field) => (
+                                    <option key={field.value} value={field.value}>{field.label}</option>
+                                ))}
+                            </select>
+                            <input
+                                className="registry-search-input"
+                                value={searchTerm}
+                                onChange={(event) => {
+                                    setSearchTerm(event.target.value);
+                                    setPage(1);
+                                }}
+                                placeholder={`Search by ${searchFields.find((field) => field.value === searchField)?.label || 'Company'}...`}
+                                autoFocus
+                            />
+                        </div>
                     ) : null}
                 </div>
                 {filteredRows.length === 0 ? renderEmptyState('No purchase ledger entries have been created yet.') : (
@@ -124,6 +174,7 @@ export default function PurchaseLedger({ ctx }) {
                                 <tr>
                                     <th>Vehicle</th>
                                     <th>Company</th>
+                                    <th>Customer</th>
                                     <th>Identity</th>
                                     <th>Purchase Date</th>
                                     <th>Paid</th>
@@ -146,6 +197,11 @@ export default function PurchaseLedger({ ctx }) {
                                             <strong>{row.company_name}</strong><br />
                                             <span className="muted-text">{row.contact_person || 'No owner'} / {row.company_phone || 'No phone'}</span><br />
                                             <span className="muted-text">{row.company_email || 'No email'}</span>
+                                        </td>
+                                        <td>
+                                            <strong>{row.customer_name || 'Not sold yet'}</strong><br />
+                                            <span className="muted-text">{row.customer_mobile || 'No mobile'}</span><br />
+                                            <span className="muted-text">{row.customer_cnic || 'No CNIC'}</span>
                                         </td>
                                         <td>
                                             Reg: {row.registration_number || 'Not set'}<br />

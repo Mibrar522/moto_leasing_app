@@ -3724,8 +3724,25 @@ body,
     box-shadow: 0 14px 28px rgba(17, 31, 54, 0.08);
 }
 
+.registry-search-controls {
+    display: grid;
+    grid-template-columns: minmax(150px, 190px) minmax(240px, 620px);
+    gap: 10px;
+    width: min(820px, 100%);
+}
+
+.registry-search-controls select {
+    min-height: 44px;
+    border-radius: 14px;
+    border: 1px solid var(--dash-border);
+    padding: 0 14px;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--dash-text);
+    font: inherit;
+}
+
 .registry-search-input {
-    width: min(620px, 100%);
+    width: 100%;
     min-height: 44px;
     border-radius: 14px;
     border: 1px solid var(--dash-border);
@@ -3736,6 +3753,12 @@ body,
 }
 
 .registry-search-input:focus {
+    outline: none;
+    border-color: var(--dash-accent-outline);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent-soft) 52%, transparent);
+}
+
+.registry-search-controls select:focus {
     outline: none;
     border-color: var(--dash-accent-outline);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent-soft) 52%, transparent);

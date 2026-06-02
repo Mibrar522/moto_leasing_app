@@ -1730,6 +1730,11 @@ exports.getDashboardData = async (req, res) => {
                     cp.company_email,
                     cp.phone AS company_phone,
                     cp.address AS company_address,
+                    sold_customer.full_name AS customer_name,
+                    sold_customer.cnic_passport_number AS customer_cnic,
+                    COALESCE(sold_customer.contact_phone, sold_customer.phone_number) AS customer_mobile,
+                    sold_sale.agreement_number AS sale_agreement_number,
+                    sold_sale.sale_mode AS sale_mode,
                     received_vehicle.image_url AS vehicle_image_url,
                     received_vehicle.serial_number,
                     received_vehicle.status AS vehicle_status
@@ -1742,10 +1747,15 @@ exports.getDashboardData = async (req, res) => {
                     ORDER BY v.created_at DESC
                     LIMIT 1
                 ) received_vehicle ON true
+                LEFT JOIN sales_transactions sold_sale ON sold_sale.vehicle_id = received_vehicle.id
+                LEFT JOIN customers sold_customer ON sold_customer.id = sold_sale.customer_id
                 WHERE so.order_status = 'RECEIVED'
                   AND COALESCE(so.received_quantity, 0) > 0
                   ${hasGlobalScope ? '' : 'AND so.dealer_id = $1'}
-                ORDER BY COALESCE(so.order_date, so.expected_delivery_date, so.created_at) DESC, COALESCE(so.updated_at, so.created_at) DESC
+                ORDER BY
+                    CASE WHEN COALESCE(so.remaining_amount, 0) > 0 THEN 0 ELSE 1 END ASC,
+                    COALESCE(so.order_date, so.expected_delivery_date, so.created_at) DESC,
+                    COALESCE(so.updated_at, so.created_at) DESC
                 LIMIT 500
                 `,
                 hasGlobalScope ? [] : [effectiveDealerId]
