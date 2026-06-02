@@ -1730,11 +1730,11 @@ exports.getDashboardData = async (req, res) => {
                     cp.company_email,
                     cp.phone AS company_phone,
                     cp.address AS company_address,
-                    sold_customer.full_name AS customer_name,
-                    sold_customer.cnic_passport_number AS customer_cnic,
-                    COALESCE(sold_customer.contact_phone, sold_customer.phone_number) AS customer_mobile,
-                    sold_sale.agreement_number AS sale_agreement_number,
-                    sold_sale.sale_mode AS sale_mode,
+                    sold_context.customer_name,
+                    sold_context.customer_cnic,
+                    sold_context.customer_mobile,
+                    sold_context.sale_agreement_number,
+                    sold_context.sale_mode,
                     received_vehicle.image_url AS vehicle_image_url,
                     received_vehicle.serial_number,
                     received_vehicle.status AS vehicle_status
@@ -1747,8 +1747,30 @@ exports.getDashboardData = async (req, res) => {
                     ORDER BY v.created_at DESC
                     LIMIT 1
                 ) received_vehicle ON true
-                LEFT JOIN sales_transactions sold_sale ON sold_sale.vehicle_id = received_vehicle.id
-                LEFT JOIN customers sold_customer ON sold_customer.id = sold_sale.customer_id
+                LEFT JOIN LATERAL (
+                    SELECT
+                        st.agreement_number AS sale_agreement_number,
+                        st.sale_mode AS sale_mode,
+                        c.full_name AS customer_name,
+                        c.cnic_passport_number AS customer_cnic,
+                        COALESCE(
+                            NULLIF(c.ocr_details->>'contact_phone', ''),
+                            NULLIF(ca.phone_e164, ''),
+                            NULLIF(ca.phone_number, '')
+                        ) AS customer_mobile
+                    FROM sales_transactions st
+                    LEFT JOIN customers c ON c.id = st.customer_id
+                    LEFT JOIN LATERAL (
+                        SELECT phone_e164, phone_number
+                        FROM customer_accounts ca
+                        WHERE ca.customer_id = c.id
+                        ORDER BY ca.is_active DESC, ca.created_at DESC
+                        LIMIT 1
+                    ) ca ON true
+                    WHERE st.vehicle_id = received_vehicle.id
+                    ORDER BY st.created_at DESC
+                    LIMIT 1
+                ) sold_context ON true
                 WHERE so.order_status = 'RECEIVED'
                   AND COALESCE(so.received_quantity, 0) > 0
                   ${hasGlobalScope ? '' : 'AND so.dealer_id = $1'}
