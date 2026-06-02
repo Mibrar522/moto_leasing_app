@@ -1143,6 +1143,121 @@ exports.receiveStockOrder = async (req, res) => {
     }
 };
 
+exports.recordStockPayment = async (req, res) => {
+    const client = await pool.connect();
+    let transactionStarted = false;
+
+    try {
+        const globalScope = hasGlobalScope(req.user);
+        const dealerId = getEffectiveDealerId(req.user);
+        await ensureStockScopedColumns();
+
+        const paymentAmount = roundMoney(req.body?.payment_amount);
+        const paymentDate = req.body?.payment_date || new Date().toISOString();
+        const notes = req.body?.notes || null;
+
+        if (!paymentAmount || paymentAmount <= 0) {
+            return res.status(400).json({ message: 'Payment amount must be greater than zero.' });
+        }
+
+        await client.query('BEGIN');
+        transactionStarted = true;
+
+        const orderResult = await client.query(
+            `
+            SELECT so.*
+            FROM stock_orders so
+            LEFT JOIN product_catalog pc ON pc.id = so.product_id
+            LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
+            LEFT JOIN users u ON u.id = so.ordered_by
+            WHERE so.id = $1
+              ${globalScope ? '' : stockOrderDealerScopeAndClause(2, 3)}
+            FOR UPDATE OF so
+            `,
+            globalScope ? [req.params.id] : [req.params.id, dealerId, req.user.id]
+        );
+
+        if (orderResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            transactionStarted = false;
+            return res.status(404).json({ message: 'Stock order not found.' });
+        }
+
+        const order = orderResult.rows[0];
+        if (order.order_status !== 'RECEIVED' || Number(order.received_quantity || 0) < 1) {
+            await client.query('ROLLBACK');
+            transactionStarted = false;
+            return res.status(400).json({ message: 'Payments can only be recorded against received stock.' });
+        }
+
+        const totalAmount = roundMoney(order.total_amount || order.unit_price || 0);
+        const currentPaidAmount = roundMoney(order.paid_amount);
+        const currentRemainingAmount = calculateRemainingAmount(totalAmount, currentPaidAmount);
+
+        if (currentRemainingAmount <= 0) {
+            await client.query('ROLLBACK');
+            transactionStarted = false;
+            return res.status(400).json({ message: 'This stock invoice is already fully paid.' });
+        }
+
+        if (paymentAmount > currentRemainingAmount) {
+            await client.query('ROLLBACK');
+            transactionStarted = false;
+            return res.status(400).json({ message: `Payment amount cannot be greater than the remaining balance of ${currentRemainingAmount}.` });
+        }
+
+        const nextPaidAmount = Math.min(roundMoney(currentPaidAmount + paymentAmount), totalAmount);
+        const nextRemainingAmount = calculateRemainingAmount(totalAmount, nextPaidAmount);
+
+        const updatedResult = await client.query(
+            `
+            UPDATE stock_orders
+            SET
+                paid_amount = $2,
+                remaining_amount = $3,
+                purchase_paid_at = $4,
+                notes = COALESCE($5, notes),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+            `,
+            [order.id, nextPaidAmount, nextRemainingAmount, paymentDate, notes]
+        );
+
+        const updatedOrder = updatedResult.rows[0];
+        await client.query('COMMIT');
+        transactionStarted = false;
+
+        const ledgerClient = await pool.connect();
+        try {
+            await upsertPurchaseLedger(ledgerClient, updatedOrder, req.user.id);
+        } catch (ledgerError) {
+            console.warn('Purchase ledger sync skipped after stock payment:', {
+                orderId: order.id,
+                message: ledgerError.message,
+            });
+        } finally {
+            ledgerClient.release();
+        }
+
+        res.status(200).json(updatedOrder);
+    } catch (error) {
+        if (transactionStarted) {
+            await client.query('ROLLBACK');
+        }
+        console.error('Stock payment error:', {
+            orderId: req.params.id,
+            message: error.message,
+            code: error.code,
+            constraint: error.constraint,
+            detail: error.detail,
+        });
+        res.status(500).json({ message: 'Failed to record stock payment', error: error.message });
+    } finally {
+        client.release();
+    }
+};
+
 exports.resendStockOrderEmail = async (req, res) => {
     try {
         const context = await getStockOrderEmailContext(req.params.id, req.user);

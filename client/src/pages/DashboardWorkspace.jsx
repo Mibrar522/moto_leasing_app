@@ -9617,6 +9617,7 @@ const selectedCustomer = useMemo(
         isPreviewablePdf,
         isSelectedSaleVehicleAvailable,
         isSuperAdmin,
+        loadDashboard,
         payrollMonth,
         pendingWorkflowTasks,
         processingWorkflowTaskId,
