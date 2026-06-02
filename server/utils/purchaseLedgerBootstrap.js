@@ -15,7 +15,8 @@ const syncPurchaseLedgerSchema = async () => {
         ALTER TABLE stock_orders
             ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
             ADD COLUMN IF NOT EXISTS remaining_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-            ADD COLUMN IF NOT EXISTS purchase_paid_at TIMESTAMPTZ
+            ADD COLUMN IF NOT EXISTS purchase_paid_at TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS order_date TIMESTAMPTZ
     `);
 
     await runLedgerQuery('purchase ledger table', `
@@ -87,6 +88,10 @@ const syncPurchaseLedgerSchema = async () => {
           )
     `);
 
+    await runLedgerQuery('purchase ledger stock order unique index reset', `
+        DROP INDEX IF EXISTS purchase_ledger_stock_order_id_unique
+    `);
+
     await runLedgerQuery('purchase ledger stock order unique index', `
         CREATE UNIQUE INDEX IF NOT EXISTS purchase_ledger_stock_order_id_unique
         ON purchase_ledger (stock_order_id)
@@ -94,7 +99,7 @@ const syncPurchaseLedgerSchema = async () => {
 };
 
 const backfillPurchaseLedger = async () => {
-    await pool.query(`
+    await runLedgerQuery('received stock backfill', `
         INSERT INTO purchase_ledger (
             dealer_id,
             stock_order_id,

@@ -590,7 +590,11 @@ exports.getDashboardData = async (req, res) => {
             await ensureStockScopedColumns();
         }
         if (wantsGroup('purchaseLedger')) {
-            await syncPurchaseLedger();
+            try {
+                await syncPurchaseLedger();
+            } catch (purchaseLedgerError) {
+                console.warn('Purchase ledger page sync skipped:', purchaseLedgerError.message);
+            }
         }
         const buildDashboardSalesMetricScope = () => {
             const params = [];
