@@ -31,6 +31,7 @@ const { syncAccessControlDefaults, syncAccessCatalogDefaults, syncAccessRuntimeT
 const { syncCustomerAppSchema } = require('./utils/customerAppBootstrap');
 const { syncCustomerCoreSchema } = require('./utils/customerCoreBootstrap');
 const { syncDealerOwnership } = require('./utils/dealerOwnershipBootstrap');
+const { syncPurchaseLedger } = require('./utils/purchaseLedgerBootstrap');
 
 const app = express();
 app.set('etag', false);
@@ -180,6 +181,13 @@ const startServer = async () => {
             console.log('Dealer ownership scope verified.');
         } catch (ownershipError) {
             console.warn('Dealer ownership bootstrap skipped:', ownershipError.message);
+        }
+
+        try {
+            await syncPurchaseLedger();
+            console.log('Purchase ledger schema and balances verified.');
+        } catch (purchaseLedgerError) {
+            console.warn('Purchase ledger bootstrap skipped:', purchaseLedgerError.message);
         }
         // await syncCustomerAppSchema();
         // await syncCustomerCoreSchema();
