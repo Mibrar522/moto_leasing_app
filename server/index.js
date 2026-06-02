@@ -33,6 +33,14 @@ const { syncCustomerCoreSchema } = require('./utils/customerCoreBootstrap');
 const { syncDealerOwnership } = require('./utils/dealerOwnershipBootstrap');
 
 const app = express();
+app.set('etag', false);
+
+app.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    next();
+});
 
 // 3. Optimized CORS & Security Middleware
 const allowedOrigins = [
