@@ -141,9 +141,47 @@ const ensureStockScopedColumns = async () => {
     await runOptionalStockSchemaQuery('purchase ledger optional columns', `
         ALTER TABLE purchase_ledger
             ADD COLUMN IF NOT EXISTS dealer_id UUID,
+            ADD COLUMN IF NOT EXISTS stock_order_id UUID,
+            ADD COLUMN IF NOT EXISTS company_profile_id UUID,
             ADD COLUMN IF NOT EXISTS vehicle_id UUID REFERENCES vehicles(id) ON DELETE SET NULL,
+            ADD COLUMN IF NOT EXISTS company_name VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS vehicle_label VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS color VARCHAR(120),
+            ADD COLUMN IF NOT EXISTS registration_number VARCHAR(120),
+            ADD COLUMN IF NOT EXISTS chassis_number VARCHAR(160),
+            ADD COLUMN IF NOT EXISTS engine_number VARCHAR(160),
+            ADD COLUMN IF NOT EXISTS purchase_date TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS remaining_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
             ADD COLUMN IF NOT EXISTS payment_date TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS notes TEXT,
+            ADD COLUMN IF NOT EXISTS created_by UUID,
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    `);
+    await runOptionalStockSchemaQuery('purchase ledger required defaults', `
+        UPDATE purchase_ledger
+        SET
+            company_name = COALESCE(company_name, 'Supplier'),
+            vehicle_label = COALESCE(vehicle_label, 'Vehicle'),
+            paid_amount = COALESCE(paid_amount, 0),
+            remaining_amount = COALESCE(remaining_amount, 0),
+            created_at = COALESCE(created_at, NOW()),
+            updated_at = COALESCE(updated_at, NOW())
+    `);
+    await runOptionalStockSchemaQuery('purchase ledger stock order duplicates cleanup', `
+        DELETE FROM purchase_ledger stale
+        USING purchase_ledger keeper
+        WHERE stale.stock_order_id IS NOT NULL
+          AND keeper.stock_order_id = stale.stock_order_id
+          AND (
+              keeper.updated_at > stale.updated_at
+              OR (keeper.updated_at = stale.updated_at AND keeper.id::text > stale.id::text)
+          )
+    `);
+    await runOptionalStockSchemaQuery('purchase ledger stock order unique index', `
+        CREATE UNIQUE INDEX IF NOT EXISTS purchase_ledger_stock_order_id_unique
+        ON purchase_ledger (stock_order_id)
     `);
 };
 
