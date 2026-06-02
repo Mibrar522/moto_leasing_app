@@ -1707,22 +1707,25 @@ exports.getDashboardData = async (req, res) => {
             () => pool.query(
                 `
                 SELECT
-                    COALESCE(pl.id, so.id) AS id,
-                    COALESCE(pl.dealer_id, so.dealer_id) AS dealer_id,
+                    so.id AS id,
+                    so.dealer_id AS dealer_id,
                     so.id AS stock_order_id,
                     so.company_profile_id,
                     received_vehicle.id AS vehicle_id,
-                    COALESCE(pl.company_name, so.company_name, cp.company_name, 'Supplier') AS company_name,
-                    COALESCE(pl.vehicle_label, CONCAT_WS(' / ', so.brand, so.model, so.vehicle_type), 'Vehicle') AS vehicle_label,
-                    COALESCE(pl.color, received_vehicle.color) AS color,
-                    COALESCE(pl.registration_number, received_vehicle.registration_number, so.registration_number) AS registration_number,
-                    COALESCE(pl.chassis_number, received_vehicle.chassis_number, so.chassis_number) AS chassis_number,
-                    COALESCE(pl.engine_number, received_vehicle.engine_number, so.engine_number) AS engine_number,
-                    COALESCE(pl.purchase_date, so.expected_delivery_date, so.created_at) AS purchase_date,
-                    COALESCE(pl.paid_amount, so.paid_amount, 0) AS paid_amount,
-                    COALESCE(pl.remaining_amount, so.remaining_amount, GREATEST(COALESCE(so.total_amount, 0) - COALESCE(so.paid_amount, 0), 0)) AS remaining_amount,
-                    COALESCE(pl.payment_date, so.purchase_paid_at) AS payment_date,
-                    COALESCE(pl.notes, so.notes) AS notes,
+                    COALESCE(so.company_name, cp.company_name, 'Supplier') AS company_name,
+                    COALESCE(NULLIF(CONCAT_WS(' / ', so.brand, so.model, so.vehicle_type), ''), 'Vehicle') AS vehicle_label,
+                    received_vehicle.color AS color,
+                    received_vehicle.registration_number AS registration_number,
+                    received_vehicle.chassis_number AS chassis_number,
+                    received_vehicle.engine_number AS engine_number,
+                    COALESCE(so.order_date, so.expected_delivery_date, so.created_at) AS purchase_date,
+                    COALESCE(so.paid_amount, 0) AS paid_amount,
+                    COALESCE(
+                        so.remaining_amount,
+                        GREATEST(COALESCE(so.total_amount, 0) - COALESCE(so.paid_amount, 0), 0)
+                    ) AS remaining_amount,
+                    so.purchase_paid_at AS payment_date,
+                    so.notes AS notes,
                     cp.contact_person,
                     cp.company_email,
                     cp.phone AS company_phone,
@@ -1731,7 +1734,6 @@ exports.getDashboardData = async (req, res) => {
                     received_vehicle.serial_number,
                     received_vehicle.status AS vehicle_status
                 FROM stock_orders so
-                LEFT JOIN purchase_ledger pl ON pl.stock_order_id = so.id
                 LEFT JOIN company_profiles cp ON cp.id = so.company_profile_id
                 LEFT JOIN LATERAL (
                     SELECT id, registration_number, chassis_number, engine_number, color, image_url, serial_number, status
@@ -1740,8 +1742,10 @@ exports.getDashboardData = async (req, res) => {
                     ORDER BY v.created_at DESC
                     LIMIT 1
                 ) received_vehicle ON true
-                ${hasGlobalScope ? '' : 'WHERE COALESCE(so.dealer_id, pl.dealer_id) = $1'}
-                ORDER BY COALESCE(pl.purchase_date, so.expected_delivery_date, so.created_at) DESC, COALESCE(pl.updated_at, so.updated_at, so.created_at) DESC
+                WHERE so.order_status = 'RECEIVED'
+                  AND COALESCE(so.received_quantity, 0) > 0
+                  ${hasGlobalScope ? '' : 'AND so.dealer_id = $1'}
+                ORDER BY COALESCE(so.order_date, so.expected_delivery_date, so.created_at) DESC, COALESCE(so.updated_at, so.created_at) DESC
                 LIMIT 500
                 `,
                 hasGlobalScope ? [] : [effectiveDealerId]
